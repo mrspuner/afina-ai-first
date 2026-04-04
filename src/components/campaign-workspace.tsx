@@ -24,6 +24,7 @@ import { Step4Limit } from "@/components/steps/step-4-limit";
 import { Step5Upload } from "@/components/steps/step-5-upload";
 import { Step6Summary } from "@/components/steps/step-6-summary";
 import { Step7Processing } from "@/components/steps/step-7-processing";
+import { Step8Result } from "@/components/steps/step-8-result";
 
 function WorkspaceInner() {
   const [currentStep, setCurrentStep] = useState(1);
@@ -36,6 +37,11 @@ function WorkspaceInner() {
 
   function handleStepperClick(step: number) {
     setCurrentStep(Math.max(1, Math.min(step, 8)));
+  }
+
+  function handleLaunchNew() {
+    setStepData(initialStepData);
+    setCurrentStep(1);
   }
 
   function renderStep() {
@@ -54,6 +60,8 @@ function WorkspaceInner() {
         return <Step6Summary data={stepData} onNext={handleNext} />;
       case 7:
         return <Step7Processing data={stepData} onNext={handleNext} />;
+      case 8:
+        return <Step8Result data={stepData} onNext={handleLaunchNew} />;
       default:
         return <div className="text-muted-foreground">Step {currentStep} placeholder</div>;
     }
