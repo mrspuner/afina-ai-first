@@ -18,6 +18,7 @@ import { StepData, initialStepData } from "@/types/campaign";
 
 // Step components — imported one by one as they are built
 import { Step1Scenario } from "@/components/steps/step-1-scenario";
+import { Step2Interests } from "@/components/steps/step-2-interests";
 
 function WorkspaceInner() {
   const [currentStep, setCurrentStep] = useState(1);
@@ -36,6 +37,8 @@ function WorkspaceInner() {
     switch (currentStep) {
       case 1:
         return <Step1Scenario data={stepData} onNext={handleNext} />;
+      case 2:
+        return <Step2Interests data={stepData} onNext={handleNext} />;
       default:
         return <div className="text-muted-foreground">Step {currentStep} placeholder</div>;
     }
