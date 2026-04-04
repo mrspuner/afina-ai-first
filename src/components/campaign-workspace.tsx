@@ -20,6 +20,7 @@ import { StepData, initialStepData } from "@/types/campaign";
 import { Step1Scenario } from "@/components/steps/step-1-scenario";
 import { Step2Interests } from "@/components/steps/step-2-interests";
 import { Step3Segments } from "@/components/steps/step-3-segments";
+import { Step4Limit } from "@/components/steps/step-4-limit";
 
 function WorkspaceInner() {
   const [currentStep, setCurrentStep] = useState(1);
@@ -42,6 +43,8 @@ function WorkspaceInner() {
         return <Step2Interests data={stepData} onNext={handleNext} />;
       case 3:
         return <Step3Segments data={stepData} onNext={handleNext} />;
+      case 4:
+        return <Step4Limit data={stepData} onNext={handleNext} />;
       default:
         return <div className="text-muted-foreground">Step {currentStep} placeholder</div>;
     }
