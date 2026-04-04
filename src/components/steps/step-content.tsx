@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import { useTypewriter } from "@/hooks/use-typewriter";
 
 interface StepContentProps {
@@ -39,13 +39,18 @@ export function StepContent({
         </p>
       </div>
 
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: subtitleDone ? 1 : 0 }}
-        transition={{ duration: 0.35 }}
-      >
-        {children}
-      </motion.div>
+      <AnimatePresence>
+        {subtitleDone && (
+          <motion.div
+            key="content"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.35 }}
+          >
+            {children}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
