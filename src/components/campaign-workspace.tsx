@@ -13,6 +13,7 @@ import {
   PromptInputSubmit,
   PromptInputProvider,
 } from "@/components/ai-elements/prompt-input";
+import { CampaignStepper } from "@/components/campaign-stepper";
 import { StepData, initialStepData } from "@/types/campaign";
 
 // Step components — imported one by one as they are built
@@ -42,7 +43,15 @@ function WorkspaceInner() {
 
   return (
     <div className="relative flex flex-1 flex-col overflow-hidden">
-      {/* Stepper — rendered from step 2 onward (added in Task 4) */}
+      {currentStep >= 2 && (
+        <div className="absolute right-6 top-6 z-10">
+          <CampaignStepper
+            currentStep={currentStep}
+            onStepClick={handleStepperClick}
+            disabled={currentStep === 7}
+          />
+        </div>
+      )}
 
       {/* Animated step area */}
       <div className="flex flex-1 overflow-hidden">
