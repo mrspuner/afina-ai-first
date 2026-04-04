@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Download, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -7,10 +8,11 @@ import { StepContent } from "@/components/steps/step-content";
 import { StepProps } from "@/types/campaign";
 
 export function Step8Result({ data, onNext }: StepProps) {
-  // Mock signal count: 80–95% of limit
-  const signalCount = data.signalLimit
-    ? Math.floor(data.signalLimit * (0.8 + Math.random() * 0.15))
-    : 0;
+  const [signalCount] = useState(() =>
+    data.signalLimit
+      ? Math.floor(data.signalLimit * (0.8 + Math.random() * 0.15))
+      : 0
+  );
 
   function handleDownload() {
     console.log("Download signals", { signalCount, data });

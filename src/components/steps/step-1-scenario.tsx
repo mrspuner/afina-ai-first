@@ -55,6 +55,7 @@ export function Step1Scenario({ data, onNext }: StepProps) {
         {SCENARIOS.map((s) => (
           <button
             key={s.id}
+            type="button"
             onClick={() => handleSelect(s.id, s.name)}
             className={cn(
               "flex flex-col items-start rounded-lg border p-4 text-left transition-all",

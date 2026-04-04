@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Mic } from "lucide-react";
 import {
@@ -30,19 +30,19 @@ function WorkspaceInner() {
   const [currentStep, setCurrentStep] = useState(1);
   const [stepData, setStepData] = useState<StepData>(initialStepData);
 
-  function handleNext(partial: Partial<StepData>) {
+  const handleNext = useCallback((partial: Partial<StepData>) => {
     setStepData((prev) => ({ ...prev, ...partial }));
     setCurrentStep((prev) => Math.min(prev + 1, 8));
-  }
+  }, []);
 
   function handleStepperClick(step: number) {
     setCurrentStep(Math.max(1, Math.min(step, 8)));
   }
 
-  function handleLaunchNew() {
+  const handleLaunchNew = useCallback(() => {
     setStepData(initialStepData);
     setCurrentStep(1);
-  }
+  }, []);
 
   function renderStep() {
     switch (currentStep) {
@@ -85,8 +85,7 @@ function WorkspaceInner() {
           <motion.div
             key={currentStep}
             className="flex flex-1 flex-col items-center justify-center overflow-y-auto px-8 py-10"
-            exit={{ y: -60, opacity: 0 }}
-            transition={{ duration: 0.22, ease: "easeIn" }}
+            exit={{ y: -60, opacity: 0, transition: { duration: 0.22, ease: "easeOut" } }}
           >
             {renderStep()}
           </motion.div>

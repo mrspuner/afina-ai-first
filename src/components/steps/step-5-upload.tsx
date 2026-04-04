@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StepContent } from "@/components/steps/step-content";
@@ -23,19 +23,18 @@ function HashingLoader({
   const stage = HASHING_STAGES[stageIndex];
   const { displayed, isDone } = useTypewriter(stage.text, 30);
 
-  const advancedRef = useRef(false);
-  if (isDone && !advancedRef.current) {
-    advancedRef.current = true;
+  useEffect(() => {
+    if (!isDone) return;
     const remaining = stage.duration - stage.text.length * 30;
-    setTimeout(() => {
+    const id = setTimeout(() => {
       if (stageIndex < HASHING_STAGES.length - 1) {
         setStageIndex((i) => i + 1);
-        advancedRef.current = false;
       } else {
         onComplete();
       }
     }, Math.max(remaining, 300));
-  }
+    return () => clearTimeout(id);
+  }, [isDone, stageIndex, stage.duration, stage.text.length, onComplete]);
 
   return (
     <div className="flex flex-col items-center gap-3 py-8">
