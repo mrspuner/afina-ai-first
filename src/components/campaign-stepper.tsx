@@ -39,7 +39,7 @@ export function CampaignStepper({
               <div
                 className={cn(
                   "w-px flex-1",
-                  idx === 0 ? "invisible" : isCompleted ? "bg-primary" : "bg-border"
+                  idx === 0 ? "invisible" : isCompleted || isActive ? "bg-primary" : "bg-border"
                 )}
               />
               {/* Circle */}
