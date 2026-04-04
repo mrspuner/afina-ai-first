@@ -23,6 +23,7 @@ import { Step3Segments } from "@/components/steps/step-3-segments";
 import { Step4Limit } from "@/components/steps/step-4-limit";
 import { Step5Upload } from "@/components/steps/step-5-upload";
 import { Step6Summary } from "@/components/steps/step-6-summary";
+import { Step7Processing } from "@/components/steps/step-7-processing";
 
 function WorkspaceInner() {
   const [currentStep, setCurrentStep] = useState(1);
@@ -51,6 +52,8 @@ function WorkspaceInner() {
         return <Step5Upload data={stepData} onNext={handleNext} />;
       case 6:
         return <Step6Summary data={stepData} onNext={handleNext} />;
+      case 7:
+        return <Step7Processing data={stepData} onNext={handleNext} />;
       default:
         return <div className="text-muted-foreground">Step {currentStep} placeholder</div>;
     }
