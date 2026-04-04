@@ -24,11 +24,11 @@ function WorkspaceInner() {
 
   function handleNext(partial: Partial<StepData>) {
     setStepData((prev) => ({ ...prev, ...partial }));
-    setCurrentStep((prev) => prev + 1);
+    setCurrentStep((prev) => Math.min(prev + 1, 8));
   }
 
   function handleStepperClick(step: number) {
-    setCurrentStep(step);
+    setCurrentStep(Math.max(1, Math.min(step, 8)));
   }
 
   function renderStep() {
