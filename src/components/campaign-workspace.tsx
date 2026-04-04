@@ -29,17 +29,21 @@ import { Step8Result } from "@/components/steps/step-8-result";
 function WorkspaceInner() {
   const [currentStep, setCurrentStep] = useState(1);
   const [stepData, setStepData] = useState<StepData>(initialStepData);
+  const [direction, setDirection] = useState<1 | -1>(1);
 
   const handleNext = useCallback((partial: Partial<StepData>) => {
+    setDirection(1);
     setStepData((prev) => ({ ...prev, ...partial }));
     setCurrentStep((prev) => Math.min(prev + 1, 8));
   }, []);
 
-  function handleStepperClick(step: number) {
+  const handleStepperClick = useCallback((step: number) => {
+    setDirection(step > currentStep ? 1 : -1);
     setCurrentStep(Math.max(1, Math.min(step, 8)));
-  }
+  }, [currentStep]);
 
   const handleLaunchNew = useCallback(() => {
+    setDirection(-1);
     setStepData(initialStepData);
     setCurrentStep(1);
   }, []);
@@ -84,8 +88,12 @@ function WorkspaceInner() {
         <AnimatePresence mode="wait">
           <motion.div
             key={currentStep}
+            custom={direction}
+            initial={{ y: direction === 1 ? "60%" : "-60%", opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: direction === 1 ? "-60%" : "60%", opacity: 0 }}
+            transition={{ duration: 0.35, ease: "easeInOut" }}
             className="flex flex-1 flex-col items-center justify-center overflow-y-auto px-8 py-10"
-            exit={{ y: -60, opacity: 0, transition: { duration: 0.22, ease: "easeOut" } }}
           >
             {renderStep()}
           </motion.div>
