@@ -17,7 +17,7 @@ import { CampaignStepper } from "@/components/campaign-stepper";
 import { StepData, initialStepData } from "@/types/campaign";
 
 // Step components — imported one by one as they are built
-// import { Step1Scenario } from "@/components/steps/step-1-scenario";
+import { Step1Scenario } from "@/components/steps/step-1-scenario";
 
 function WorkspaceInner() {
   const [currentStep, setCurrentStep] = useState(1);
@@ -35,7 +35,7 @@ function WorkspaceInner() {
   function renderStep() {
     switch (currentStep) {
       case 1:
-        return <div className="text-muted-foreground">Step 1 placeholder</div>;
+        return <Step1Scenario data={stepData} onNext={handleNext} />;
       default:
         return <div className="text-muted-foreground">Step {currentStep} placeholder</div>;
     }
