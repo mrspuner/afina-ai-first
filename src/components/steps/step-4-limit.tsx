@@ -13,55 +13,60 @@ const SEGMENT_PRICES: Record<string, number> = {
   medium: 0.07,
 };
 
-function calcCost(segments: string[], limit: number | null): string {
-  if (!limit || segments.length === 0) return "—";
-  const prices = segments.map((s) => SEGMENT_PRICES[s] ?? 0);
-  const min = Math.min(...prices);
-  const max = Math.max(...prices);
-  if (min === max) return `€ ${(max * limit).toFixed(2)}`;
-  return `€ ${(min * limit).toFixed(2)} – € ${(max * limit).toFixed(2)}`;
+function calcSignals(segments: string[], budget: number): string {
+  if (segments.length === 0) return "—";
+  const prices = segments.map((s) => SEGMENT_PRICES[s] ?? 0).filter(Boolean);
+  if (prices.length === 0) return "—";
+  const minPrice = Math.min(...prices);
+  const maxPrice = Math.max(...prices);
+  const maxSignals = Math.floor(budget / minPrice);
+  const minSignals = Math.floor(budget / maxPrice);
+  if (minSignals === maxSignals) return `${maxSignals.toLocaleString("ru")} сигналов`;
+  return `${minSignals.toLocaleString("ru")} – ${maxSignals.toLocaleString("ru")} сигналов`;
 }
 
 export function Step4Limit({ data, onNext }: StepProps) {
   const [value, setValue] = useState<string>(
-    data.signalLimit ? String(data.signalLimit) : ""
+    data.budget ? String(data.budget) : ""
   );
 
-  const parsed = parseInt(value, 10);
+  const parsed = parseFloat(value);
   const isValid = !isNaN(parsed) && parsed > 0;
-  const estimatedCost = calcCost(data.segments, isValid ? parsed : null);
+  const estimatedSignals = calcSignals(data.segments, isValid ? parsed : 0);
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const raw = e.target.value.replace(/[^0-9]/g, "");
+    const raw = e.target.value.replace(/[^0-9.,]/g, "").replace(",", ".");
     setValue(raw);
   }
 
   return (
     <StepContent
-      title="Укажите лимит сигналов"
-      subtitle="Мы остановимся, как только наберём нужное количество"
+      title="Укажите максимальный бюджет"
+      subtitle="Мы найдём максимальное количество сигналов в рамках этой суммы"
       maxWidth="max-w-md"
     >
       <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-1.5">
           <Input
             type="text"
-            inputMode="numeric"
-            placeholder="Например, 1000"
+            inputMode="decimal"
+            placeholder="Например, 500"
             value={value}
             onChange={handleChange}
             className="text-lg"
           />
           <p className="text-sm text-muted-foreground">
-            Ориентировочная стоимость:{" "}
-            <span className="font-medium text-foreground">{estimatedCost}</span>
+            Максимальное количество сигналов:{" "}
+            <span className="font-medium text-foreground">
+              {isValid ? estimatedSignals : "—"}
+            </span>
           </p>
         </div>
 
         <div className="flex justify-end">
           <Button
             disabled={!isValid}
-            onClick={() => onNext({ signalLimit: parsed })}
+            onClick={() => onNext({ budget: parsed })}
           >
             Далее
           </Button>

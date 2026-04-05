@@ -3,7 +3,7 @@ export interface StepData {
   interests: string[];
   triggers: string[];
   segments: string[];
-  signalLimit: number | null;
+  budget: number | null;
   file: File | null;
 }
 
@@ -12,11 +12,12 @@ export const initialStepData: StepData = {
   interests: [],
   triggers: [],
   segments: [],
-  signalLimit: null,
+  budget: null,
   file: null,
 };
 
 export interface StepProps {
   data: StepData;
   onNext: (partial: Partial<StepData>) => void;
+  onGoToStep?: (step: number) => void;
 }

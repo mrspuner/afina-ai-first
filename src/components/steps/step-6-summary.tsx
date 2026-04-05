@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { StepContent } from "@/components/steps/step-content";
 import { StepProps } from "@/types/campaign";
+import { cn } from "@/lib/utils";
 
 const SCENARIO_NAMES: Record<string, string> = {
   registration: "Регистрация",
@@ -28,43 +29,64 @@ const SEGMENT_PRICES: Record<string, number> = {
   medium: 0.07,
 };
 
-function SummaryRow({ label, value }: { label: string; value: string }) {
+function SummaryRow({
+  label,
+  value,
+  onClick,
+}: {
+  label: string;
+  value: string;
+  onClick?: () => void;
+}) {
   return (
-    <div className="flex items-start justify-between gap-4 py-3">
+    <div
+      onClick={onClick}
+      className={cn(
+        "flex items-start justify-between gap-4 py-3 transition-colors",
+        onClick && "cursor-pointer rounded px-2 -mx-2 hover:bg-accent"
+      )}
+    >
       <span className="shrink-0 text-sm text-muted-foreground">{label}</span>
-      <span className="text-right text-sm font-medium text-foreground">{value}</span>
+      <span className="text-right text-sm font-medium text-foreground">
+        {value}
+      </span>
     </div>
   );
 }
 
-export function Step6Summary({ data, onNext }: StepProps) {
-  const limit = data.signalLimit ?? 0;
-  const prices = data.segments.map((s) => SEGMENT_PRICES[s] ?? 0);
-  const minCost = prices.length ? Math.min(...prices) * limit : 0;
-  const maxCost = prices.length ? Math.max(...prices) * limit : 0;
-  const costStr =
-    minCost === maxCost
-      ? `€ ${minCost.toFixed(2)}`
-      : `€ ${minCost.toFixed(2)} – € ${maxCost.toFixed(2)}`;
+export function Step6Summary({ data, onNext, onGoToStep }: StepProps) {
+  const budget = data.budget ?? 0;
+  const prices = data.segments.map((s) => SEGMENT_PRICES[s] ?? 0).filter(Boolean);
+  const minSignals = prices.length ? Math.floor(budget / Math.max(...prices)) : 0;
+  const maxSignals = prices.length ? Math.floor(budget / Math.min(...prices)) : 0;
+  const signalsStr =
+    minSignals === maxSignals
+      ? `${maxSignals.toLocaleString("ru")} сигналов`
+      : `${minSignals.toLocaleString("ru")} – ${maxSignals.toLocaleString("ru")} сигналов`;
+
+  const goto = onGoToStep;
 
   return (
     <StepContent
       title="Проверьте настройки кампании"
-      subtitle="Если что-то нужно изменить — вернитесь к нужному шагу через навигацию"
+      subtitle="Нажмите на строку, чтобы вернуться к шагу для редактирования"
     >
       <div className="rounded-lg border border-border bg-card">
         <div className="divide-y divide-border px-4">
           <SummaryRow
             label="Сценарий"
             value={SCENARIO_NAMES[data.scenario ?? ""] ?? "—"}
+            onClick={goto ? () => goto(1) : undefined}
           />
           <SummaryRow
             label="Интересы"
             value={data.interests.length ? data.interests.join(", ") : "—"}
+            onClick={goto ? () => goto(2) : undefined}
           />
           <SummaryRow
             label="Триггеры"
             value={data.triggers.length ? data.triggers.join(", ") : "—"}
+            onClick={goto ? () => goto(2) : undefined}
           />
           <SummaryRow
             label="Сегменты"
@@ -73,15 +95,21 @@ export function Step6Summary({ data, onNext }: StepProps) {
                 ? data.segments.map((s) => SEGMENT_NAMES[s]).join("; ")
                 : "—"
             }
+            onClick={goto ? () => goto(3) : undefined}
           />
           <SummaryRow
-            label="Лимит сигналов"
-            value={limit ? `${limit.toLocaleString("ru")} сигналов` : "—"}
+            label="Максимальный бюджет"
+            value={budget ? `€ ${budget.toFixed(2)}` : "—"}
+            onClick={goto ? () => goto(4) : undefined}
           />
-          <SummaryRow label="Ориентировочная стоимость" value={costStr} />
+          <SummaryRow
+            label="Максимум сигналов"
+            value={budget && prices.length ? signalsStr : "—"}
+          />
           <SummaryRow
             label="Файл с базой"
             value={data.file ? data.file.name : "—"}
+            onClick={goto ? () => goto(5) : undefined}
           />
         </div>
       </div>

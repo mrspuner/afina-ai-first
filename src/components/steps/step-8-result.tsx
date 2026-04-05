@@ -9,8 +9,8 @@ import { StepProps } from "@/types/campaign";
 
 export function Step8Result({ data, onNext }: StepProps) {
   const [signalCount] = useState(() =>
-    data.signalLimit
-      ? Math.floor(data.signalLimit * (0.8 + Math.random() * 0.15))
+    data.budget
+      ? Math.floor(data.budget * (0.8 + Math.random() * 0.15))
       : 0
   );
 
