@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useState } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { useCallback, useRef, useState } from "react";
+import { motion } from "motion/react";
 import { Mic } from "lucide-react";
 import {
   PromptInput,
@@ -15,8 +15,6 @@ import {
 } from "@/components/ai-elements/prompt-input";
 import { CampaignStepper } from "@/components/campaign-stepper";
 import { StepData, initialStepData } from "@/types/campaign";
-
-// Step components — imported one by one as they are built
 import { Step1Scenario } from "@/components/steps/step-1-scenario";
 import { Step2Interests } from "@/components/steps/step-2-interests";
 import { Step3Segments } from "@/components/steps/step-3-segments";
@@ -28,48 +26,71 @@ import { Step8Result } from "@/components/steps/step-8-result";
 
 function WorkspaceInner() {
   const [currentStep, setCurrentStep] = useState(1);
+  const [maxStep, setMaxStep] = useState(1);
+  const [animatingStep, setAnimatingStep] = useState<number | null>(1);
   const [stepData, setStepData] = useState<StepData>(initialStepData);
-  const [direction, setDirection] = useState<1 | -1>(1);
+  const stepRefs = useRef<Record<number, HTMLDivElement | null>>({});
 
-  const handleNext = useCallback((partial: Partial<StepData>) => {
-    setDirection(1);
-    setStepData((prev) => ({ ...prev, ...partial }));
-    setCurrentStep((prev) => Math.min(prev + 1, 8));
-  }, []);
+  function scrollToStep(step: number, behavior: ScrollBehavior = "smooth") {
+    stepRefs.current[step]?.scrollIntoView({ behavior, block: "start" });
+  }
+
+  const handleNext = useCallback(
+    (partial: Partial<StepData>) => {
+      setStepData((prev) => ({ ...prev, ...partial }));
+      const next = currentStep + 1;
+      if (next > maxStep) {
+        // First time reaching this step — animate it in
+        setMaxStep(next);
+        setAnimatingStep(next);
+        setCurrentStep(next);
+        requestAnimationFrame(() => scrollToStep(next, "smooth"));
+      } else {
+        // Returning scenario — step already rendered, just scroll
+        setAnimatingStep(null);
+        setCurrentStep(next);
+        requestAnimationFrame(() => scrollToStep(next, "smooth"));
+      }
+    },
+    [currentStep, maxStep]
+  );
 
   const handleStepperClick = useCallback((step: number) => {
-    setDirection(step > currentStep ? 1 : -1);
-    setCurrentStep(Math.max(1, Math.min(step, 8)));
-  }, [currentStep]);
-
-  const handleLaunchNew = useCallback(() => {
-    setDirection(-1);
-    setStepData(initialStepData);
-    setCurrentStep(1);
+    setAnimatingStep(null);
+    setCurrentStep(step);
+    requestAnimationFrame(() => scrollToStep(step, "instant"));
   }, []);
 
-  function renderStep() {
-    switch (currentStep) {
-      case 1:
-        return <Step1Scenario data={stepData} onNext={handleNext} />;
-      case 2:
-        return <Step2Interests data={stepData} onNext={handleNext} />;
-      case 3:
-        return <Step3Segments data={stepData} onNext={handleNext} />;
-      case 4:
-        return <Step4Limit data={stepData} onNext={handleNext} />;
-      case 5:
-        return <Step5Upload data={stepData} onNext={handleNext} />;
-      case 6:
-        return <Step6Summary data={stepData} onNext={handleNext} />;
-      case 7:
-        return <Step7Processing data={stepData} onNext={handleNext} />;
-      case 8:
-        return <Step8Result data={stepData} onNext={handleLaunchNew} />;
-      default:
-        return <div className="text-muted-foreground">Step {currentStep} placeholder</div>;
+  const handleGoToStep = useCallback((step: number) => {
+    setAnimatingStep(null);
+    setCurrentStep(step);
+    requestAnimationFrame(() => scrollToStep(step, "smooth"));
+  }, []);
+
+  const handleLaunchNew = useCallback(() => {
+    setStepData(initialStepData);
+    setCurrentStep(1);
+    setMaxStep(1);
+    setAnimatingStep(1);
+    requestAnimationFrame(() => scrollToStep(1, "instant"));
+  }, []);
+
+  function renderStepContent(step: number) {
+    const props = { data: stepData, onNext: handleNext };
+    switch (step) {
+      case 1: return <Step1Scenario {...props} />;
+      case 2: return <Step2Interests {...props} />;
+      case 3: return <Step3Segments {...props} />;
+      case 4: return <Step4Limit {...props} />;
+      case 5: return <Step5Upload {...props} />;
+      case 6: return <Step6Summary {...props} onGoToStep={handleGoToStep} />;
+      case 7: return <Step7Processing {...props} />;
+      case 8: return <Step8Result data={stepData} onNext={handleLaunchNew} />;
+      default: return null;
     }
   }
+
+  const visibleSteps = Array.from({ length: maxStep }, (_, i) => i + 1);
 
   return (
     <div className="relative flex flex-1 flex-col overflow-hidden">
@@ -83,24 +104,23 @@ function WorkspaceInner() {
         </div>
       )}
 
-      {/* Animated step area */}
-      <div className="flex flex-1 overflow-hidden">
-        <AnimatePresence mode="wait">
+      {/* Scrollable step column */}
+      <div className="flex flex-1 flex-col overflow-y-auto">
+        {visibleSteps.map((step) => (
           <motion.div
-            key={currentStep}
-            custom={direction}
-            initial={{ y: direction === 1 ? "60%" : "-60%", opacity: 0 }}
+            key={step}
+            ref={(el) => { stepRefs.current[step] = el; }}
+            initial={step === animatingStep ? { y: 60, opacity: 0 } : false}
             animate={{ y: 0, opacity: 1 }}
-            exit={{ y: direction === 1 ? "-60%" : "60%", opacity: 0 }}
-            transition={{ duration: 0.35, ease: "easeInOut" }}
-            className="flex flex-1 flex-col items-center justify-center overflow-y-auto px-8 py-10"
+            transition={{ duration: 0.35, ease: "easeOut" }}
+            className="flex min-h-screen flex-col items-center justify-center px-8 py-10"
           >
-            {renderStep()}
+            {renderStepContent(step)}
           </motion.div>
-        </AnimatePresence>
+        ))}
       </div>
 
-      {/* Chat input — pinned to bottom, outside animation */}
+      {/* Chat input — pinned to bottom */}
       <div className="border-t border-border bg-background px-8 py-4">
         <div className="mx-auto w-full max-w-2xl">
           <PromptInput
