@@ -22,6 +22,8 @@ function HashingLoader({
   const [stageIndex, setStageIndex] = useState(0);
   const stage = HASHING_STAGES[stageIndex];
   const { displayed, isDone } = useTypewriter(stage.text, 30);
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
 
   useEffect(() => {
     if (!isDone) return;
@@ -30,11 +32,12 @@ function HashingLoader({
       if (stageIndex < HASHING_STAGES.length - 1) {
         setStageIndex((i) => i + 1);
       } else {
-        onComplete();
+        onCompleteRef.current();
       }
     }, Math.max(remaining, 300));
     return () => clearTimeout(id);
-  }, [isDone, stageIndex, stage.duration, stage.text.length, onComplete]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDone, stageIndex, stage.duration, stage.text.length]);
 
   return (
     <div className="flex flex-col items-center gap-3 py-8">

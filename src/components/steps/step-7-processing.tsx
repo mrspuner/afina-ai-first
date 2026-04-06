@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { StepContent } from "@/components/steps/step-content";
 import { StepProps } from "@/types/campaign";
@@ -10,6 +10,8 @@ const TICK = 50;
 
 export function Step7Processing({ data, onNext }: StepProps) {
   const [progress, setProgress] = useState(0);
+  const onNextRef = useRef(onNext);
+  onNextRef.current = onNext;
 
   useEffect(() => {
     const steps = TOTAL_DURATION / TICK;
@@ -19,11 +21,12 @@ export function Step7Processing({ data, onNext }: StepProps) {
       setProgress(Math.min((count / steps) * 100, 100));
       if (count >= steps) {
         clearInterval(id);
-        setTimeout(() => onNext({}), 200);
+        setTimeout(() => onNextRef.current({}), 200);
       }
     }, TICK);
     return () => clearInterval(id);
-  }, [onNext]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <StepContent
