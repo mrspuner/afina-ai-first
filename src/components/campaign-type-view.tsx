@@ -42,10 +42,10 @@ interface CampaignTypeViewProps {
 
 export function CampaignTypeView({ onSelect, campaign }: CampaignTypeViewProps) {
   return (
-    <div className="flex flex-1 flex-col overflow-y-auto px-8 pb-40 pt-10">
+    <div className="flex flex-1 flex-col overflow-y-auto px-8 pb-40 pt-[140px]">
       <div className="mx-auto flex w-full max-w-2xl flex-col">
         {/* Section header */}
-        <h1 className="mb-6 text-[38px] font-semibold leading-[46px] tracking-tight">
+        <h1 className="mb-6 text-center text-[38px] font-semibold leading-[46px] tracking-tight">
           Кампании
         </h1>
 

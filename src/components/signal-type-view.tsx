@@ -27,10 +27,10 @@ export function SignalTypeView({ onCreateSignal, signal, onLaunchCampaign }: Sig
     : null;
 
   return (
-    <div className="flex flex-1 flex-col overflow-y-auto px-8 pb-40 pt-10">
+    <div className="flex flex-1 flex-col overflow-y-auto px-8 pb-40 pt-[140px]">
       <div className="mx-auto flex w-full max-w-2xl flex-col">
         {/* Section header */}
-        <h1 className="mb-6 text-[38px] font-semibold leading-[46px] tracking-tight">
+        <h1 className="mb-6 text-center text-[38px] font-semibold leading-[46px] tracking-tight">
           Сигналы
         </h1>
 
@@ -61,7 +61,7 @@ export function SignalTypeView({ onCreateSignal, signal, onLaunchCampaign }: Sig
 
         {/* Empty state / create button */}
         {!signal ? (
-          <div className="flex flex-1 flex-col items-center justify-center pt-20">
+          <div className="fixed inset-0 left-[120px] flex flex-col items-center justify-center">
             <p className="mb-4 max-w-sm text-center text-sm text-muted-foreground">
               Вы не создали ещё ни одного сигнала. Перед тем как запустить кампанию,
               сформируйте первый сигнал.
