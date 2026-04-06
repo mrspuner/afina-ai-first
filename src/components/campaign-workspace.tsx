@@ -13,7 +13,7 @@ import { Step6Summary } from "@/components/steps/step-6-summary";
 import { Step7Processing } from "@/components/steps/step-7-processing";
 import { Step8Result } from "@/components/steps/step-8-result";
 
-function WorkspaceInner({ onSignalComplete }: { onSignalComplete?: () => void }) {
+function WorkspaceInner({ onSignalComplete, onStep8Reached }: { onSignalComplete?: () => void; onStep8Reached?: () => void }) {
   const [currentStep, setCurrentStep] = useState(1);
   const [maxStep, setMaxStep] = useState(1);
   const [animatingStep, setAnimatingStep] = useState<number | null>(1);
@@ -41,13 +41,14 @@ function WorkspaceInner({ onSignalComplete }: { onSignalComplete?: () => void })
         setMaxStep(next);
         setAnimatingStep(next);
         setCurrentStep(next);
+        if (next === 8) onStep8Reached?.();
       } else {
         setAnimatingStep(null);
         setCurrentStep(next);
       }
       pendingScroll.current = { step: next, behavior: "smooth" };
     },
-    [currentStep, maxStep]
+    [currentStep, maxStep, onStep8Reached]
   );
 
   const handleStepperClick = useCallback((step: number) => {
@@ -119,6 +120,6 @@ function WorkspaceInner({ onSignalComplete }: { onSignalComplete?: () => void })
   );
 }
 
-export function CampaignWorkspace({ onSignalComplete }: { onSignalComplete?: () => void } = {}) {
-  return <WorkspaceInner onSignalComplete={onSignalComplete} />;
+export function CampaignWorkspace({ onSignalComplete, onStep8Reached }: { onSignalComplete?: () => void; onStep8Reached?: () => void } = {}) {
+  return <WorkspaceInner onSignalComplete={onSignalComplete} onStep8Reached={onStep8Reached} />;
 }

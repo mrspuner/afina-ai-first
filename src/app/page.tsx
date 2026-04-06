@@ -58,9 +58,14 @@ export default function Home() {
     setFlowPhase("signal");
   }
 
-  // Step 8 "Запустить кампанию" → signal done, step 2 now active
-  function handleSignalComplete() {
+  // Step 8 activates (counter shows) → animate Step 2 badge
+  function handleStep8Reached() {
     setFlowPhase("awaiting-campaign");
+  }
+
+  // Step 8 "Запустить кампанию" button → go to campaign selection
+  function handleSignalComplete() {
+    setFlowPhase("campaign");
   }
 
   // Step 2 badge clicked → open campaign type selection
@@ -116,7 +121,7 @@ export default function Home() {
   function renderMain() {
     // Guided signal flow (CampaignWorkspace persists through awaiting-campaign so step 8 stays visible)
     if (flowPhase === "signal" || flowPhase === "awaiting-campaign") {
-      return <CampaignWorkspace onSignalComplete={handleSignalComplete} />;
+      return <CampaignWorkspace onSignalComplete={handleSignalComplete} onStep8Reached={handleStep8Reached} />;
     }
     // Guided campaign flow
     if (flowPhase === "campaign" && !selectedCampaign) {
