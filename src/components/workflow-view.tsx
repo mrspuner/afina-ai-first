@@ -1,7 +1,7 @@
 // src/components/workflow-view.tsx
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { WorkflowGraph } from "@/components/workflow-graph";
 import { WorkflowStatus } from "@/components/workflow-status";
@@ -11,6 +11,7 @@ import {
   parseWorkflowCommand,
 } from "@/types/workflow";
 import type { WorkflowNode, WorkflowEdge } from "@/types/workflow";
+import { useState } from "react";
 
 interface GraphState {
   nodes: WorkflowNode[];
@@ -36,11 +37,19 @@ export function WorkflowView({
   });
   const [unknownCmd, setUnknownCmd] = useState<string | null>(null);
   const unknownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const graphRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!pendingCommand) return;
     const updater = parseWorkflowCommand(pendingCommand);
     if (updater) {
+      // Flash the graph, then apply the update
+      const el = graphRef.current;
+      if (el) {
+        el.classList.remove("wf-graph-flash");
+        void el.offsetHeight; // force reflow
+        el.classList.add("wf-graph-flash");
+      }
       setGraph((prev) => updater(prev.nodes, prev.edges));
     } else {
       if (unknownTimerRef.current) clearTimeout(unknownTimerRef.current);
@@ -59,19 +68,32 @@ export function WorkflowView({
 
   return (
     <div className="relative flex flex-1 flex-col overflow-hidden">
-      <AnimatePresence mode="wait">
-        {!launched ? (
+      {/* Graph — shrinks when launched to make room for status */}
+      <motion.div
+        layout
+        className="flex flex-col"
+        animate={launched ? { flex: "0 0 52%" } : { flex: "1 1 0%" }}
+        transition={{ duration: 0.55, ease: [0.32, 0.72, 0, 1] }}
+        style={{ minHeight: 0 }}
+      >
+        <div ref={graphRef} className="flex flex-1 flex-col">
+          <WorkflowGraph nodes={graph.nodes} edges={graph.edges} />
+        </div>
+      </motion.div>
+
+      {/* Status — slides in below the graph */}
+      <AnimatePresence>
+        {launched && (
           <motion.div
-            key="graph"
-            className="flex flex-1 flex-col"
-            initial={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
+            key="status"
+            initial={{ opacity: 0, y: 32 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 32 }}
+            transition={{ duration: 0.5, ease: [0.32, 0.72, 0, 1], delay: 0.2 }}
+            className="flex shrink-0 flex-col items-center justify-center py-8"
           >
-            <WorkflowGraph nodes={graph.nodes} edges={graph.edges} />
+            <WorkflowStatus onGoToStats={onGoToStats} />
           </motion.div>
-        ) : (
-          <WorkflowStatus key="status" onGoToStats={onGoToStats} />
         )}
       </AnimatePresence>
 
@@ -81,6 +103,17 @@ export function WorkflowView({
           {unknownCmd}
         </div>
       )}
+
+      <style>{`
+        @keyframes wf-graph-flash {
+          0%   { opacity: 1; }
+          25%  { opacity: 0.45; }
+          100% { opacity: 1; }
+        }
+        .wf-graph-flash {
+          animation: wf-graph-flash 0.4s ease-out;
+        }
+      `}</style>
     </div>
   );
 }

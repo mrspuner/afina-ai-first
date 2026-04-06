@@ -1,8 +1,9 @@
 "use client";
 
+import { motion } from "motion/react";
 import { Handle, Position } from "@xyflow/react";
 import type { NodeProps } from "@xyflow/react";
-import type { WorkflowNodeData, WorkflowNodeType } from "@/types/workflow";
+import type { WorkflowNode, WorkflowNodeType } from "@/types/workflow";
 
 const STYLES: Record<WorkflowNodeType, { border: string; bg: string; color: string }> = {
   default:  { border: "#2a2a2a", bg: "#111111", color: "#e5e5e5" },
@@ -20,16 +21,20 @@ const HANDLE_STYLE = {
   height: 8,
 };
 
-export function WorkflowNodeComponent({ data }: NodeProps<WorkflowNodeData>) {
+export function WorkflowNodeComponent({ data }: NodeProps<WorkflowNode>) {
   const s = STYLES[data.nodeType] ?? STYLES.default;
   return (
-    <div
+    <motion.div
+      initial={{ opacity: 0, scale: 0.88 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.25, ease: "easeOut" }}
       style={{
         border: `1px solid ${s.border}`,
         background: s.bg,
         borderRadius: 8,
         padding: "10px 14px",
         minWidth: 110,
+        transition: "border-color 0.3s ease, background 0.3s ease",
       }}
     >
       <Handle type="target" position={Position.Left} style={HANDLE_STYLE} />
@@ -40,16 +45,17 @@ export function WorkflowNodeComponent({ data }: NodeProps<WorkflowNodeData>) {
           color: s.color,
           whiteSpace: "nowrap",
           lineHeight: "1.4",
+          transition: "color 0.3s ease",
         }}
       >
         {data.label}
       </div>
       {data.sublabel && (
-        <div style={{ fontSize: 10, color: "#555", marginTop: 2 }}>
+        <div style={{ fontSize: 10, color: "rgba(255,255,255,0.55)", marginTop: 2 }}>
           {data.sublabel}
         </div>
       )}
       <Handle type="source" position={Position.Right} style={HANDLE_STYLE} />
-    </div>
+    </motion.div>
   );
 }

@@ -2,7 +2,6 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { motion } from "motion/react";
 
 interface CounterCardProps {
   label: string;
@@ -53,12 +52,7 @@ interface WorkflowStatusProps {
 
 export function WorkflowStatus({ onGoToStats }: WorkflowStatusProps) {
   return (
-    <motion.div
-      className="flex flex-1 flex-col items-center justify-center gap-6"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.4 }}
-    >
+    <div className="flex flex-col items-center gap-6">
       {/* Status badge */}
       <div className="flex items-center gap-2 rounded-full border border-[#14532d] bg-[#030d06] px-4 py-1.5">
         <span
@@ -90,6 +84,6 @@ export function WorkflowStatus({ onGoToStats }: WorkflowStatusProps) {
           50% { opacity: 0.35; }
         }
       `}</style>
-    </motion.div>
+    </div>
   );
 }

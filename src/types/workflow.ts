@@ -35,7 +35,7 @@ function makeNode(
   return { id, type: "workflowNode", position: { x, y }, data: { label, nodeType, sublabel } };
 }
 
-const LABEL_STYLE = { fill: "#555", fontSize: 10, fontWeight: 500 };
+const LABEL_STYLE = { fill: "rgba(255,255,255,0.65)", fontSize: 10, fontWeight: 500 };
 const LABEL_BG    = { fill: "transparent", fillOpacity: 0 };
 
 function makeEdge(source: string, target: string, label?: string): WorkflowEdge {
@@ -43,7 +43,7 @@ function makeEdge(source: string, target: string, label?: string): WorkflowEdge 
     id: `${source}-${target}`,
     source,
     target,
-    type: "smoothstep",
+    type: "default",
     style: { stroke: "#2a2a2a", strokeWidth: 1.5 },
     ...(label ? { label, labelStyle: LABEL_STYLE, labelBgStyle: LABEL_BG } : {}),
   };
