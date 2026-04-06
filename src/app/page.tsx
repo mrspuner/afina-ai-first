@@ -232,13 +232,6 @@ export default function Home() {
       />
     );
     if (activeNav === "Кампании") {
-      if (!signalDone) return (
-        <SignalTypeView
-          onCreateSignal={handleStep1Click}
-          signal={null}
-          onLaunchCampaign={undefined}
-        />
-      );
       return (
         <CampaignTypeView
           onSelect={handleCampaignSelect}
