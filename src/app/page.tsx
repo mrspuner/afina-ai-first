@@ -139,7 +139,7 @@ export default function Home() {
     }
     // Direct sidebar sections
     if (activeNav === "Статистика") return <StatisticsView />;
-    if (activeNav === "Сигналы")    return <SignalTypeView onSelect={() => {}} />;
+    if (activeNav === "Сигналы")    return <SignalTypeView onCreateSignal={handleStep1Click} />;
     if (activeNav === "Кампании")   return <CampaignTypeView onSelect={handleCampaignSelect} />;
     // Welcome
     return <WelcomeView onStep1Click={handleStep1Click} />;
