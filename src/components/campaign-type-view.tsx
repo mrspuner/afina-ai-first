@@ -43,54 +43,50 @@ interface CampaignTypeViewProps {
 export function CampaignTypeView({ onSelect, campaign }: CampaignTypeViewProps) {
   return (
     <div className="flex flex-1 flex-col overflow-y-auto px-8 pb-40 pt-10">
-      {/* Section header */}
-      <div className="mb-6">
-        <h1 className="text-[38px] font-semibold leading-[46px] tracking-tight">
+      <div className="mx-auto flex w-full max-w-2xl flex-col">
+        {/* Section header */}
+        <h1 className="mb-6 text-[38px] font-semibold leading-[46px] tracking-tight">
           Кампании
         </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {campaign ? "1 кампания" : "Нет кампаний"}
-        </p>
-      </div>
 
-      {/* Campaign card */}
-      {campaign && (
-        <div className="mb-6 rounded-xl border border-border bg-card p-5">
-          <div className="flex items-center gap-2">
-            <p className="text-sm font-semibold text-foreground">{campaign.typeName}</p>
-            <span className="rounded-full border border-green-500/30 bg-green-500/10 px-2 py-0.5 text-[11px] font-medium text-green-400">
-              Активна
-            </span>
-          </div>
-          <p className="mt-1 text-xs text-muted-foreground">Запущена {campaign.launchedAt}</p>
-        </div>
-      )}
-
-      {/* Campaign type selection */}
-      <div>
-        {!campaign && (
-          <p className="mb-4 text-sm font-medium text-foreground">Выберите тип кампании</p>
-        )}
+        {/* Campaign card */}
         {campaign && (
-          <p className="mb-4 text-sm font-medium text-foreground">Создать ещё одну кампанию</p>
-        )}
-        <div className="grid grid-cols-3 gap-3">
-          {CAMPAIGNS.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              onClick={() => onSelect?.(c.id, c.name)}
-              className={cn(
-                "flex flex-col items-start rounded-lg border p-4 text-left transition-all",
-                "border-border bg-card hover:bg-accent hover:border-border"
-              )}
-            >
-              <span className="text-sm font-medium text-foreground">{c.name}</span>
-              <span className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                {c.description}
+          <div className="mb-6 rounded-xl border border-border bg-card p-5">
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-semibold text-foreground">{campaign.typeName}</p>
+              <span className="rounded-full border border-green-500/30 bg-green-500/10 px-2 py-0.5 text-[11px] font-medium text-green-400">
+                Активна
               </span>
-            </button>
-          ))}
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">Запущена {campaign.launchedAt}</p>
+          </div>
+        )}
+
+        {/* Campaign type selection */}
+        <div>
+          {campaign ? (
+            <p className="mb-4 text-sm font-medium text-foreground">Создать ещё одну кампанию</p>
+          ) : (
+            <p className="mb-4 text-sm font-medium text-foreground">Выберите тип кампании</p>
+          )}
+          <div className="grid grid-cols-3 gap-3">
+            {CAMPAIGNS.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => onSelect?.(c.id, c.name)}
+                className={cn(
+                  "flex flex-col items-start rounded-lg border p-4 text-left transition-all",
+                  "border-border bg-card hover:bg-accent hover:border-border"
+                )}
+              >
+                <span className="text-sm font-medium text-foreground">{c.name}</span>
+                <span className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                  {c.description}
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </div>
