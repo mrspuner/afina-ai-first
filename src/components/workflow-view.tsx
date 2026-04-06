@@ -1,7 +1,7 @@
 // src/components/workflow-view.tsx
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { WorkflowGraph } from "@/components/workflow-graph";
 import { WorkflowStatus } from "@/components/workflow-status";
@@ -11,7 +11,6 @@ import {
   parseWorkflowCommand,
 } from "@/types/workflow";
 import type { WorkflowNode, WorkflowEdge } from "@/types/workflow";
-import { useState } from "react";
 
 interface GraphState {
   nodes: WorkflowNode[];
@@ -38,16 +37,16 @@ export function WorkflowView({
   const [unknownCmd, setUnknownCmd] = useState<string | null>(null);
   const unknownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const graphRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!pendingCommand) return;
     const updater = parseWorkflowCommand(pendingCommand);
     if (updater) {
-      // Flash the graph, then apply the update
       const el = graphRef.current;
       if (el) {
         el.classList.remove("wf-graph-flash");
-        void el.offsetHeight; // force reflow
+        void el.offsetHeight;
         el.classList.add("wf-graph-flash");
       }
       setGraph((prev) => updater(prev.nodes, prev.edges));
@@ -59,7 +58,15 @@ export function WorkflowView({
     onCommandHandled();
   }, [pendingCommand, onCommandHandled]);
 
-  // Cleanup timer on unmount
+  // Auto-scroll to show status after launch
+  useEffect(() => {
+    if (!launched) return;
+    const t = setTimeout(() => {
+      scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+    }, 350);
+    return () => clearTimeout(t);
+  }, [launched]);
+
   useEffect(() => {
     return () => {
       if (unknownTimerRef.current) clearTimeout(unknownTimerRef.current);
@@ -67,30 +74,22 @@ export function WorkflowView({
   }, []);
 
   return (
-    <div className="relative flex flex-1 flex-col overflow-hidden">
-      {/* Graph — shrinks when launched to make room for status */}
-      <motion.div
-        layout
-        className="flex flex-col"
-        animate={launched ? { flex: "0 0 52%" } : { flex: "1 1 0%" }}
-        transition={{ duration: 0.55, ease: [0.32, 0.72, 0, 1] }}
-        style={{ minHeight: 0 }}
-      >
-        <div ref={graphRef} className="flex flex-1 flex-col">
-          <WorkflowGraph nodes={graph.nodes} edges={graph.edges} />
-        </div>
-      </motion.div>
+    <div ref={scrollRef} className="relative flex flex-1 flex-col overflow-y-auto">
+      {/* Graph — always occupies the full viewport height of the scroll container */}
+      <div ref={graphRef} className="flex h-full min-h-[360px] flex-shrink-0 flex-col">
+        <WorkflowGraph nodes={graph.nodes} edges={graph.edges} />
+      </div>
 
-      {/* Status — slides in below the graph */}
+      {/* Status — appears below the graph */}
       <AnimatePresence>
         {launched && (
           <motion.div
             key="status"
-            initial={{ opacity: 0, y: 32 }}
+            initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 32 }}
-            transition={{ duration: 0.5, ease: [0.32, 0.72, 0, 1], delay: 0.2 }}
-            className="flex shrink-0 flex-col items-center justify-center py-8"
+            exit={{ opacity: 0, y: 24 }}
+            transition={{ duration: 0.45, ease: [0.32, 0.72, 0, 1] }}
+            className="flex flex-shrink-0 flex-col items-center justify-center py-12"
           >
             <WorkflowStatus onGoToStats={onGoToStats} />
           </motion.div>
