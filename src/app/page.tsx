@@ -1,7 +1,7 @@
 // src/app/page.tsx
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { motion } from "motion/react";
 import { Mic, ChevronRight } from "lucide-react";
 import { AppSidebar } from "@/components/app-sidebar";
@@ -23,12 +23,6 @@ import {
   PromptInputTools,
 } from "@/components/ai-elements/prompt-input";
 import { cn } from "@/lib/utils";
-
-const WELCOME_STEPS = [
-  { n: 1, label: "Получение сигнала",   active: true  },
-  { n: 2, label: "Запуск кампании",     active: false },
-  { n: 3, label: "Статистика кампании", active: false },
-];
 
 interface SelectedCampaign {
   id: string;
@@ -64,9 +58,9 @@ export default function Home() {
     }
   }
 
-  function handleCommandHandled() {
+  const handleCommandHandled = useCallback(() => {
     setWorkflowCommand(null);
-  }
+  }, []);
 
   function handleGoToStats() {
     setActiveNav("Статистика");
@@ -75,6 +69,12 @@ export default function Home() {
   }
 
   const isWorkflow = activeNav === "Кампании" && selectedCampaign !== null;
+
+  const welcomeSteps = [
+    { n: 1, label: "Получение сигнала",   active: activeNav === null },
+    { n: 2, label: "Запуск кампании",     active: isWorkflow && !workflowLaunched },
+    { n: 3, label: "Статистика кампании", active: workflowLaunched },
+  ];
 
   function renderMain() {
     if (activeNav === null) {
@@ -163,13 +163,13 @@ export default function Home() {
 
                 {/* Step badges — always visible */}
                 <div className="flex gap-2">
-                  {WELCOME_STEPS.map(({ n, label, active }) => (
+                  {welcomeSteps.map(({ n, label, active }) => (
                     <button
                       key={n}
                       type="button"
                       disabled={!active}
                       onClick={
-                        active && activeNav === null
+                        n === 1 && active
                           ? () => setActiveNav("Кампании")
                           : undefined
                       }

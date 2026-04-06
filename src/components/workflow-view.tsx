@@ -1,7 +1,7 @@
 // src/components/workflow-view.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { WorkflowGraph } from "@/components/workflow-graph";
 import { WorkflowStatus } from "@/components/workflow-status";
@@ -30,21 +30,32 @@ export function WorkflowView({
   onCommandHandled,
   onGoToStats,
 }: WorkflowViewProps) {
-  // Combined state prevents stale-closure bugs when updater reads both nodes and edges
   const [graph, setGraph] = useState<GraphState>({
     nodes: createBaseNodes(),
     edges: createBaseEdges(),
   });
+  const [unknownCmd, setUnknownCmd] = useState<string | null>(null);
+  const unknownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Process incoming command from the shared chat input
   useEffect(() => {
     if (!pendingCommand) return;
     const updater = parseWorkflowCommand(pendingCommand);
     if (updater) {
       setGraph((prev) => updater(prev.nodes, prev.edges));
+    } else {
+      if (unknownTimerRef.current) clearTimeout(unknownTimerRef.current);
+      setUnknownCmd("Команда не распознана");
+      unknownTimerRef.current = setTimeout(() => setUnknownCmd(null), 2500);
     }
     onCommandHandled();
   }, [pendingCommand, onCommandHandled]);
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (unknownTimerRef.current) clearTimeout(unknownTimerRef.current);
+    };
+  }, []);
 
   return (
     <div className="relative flex flex-1 flex-col overflow-hidden">
@@ -63,6 +74,13 @@ export function WorkflowView({
           <WorkflowStatus key="status" onGoToStats={onGoToStats} />
         )}
       </AnimatePresence>
+
+      {/* Unknown command feedback */}
+      {unknownCmd && (
+        <div className="pointer-events-none absolute bottom-[140px] left-1/2 -translate-x-1/2 rounded-lg border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground">
+          {unknownCmd}
+        </div>
+      )}
     </div>
   );
 }
