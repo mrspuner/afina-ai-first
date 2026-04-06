@@ -94,7 +94,8 @@ export default function Home() {
   const [campaignDone,     setCampaignDone]     = useState(false);
   const [initialScenario,  setInitialScenario]  = useState<{ id: string; name: string } | null>(null);
   const [signalScenarioId, setSignalScenarioId] = useState<string>("");
-  const [signalCreatedAt,  setSignalCreatedAt]  = useState<string>("");
+  const [signalCreatedAt,    setSignalCreatedAt]    = useState<string>("");
+  const [campaignLaunchedAt, setCampaignLaunchedAt] = useState<string>("");
 
   // Sidebar navigation — exits guided flow, goes to standalone section
   function handleNavChange(nav: string) {
@@ -238,7 +239,12 @@ export default function Home() {
           onLaunchCampaign={undefined}
         />
       );
-      return <CampaignTypeView onSelect={handleCampaignSelect} />;
+      return (
+        <CampaignTypeView
+          onSelect={handleCampaignSelect}
+          campaign={campaignDone && selectedCampaign ? { typeName: selectedCampaign.name, launchedAt: campaignLaunchedAt } : null}
+        />
+      );
     }
     // Welcome
     return <WelcomeView onStep1Click={handleStep1Click} />;
@@ -291,7 +297,7 @@ export default function Home() {
                   <div className="flex justify-end">
                     <button
                       type="button"
-                      onClick={() => { setWorkflowLaunched(true); setCampaignDone(true); }}
+                      onClick={() => { setWorkflowLaunched(true); setCampaignDone(true); setCampaignLaunchedAt(new Date().toLocaleDateString("ru-RU")); }}
                       className="rounded-lg bg-foreground px-5 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90"
                     >
                       Начать кампанию →
