@@ -111,35 +111,35 @@ export function parseWorkflowCommand(msg: string): CommandUpdater | null {
   if (lower.includes("добавь фильтр") || lower.includes("фильтр активности") || lower.includes("добавить фильтр")) {
     return (nodes, edges) => {
       if (nodes.find((n) => n.id === "filter")) return { nodes, edges }; // idempotent
-      const signalsNode = nodes.find((n) => n.id === "signals")!;
+      const signalsNode = nodes.find((n) => n.id === "signals");
+      if (!signalsNode) return { nodes, edges };
       const filterX = signalsNode.position.x + 200;
       const shifted = shiftRight(nodes, filterX, 200);
       const filterNode = makeNode(
         "filter", "Фильтр 24ч", "new", filterX, signalsNode.position.y
       );
-      const newEdges = edges.filter(
+      const filteredEdges = edges.filter(
         (e) => !(e.source === "signals" && e.target === "split")
       );
-      newEdges.push(makeEdge("signals", "filter"), makeEdge("filter", "split"));
-      return { nodes: [...shifted, filterNode], edges: newEdges };
+      return { nodes: [...shifted, filterNode], edges: [...filteredEdges, makeEdge("signals", "filter"), makeEdge("filter", "split")] };
     };
   }
 
   // 3. Add delay in retarget branch
-  if (lower.includes("добавь задержку") || lower.includes("задержка") || lower.includes("delay")) {
+  if (lower.includes("добавь задержку") || lower.includes("delay")) {
     return (nodes, edges) => {
       if (nodes.find((n) => n.id === "delay")) return { nodes, edges };
-      const retargetNode = nodes.find((n) => n.id === "retarget")!;
-      const resultNode   = nodes.find((n) => n.id === "result")!;
+      const retargetNode = nodes.find((n) => n.id === "retarget");
+      const resultNode   = nodes.find((n) => n.id === "result");
+      if (!retargetNode || !resultNode) return { nodes, edges };
       const delayX = (retargetNode.position.x + resultNode.position.x) / 2;
       const delayNode = makeNode(
         "delay", "Задержка 24ч", "new", delayX, retargetNode.position.y
       );
-      const newEdges = edges.filter(
+      const filteredEdges = edges.filter(
         (e) => !(e.source === "retarget" && e.target === "result")
       );
-      newEdges.push(makeEdge("retarget", "delay"), makeEdge("delay", "result"));
-      return { nodes: [...nodes, delayNode], edges: newEdges };
+      return { nodes: [...nodes, delayNode], edges: [...filteredEdges, makeEdge("retarget", "delay"), makeEdge("delay", "result")] };
     };
   }
 
@@ -151,20 +151,17 @@ export function parseWorkflowCommand(msg: string): CommandUpdater | null {
   ) {
     return (nodes, edges) => {
       if (nodes.find((n) => n.id === "email-condition")) return { nodes, edges };
-      const engagedNode = nodes.find((n) => n.id === "engaged")!;
-      const resultNode  = nodes.find((n) => n.id === "result")!;
+      const engagedNode = nodes.find((n) => n.id === "engaged");
+      const resultNode  = nodes.find((n) => n.id === "result");
+      if (!engagedNode || !resultNode) return { nodes, edges };
       const condX = (engagedNode.position.x + resultNode.position.x) / 2;
       const condNode = makeNode(
         "email-condition", "Email открыт?", "new", condX, engagedNode.position.y
       );
-      const newEdges = edges.filter(
+      const filteredEdges = edges.filter(
         (e) => !(e.source === "engaged" && e.target === "result")
       );
-      newEdges.push(
-        makeEdge("engaged", "email-condition"),
-        makeEdge("email-condition", "result")
-      );
-      return { nodes: [...nodes, condNode], edges: newEdges };
+      return { nodes: [...nodes, condNode], edges: [...filteredEdges, makeEdge("engaged", "email-condition"), makeEdge("email-condition", "result")] };
     };
   }
 
