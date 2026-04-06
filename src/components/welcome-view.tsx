@@ -6,7 +6,7 @@ interface WelcomeViewProps {
 
 export function WelcomeView({ onStep1Click: _ }: WelcomeViewProps) {
   return (
-    <div className="flex flex-1 items-center justify-center overflow-y-auto pb-72">
+    <div className="flex flex-1 items-center justify-center overflow-y-auto pb-[350px]">
       <div className="text-center">
         <h1 className="text-2xl font-bold text-foreground">Добро пожаловать</h1>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
