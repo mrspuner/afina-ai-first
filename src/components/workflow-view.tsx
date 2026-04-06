@@ -37,7 +37,6 @@ export function WorkflowView({
   const [unknownCmd, setUnknownCmd] = useState<string | null>(null);
   const unknownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const graphRef = useRef<HTMLDivElement>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!pendingCommand) return;
@@ -58,15 +57,6 @@ export function WorkflowView({
     onCommandHandled();
   }, [pendingCommand, onCommandHandled]);
 
-  // Auto-scroll to show status after launch
-  useEffect(() => {
-    if (!launched) return;
-    const t = setTimeout(() => {
-      scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-    }, 350);
-    return () => clearTimeout(t);
-  }, [launched]);
-
   useEffect(() => {
     return () => {
       if (unknownTimerRef.current) clearTimeout(unknownTimerRef.current);
@@ -74,22 +64,31 @@ export function WorkflowView({
   }, []);
 
   return (
-    <div ref={scrollRef} className="relative flex flex-1 flex-col overflow-y-auto">
-      {/* Graph — always occupies the full viewport height of the scroll container */}
-      <div ref={graphRef} className="flex h-full min-h-[360px] flex-shrink-0 flex-col">
+    <div className="relative flex flex-1 flex-col overflow-hidden">
+      {/* Graph — shrinks via CSS height transition when launched */}
+      <div
+        ref={graphRef}
+        style={{
+          height: launched ? "55%" : "100%",
+          transition: "height 0.55s cubic-bezier(0.32, 0.72, 0, 1)",
+          display: "flex",
+          flexDirection: "column",
+          flexShrink: 0,
+        }}
+      >
         <WorkflowGraph nodes={graph.nodes} edges={graph.edges} />
       </div>
 
-      {/* Status — appears below the graph */}
+      {/* Status — fills the remaining 45% */}
       <AnimatePresence>
         {launched && (
           <motion.div
             key="status"
-            initial={{ opacity: 0, y: 24 }}
+            initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 24 }}
-            transition={{ duration: 0.45, ease: [0.32, 0.72, 0, 1] }}
-            className="flex flex-shrink-0 flex-col items-center justify-center py-12"
+            exit={{ opacity: 0, y: 20 }}
+            transition={{ duration: 0.4, ease: [0.32, 0.72, 0, 1], delay: 0.2 }}
+            className="flex flex-1 flex-col items-center justify-center"
           >
             <WorkflowStatus onGoToStats={onGoToStats} />
           </motion.div>
