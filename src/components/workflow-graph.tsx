@@ -1,0 +1,93 @@
+"use client";
+
+import "@xyflow/react/dist/style.css";
+
+import { useCallback, useRef, useState } from "react";
+import {
+  ReactFlow,
+  ReactFlowProvider,
+  useReactFlow,
+  type Viewport,
+  PanOnScrollMode,
+} from "@xyflow/react";
+import { Controls } from "@/components/ai-elements/controls";
+import { WorkflowNodeComponent } from "@/components/workflow-node";
+import type { WorkflowNode, WorkflowEdge } from "@/types/workflow";
+
+// Defined outside component — React Flow requires stable nodeTypes reference
+const nodeTypes = { workflowNode: WorkflowNodeComponent };
+
+interface WorkflowGraphProps {
+  nodes: WorkflowNode[];
+  edges: WorkflowEdge[];
+}
+
+function GraphInner({ nodes, edges }: WorkflowGraphProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const { getNodes } = useReactFlow();
+  const [fades, setFades] = useState({ left: false, right: false });
+
+  const updateFades = useCallback(
+    (viewport: Viewport) => {
+      const allNodes = getNodes();
+      if (!allNodes.length || !containerRef.current) return;
+      const containerW = containerRef.current.clientWidth;
+      const leftmost  = Math.min(...allNodes.map((n) => n.position.x));
+      const rightmost = Math.max(...allNodes.map((n) => n.position.x + 130)); // 130 ≈ node width
+      setFades({
+        left:  leftmost  * viewport.zoom + viewport.x < -10,
+        right: rightmost * viewport.zoom + viewport.x > containerW + 10,
+      });
+    },
+    [getNodes]
+  );
+
+  return (
+    <div ref={containerRef} className="relative h-full w-full">
+      {/* Left fade */}
+      <div
+        className="pointer-events-none absolute inset-y-0 left-0 z-10 w-20 transition-opacity duration-300"
+        style={{
+          background: "linear-gradient(to right, #0a0a0a, transparent)",
+          opacity: fades.left ? 1 : 0,
+        }}
+      />
+      {/* Right fade */}
+      <div
+        className="pointer-events-none absolute inset-y-0 right-0 z-10 w-20 transition-opacity duration-300"
+        style={{
+          background: "linear-gradient(to left, #0a0a0a, transparent)",
+          opacity: fades.right ? 1 : 0,
+        }}
+      />
+
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        nodeTypes={nodeTypes}
+        fitView
+        fitViewOptions={{ padding: 0.3 }}
+        panOnDrag={false}
+        panOnScroll
+        panOnScrollMode={PanOnScrollMode.Horizontal}
+        zoomOnScroll={false}
+        nodesDraggable={false}
+        nodesConnectable={false}
+        elementsSelectable={false}
+        onViewportChange={updateFades}
+        style={{ background: "#0a0a0a" }}
+        proOptions={{ hideAttribution: true }}
+      >
+        <Controls showInteractive={false} position="top-right" />
+      </ReactFlow>
+    </div>
+  );
+}
+
+export function WorkflowGraph({ nodes, edges }: WorkflowGraphProps) {
+  return (
+    <ReactFlowProvider>
+      <GraphInner nodes={nodes} edges={edges} />
+    </ReactFlowProvider>
+  );
+}
