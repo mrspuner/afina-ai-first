@@ -25,6 +25,11 @@ import {
 } from "@/components/ai-elements/prompt-input";
 import { cn } from "@/lib/utils";
 
+// "signal"            — guided signal collection flow (CampaignWorkspace)
+// "awaiting-campaign" — signal done, step 2 badge active, waiting for user to click it
+// "campaign"          — campaign type selected or in workflow
+type FlowPhase = "signal" | "awaiting-campaign" | "campaign" | null;
+
 interface SelectedCampaign {
   id: string;
   name: string;
@@ -33,35 +38,42 @@ interface SelectedCampaign {
 export default function Home() {
   const [activeNav,        setActiveNav]        = useState<string | null>(null);
   const [launchOpen,       setLaunchOpen]       = useState(false);
-  const [selectedSignal,   setSelectedSignal]   = useState<SelectedCampaign | null>(null);
+  const [flowPhase,        setFlowPhase]        = useState<FlowPhase>(null);
   const [selectedCampaign, setSelectedCampaign] = useState<SelectedCampaign | null>(null);
   const [workflowLaunched, setWorkflowLaunched] = useState(false);
   const [workflowCommand,  setWorkflowCommand]  = useState<string | null>(null);
 
-  function handleNavChange(nav: string | null) {
+  // Sidebar navigation — exits guided flow, goes to standalone section
+  function handleNavChange(nav: string) {
     setActiveNav(nav);
-    if (nav !== "Кампании") {
-      setSelectedSignal(null);
-      setSelectedCampaign(null);
-      setWorkflowLaunched(false);
-      setWorkflowCommand(null);
-    }
-  }
-
-  function handleSignalSelect(id: string, name: string) {
-    setSelectedSignal({ id, name });
-  }
-
-  function handleCampaignSelect(id: string, name: string) {
-    setSelectedCampaign({ id, name });
+    setFlowPhase(null);
+    setSelectedCampaign(null);
     setWorkflowLaunched(false);
     setWorkflowCommand(null);
   }
 
-  function handlePromptSubmit(message: PromptInputMessage) {
-    if (selectedCampaign && !workflowLaunched) {
-      setWorkflowCommand(message.text);
-    }
+  // Welcome Step 1 badge → start guided signal flow
+  function handleStep1Click() {
+    setActiveNav(null);
+    setFlowPhase("signal");
+  }
+
+  // Step 8 "Запустить кампанию" → signal done, step 2 now active
+  function handleSignalComplete() {
+    setFlowPhase("awaiting-campaign");
+  }
+
+  // Step 2 badge clicked → open campaign type selection
+  function handleStep2Click() {
+    setFlowPhase("campaign");
+  }
+
+  // Campaign type selected
+  function handleCampaignSelect(id: string, name: string) {
+    setSelectedCampaign({ id, name });
+    setFlowPhase("campaign");
+    setWorkflowLaunched(false);
+    setWorkflowCommand(null);
   }
 
   const handleCommandHandled = useCallback(() => {
@@ -70,50 +82,47 @@ export default function Home() {
 
   function handleGoToStats() {
     setActiveNav("Статистика");
-    setSelectedSignal(null);
+    setFlowPhase(null);
     setSelectedCampaign(null);
     setWorkflowLaunched(false);
   }
 
-  const isSignalFlow = activeNav === "Кампании" && !selectedSignal;
-  const isWorkflow   = activeNav === "Кампании" && selectedCampaign !== null;
-  const isCampaignFlow = activeNav === "Кампании" && selectedSignal !== null && !selectedCampaign;
+  function handlePromptSubmit(message: PromptInputMessage) {
+    if (flowPhase === "campaign" && selectedCampaign && !workflowLaunched) {
+      setWorkflowCommand(message.text);
+    }
+  }
 
-  // Detect signal selected → animate Step 2 badge border green
+  const isWorkflow = flowPhase === "campaign" && selectedCampaign !== null;
+
+  // Step 2 badge pulse — triggers when signal collection completes
   const [stepTwoNew, setStepTwoNew] = useState(false);
-  const prevHasSignal = useRef(false);
+  const prevFlowPhase = useRef<FlowPhase>(null);
   useEffect(() => {
-    if (selectedSignal && !prevHasSignal.current) {
+    if (flowPhase === "awaiting-campaign" && prevFlowPhase.current !== "awaiting-campaign") {
       setStepTwoNew(true);
       const t = setTimeout(() => setStepTwoNew(false), 1400);
-      prevHasSignal.current = true;
+      prevFlowPhase.current = flowPhase;
       return () => clearTimeout(t);
     }
-    if (!selectedSignal) {
-      prevHasSignal.current = false;
-    }
-  }, [selectedSignal]);
+    prevFlowPhase.current = flowPhase;
+  }, [flowPhase]);
 
-  const welcomeSteps = [
-    { n: 1, label: "Получение сигнала",   active: activeNav === null || isSignalFlow },
-    { n: 2, label: "Запуск кампании",     active: (isCampaignFlow || isWorkflow) && !workflowLaunched },
-    { n: 3, label: "Статистика кампании", active: workflowLaunched },
-  ];
+  const onWelcome   = flowPhase === null && activeNav === null;
+  const step1Active = onWelcome || flowPhase === "signal";
+  const step2Active = flowPhase === "awaiting-campaign" || (flowPhase === "campaign" && !workflowLaunched);
+  const step3Active = workflowLaunched;
 
   function renderMain() {
-    if (activeNav === null) {
-      return <WelcomeView onStep1Click={() => setActiveNav("Кампании")} />;
+    // Guided signal flow (CampaignWorkspace persists through awaiting-campaign so step 8 stays visible)
+    if (flowPhase === "signal" || flowPhase === "awaiting-campaign") {
+      return <CampaignWorkspace onSignalComplete={handleSignalComplete} />;
     }
-    if (activeNav === "Статистика") {
-      return <StatisticsView />;
-    }
-    if (activeNav === "Кампании" && !selectedSignal) {
-      return <SignalTypeView onSelect={handleSignalSelect} />;
-    }
-    if (activeNav === "Кампании" && selectedSignal && !selectedCampaign) {
+    // Guided campaign flow
+    if (flowPhase === "campaign" && !selectedCampaign) {
       return <CampaignTypeView onSelect={handleCampaignSelect} />;
     }
-    if (activeNav === "Кампании" && selectedCampaign) {
+    if (flowPhase === "campaign" && selectedCampaign) {
       return (
         <WorkflowView
           launched={workflowLaunched}
@@ -123,19 +132,21 @@ export default function Home() {
         />
       );
     }
-    return <CampaignWorkspace />;
+    // Direct sidebar sections
+    if (activeNav === "Статистика") return <StatisticsView />;
+    if (activeNav === "Сигналы")    return <SignalTypeView onSelect={() => {}} />;
+    if (activeNav === "Кампании")   return <CampaignTypeView onSelect={handleCampaignSelect} />;
+    // Welcome
+    return <WelcomeView onStep1Click={handleStep1Click} />;
   }
 
-  // Derive chat placeholder
   const chatPlaceholder =
-    activeNav === null || isSignalFlow
-      ? "Выберите шаг или задайте вопрос…"
-      : isWorkflow
-      ? "Опишите изменение сценария..."
-      : "Опишите вашу кампанию...";
+    isWorkflow              ? "Опишите изменение сценария..." :
+    flowPhase === "campaign"? "Опишите вашу кампанию..."      :
+                              "Выберите шаг или задайте вопрос…";
 
-  // Bottom bar hidden during status phase
   const showBottomBar = !workflowLaunched;
+  const floatBottom   = onWelcome ? "40%" : "3%";
 
   return (
     <PromptInputProvider>
@@ -151,17 +162,16 @@ export default function Home() {
         <div className="relative flex flex-1 flex-col overflow-hidden">
           {renderMain()}
 
-          {/* Floating group: launch button + chat input + step badges */}
           {showBottomBar && (
             <motion.div
               className="fixed left-[120px] right-0 z-30 px-8"
               initial={false}
-              animate={{ bottom: activeNav === null ? "40%" : "3%" }}
+              animate={{ bottom: floatBottom }}
               transition={{ duration: 0.55, ease: [0.32, 0.72, 0, 1] }}
             >
               <div className="mx-auto flex w-full max-w-2xl flex-col gap-2">
 
-                {/* Launch button — only in workflow graph mode */}
+                {/* Launch button — only while editing the workflow graph */}
                 {isWorkflow && (
                   <div className="flex justify-end">
                     <button
@@ -190,20 +200,22 @@ export default function Home() {
 
                 {/* Step badges */}
                 <div className="flex gap-2">
-                  {welcomeSteps.map(({ n, label, active }) => (
+                  {([
+                    { n: 1, label: "Получение сигнала",   active: step1Active, onClick: onWelcome ? handleStep1Click : undefined },
+                    { n: 2, label: "Запуск кампании",     active: step2Active, onClick: flowPhase === "awaiting-campaign" ? handleStep2Click : undefined },
+                    { n: 3, label: "Статистика кампании", active: step3Active, onClick: undefined },
+                  ] as const).map(({ n, label, active, onClick }) => (
                     <button
                       key={n}
                       type="button"
                       disabled={!active}
-                      onClick={
-                        n === 1 && active && activeNav === null
-                          ? () => setActiveNav("Кампании")
-                          : undefined
-                      }
+                      onClick={onClick}
                       className={cn(
                         "flex items-center gap-2 rounded-lg border px-3 py-2 text-left transition-colors",
                         active
-                          ? "cursor-pointer border-border bg-card hover:bg-accent"
+                          ? onClick
+                            ? "cursor-pointer border-border bg-card hover:bg-accent"
+                            : "cursor-default border-border bg-card"
                           : "cursor-not-allowed border-border/40 bg-card/40 opacity-35"
                       )}
                       style={
@@ -217,7 +229,7 @@ export default function Home() {
                       </span>
                       <div className="h-3 w-px shrink-0 bg-border" />
                       <span className="text-sm font-medium text-foreground">{label}</span>
-                      {active && (
+                      {active && onClick && (
                         <ChevronRight className="ml-1 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                       )}
                     </button>
