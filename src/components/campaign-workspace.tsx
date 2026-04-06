@@ -13,11 +13,24 @@ import { Step6Summary } from "@/components/steps/step-6-summary";
 import { Step7Processing } from "@/components/steps/step-7-processing";
 import { Step8Result } from "@/components/steps/step-8-result";
 
-function WorkspaceInner({ onSignalComplete, onStep8Reached }: { onSignalComplete?: () => void; onStep8Reached?: () => void }) {
-  const [currentStep, setCurrentStep] = useState(1);
-  const [maxStep, setMaxStep] = useState(1);
-  const [animatingStep, setAnimatingStep] = useState<number | null>(1);
-  const [stepData, setStepData] = useState<StepData>(initialStepData);
+function WorkspaceInner({
+  onSignalComplete,
+  onStep8Reached,
+  initialScenario,
+}: {
+  onSignalComplete?: () => void;
+  onStep8Reached?: () => void;
+  initialScenario?: { id: string; name: string };
+}) {
+  const startStep = initialScenario ? 2 : 1;
+  const [currentStep, setCurrentStep] = useState(startStep);
+  const [maxStep, setMaxStep] = useState(startStep);
+  const [animatingStep, setAnimatingStep] = useState<number | null>(startStep);
+  const [stepData, setStepData] = useState<StepData>(
+    initialScenario
+      ? { ...initialStepData, scenario: initialScenario.id }
+      : initialStepData
+  );
   const stepRefs = useRef<Record<number, HTMLDivElement | null>>({});
   const pendingScroll = useRef<{ step: number; behavior: ScrollBehavior } | null>(null);
 
@@ -120,6 +133,20 @@ function WorkspaceInner({ onSignalComplete, onStep8Reached }: { onSignalComplete
   );
 }
 
-export function CampaignWorkspace({ onSignalComplete, onStep8Reached }: { onSignalComplete?: () => void; onStep8Reached?: () => void } = {}) {
-  return <WorkspaceInner onSignalComplete={onSignalComplete} onStep8Reached={onStep8Reached} />;
+export function CampaignWorkspace({
+  onSignalComplete,
+  onStep8Reached,
+  initialScenario,
+}: {
+  onSignalComplete?: () => void;
+  onStep8Reached?: () => void;
+  initialScenario?: { id: string; name: string };
+} = {}) {
+  return (
+    <WorkspaceInner
+      onSignalComplete={onSignalComplete}
+      onStep8Reached={onStep8Reached}
+      initialScenario={initialScenario}
+    />
+  );
 }

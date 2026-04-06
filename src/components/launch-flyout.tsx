@@ -1,23 +1,29 @@
 "use client";
 
 import { X } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 interface LaunchFlyoutProps {
   open: boolean;
   onClose: () => void;
+  onSignalSelect: (id: string, name: string) => void;
+  onCampaignSelect: () => void;
 }
 
 const signalCards = [
-  { title: "Реактивация", description: "Вернуть пользователей, переставших быть активными" },
-  { title: "Удержание", description: "Предотвратить отток перед ключевыми точками" },
-  { title: "Апсейл", description: "Предложить переход на старший план" },
+  { id: "registration", title: "Регистрация",   description: "Возврат пользователей после незавершённой регистрации или брошенной корзины" },
+  { id: "first-deal",   title: "Первая сделка", description: "Обогащение данных о клиенте, оценка потенциала и рисков" },
+  { id: "upsell",       title: "Апсейл",        description: "Мониторинг интереса к конкурентам, предотвращение оттока" },
+  { id: "retention",    title: "Удержание",     description: "Мониторинг интереса к конкурентам и предотвращение оттока" },
+  { id: "return",       title: "Возврат",       description: "Определение оптимального момента для повторного контакта" },
+  { id: "reactivation", title: "Реактивация",   description: "Определение оптимального момента для повторного контакта" },
 ];
 
 const campaignCards = [
-  { title: "С нуля", description: "Настроить кампанию под конкретную задачу вручную" },
-  { title: "Онбординг", description: "Шаблон для новых пользователей" },
-  { title: "Реактивация", description: "Шаблон для возврата неактивных" },
+  { title: "Возврат брошенных действий", description: "Возвращаем пользователей, не завершивших действие, через персонализированные касания" },
+  { title: "Прогрев до следующего шага", description: "Увеличиваем конверсию через серию касаний с нарастающей ценностью" },
+  { title: "Стимулирование повторной активности", description: "Возвращаем интерес пользователей через офферы и релевантные напоминания" },
+  { title: "Удержание через поведенческие триггеры", description: "Предотвращаем отток через своевременные реакции на изменения поведения" },
+  { title: "Реактивация через адаптивный сценарий", description: "Перестраиваем коммуникацию по сегментам, реакции и времени отклика пользователей" },
 ];
 
 function ScenarioCard({
@@ -40,7 +46,7 @@ function ScenarioCard({
   );
 }
 
-export function LaunchFlyout({ open, onClose }: LaunchFlyoutProps) {
+export function LaunchFlyout({ open, onClose, onSignalSelect, onCampaignSelect }: LaunchFlyoutProps) {
   if (!open) return null;
 
   return (
@@ -53,11 +59,7 @@ export function LaunchFlyout({ open, onClose }: LaunchFlyoutProps) {
       />
 
       {/* Панель */}
-      <div
-        className={cn(
-          "fixed inset-y-0 left-[220px] z-50 flex w-[360px] flex-col bg-background shadow-xl"
-        )}
-      >
+      <div className="fixed inset-y-0 left-[120px] z-50 flex w-[360px] flex-col bg-card shadow-xl">
         {/* Шапка панели */}
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
           <h2 className="text-sm font-semibold text-foreground">Запустить</h2>
@@ -73,23 +75,27 @@ export function LaunchFlyout({ open, onClose }: LaunchFlyoutProps) {
         {/* Контент */}
         <div className="flex-1 overflow-y-auto px-5 py-4">
           {/* Секция 1 */}
-          <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-            Запустить поиск сигналов
-          </p>
-          <div className="mb-6 flex flex-col gap-2">
-            {signalCards.map((card) => (
-              <ScenarioCard key={card.title} {...card} onClick={onClose} />
-            ))}
+          <div className="mb-2">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-foreground">
+              Запустить поиск сигналов
+            </p>
+            <div className="flex flex-col gap-2">
+              {signalCards.map((card) => (
+                <ScenarioCard key={card.title} title={card.title} description={card.description} onClick={() => { onSignalSelect(card.id, card.title); onClose(); }} />
+              ))}
+            </div>
           </div>
 
           {/* Секция 2 */}
-          <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-            Запустить новую кампанию
-          </p>
-          <div className="flex flex-col gap-2">
-            {campaignCards.map((card) => (
-              <ScenarioCard key={card.title} {...card} onClick={onClose} />
-            ))}
+          <div className="mt-6">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-foreground">
+              Запустить новую кампанию
+            </p>
+            <div className="flex flex-col gap-2">
+              {campaignCards.map((card) => (
+                <ScenarioCard key={card.title} title={card.title} description={card.description} onClick={() => { onCampaignSelect(); onClose(); }} />
+              ))}
+            </div>
           </div>
         </div>
       </div>

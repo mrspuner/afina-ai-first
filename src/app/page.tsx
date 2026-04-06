@@ -44,6 +44,7 @@ export default function Home() {
   const [workflowCommand,  setWorkflowCommand]  = useState<string | null>(null);
   const [signalDone,       setSignalDone]       = useState(false);
   const [campaignDone,     setCampaignDone]     = useState(false);
+  const [initialScenario,  setInitialScenario]  = useState<{ id: string; name: string } | null>(null);
 
   // Sidebar navigation — exits guided flow, goes to standalone section
   function handleNavChange(nav: string) {
@@ -52,6 +53,7 @@ export default function Home() {
     setSelectedCampaign(null);
     setWorkflowLaunched(false);
     setWorkflowCommand(null);
+    setInitialScenario(null);
   }
 
   // Welcome Step 1 badge → start guided signal flow
@@ -68,6 +70,7 @@ export default function Home() {
 
   // Step 8 "Запустить кампанию" button → go to campaign selection
   function handleSignalComplete() {
+    setInitialScenario(null);
     setFlowPhase("campaign");
   }
 
@@ -93,6 +96,24 @@ export default function Home() {
     setFlowPhase(null);
     setSelectedCampaign(null);
     setWorkflowLaunched(false);
+  }
+
+  function handleLaunchSignal(id: string, name: string) {
+    setLaunchOpen(false);
+    setActiveNav(null);
+    setInitialScenario({ id, name });
+    setFlowPhase("signal");
+  }
+
+  function handleLaunchCampaign() {
+    setLaunchOpen(false);
+    if (!signalDone) {
+      setActiveNav("Сигналы");
+      setFlowPhase(null);
+    } else {
+      setActiveNav(null);
+      setFlowPhase("campaign");
+    }
   }
 
   function handlePromptSubmit(message: PromptInputMessage) {
@@ -124,7 +145,13 @@ export default function Home() {
   function renderMain() {
     // Guided signal flow (CampaignWorkspace persists through awaiting-campaign so step 8 stays visible)
     if (flowPhase === "signal" || flowPhase === "awaiting-campaign") {
-      return <CampaignWorkspace onSignalComplete={handleSignalComplete} onStep8Reached={handleStep8Reached} />;
+      return (
+        <CampaignWorkspace
+          onSignalComplete={handleSignalComplete}
+          onStep8Reached={handleStep8Reached}
+          initialScenario={initialScenario ?? undefined}
+        />
+      );
     }
     // Guided campaign flow
     if (flowPhase === "campaign" && !selectedCampaign) {
@@ -166,7 +193,12 @@ export default function Home() {
           onLaunchOpen={() => setLaunchOpen(true)}
           flyoutOpen={launchOpen}
         />
-        <LaunchFlyout open={launchOpen} onClose={() => setLaunchOpen(false)} />
+        <LaunchFlyout
+          open={launchOpen}
+          onClose={() => setLaunchOpen(false)}
+          onSignalSelect={handleLaunchSignal}
+          onCampaignSelect={handleLaunchCampaign}
+        />
 
         <div className="relative flex flex-1 flex-col overflow-hidden">
           {renderMain()}
