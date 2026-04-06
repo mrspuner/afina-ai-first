@@ -59,9 +59,9 @@ function shiftRight(nodes: WorkflowNode[], fromX: number, amount: number): Workf
 
 // ── Base graph (Шаг 1 — базовый workflow) ────────────────────────────────────
 
-export function createBaseNodes(): WorkflowNode[] {
+export function createBaseNodes(signalName?: string): WorkflowNode[] {
   return [
-    makeNode("signals",  "Сигналы + сегменты", "default",   0,    0,  "Вход из предыдущего шага"),
+    makeNode("signals",  "Сигналы + сегменты", "default",   0,    0,  signalName ?? "Вход из предыдущего шага"),
     makeNode("split",    "Split по сегментам",  "split",   220,   0),
     makeNode("push",     "Push",                "channel", 440,  -80, "Мягкий"),
     makeNode("email",    "Email",               "channel", 440,   0,  "Рассылка"),
