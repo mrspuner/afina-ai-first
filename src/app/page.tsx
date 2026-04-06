@@ -177,7 +177,7 @@ export default function Home() {
               <div className="mx-auto flex w-full max-w-2xl flex-col gap-2">
 
                 {/* Launch button — only while editing the workflow graph */}
-                {isWorkflow && (
+                {isWorkflow && !workflowLaunched && (
                   <div className="flex justify-end">
                     <button
                       type="button"
