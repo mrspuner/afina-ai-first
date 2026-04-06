@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import {
-  Rocket,
+  CirclePlus,
   Bell,
   Megaphone,
   BarChart2,
@@ -12,7 +12,6 @@ import {
   ChevronUp,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,82 +25,80 @@ interface AppSidebarProps {
   activeNav?: string;
   onNavChange?: (nav: string) => void;
   onLaunchOpen?: () => void;
+  flyoutOpen?: boolean;
 }
 
 export function AppSidebar({
-  activeNav = "Кампании",
+  activeNav,
   onNavChange,
   onLaunchOpen,
+  flyoutOpen = false,
 }: AppSidebarProps) {
   const navItems = [
-    { icon: Bell, label: "Сигналы", badge: 3 },
-    { icon: Megaphone, label: "Кампании", badge: 2 },
+    { icon: Bell, label: "Сигналы" },
+    { icon: Megaphone, label: "Кампании" },
     { icon: BarChart2, label: "Статистика" },
   ];
 
   return (
-    <aside className="flex h-screen w-[220px] shrink-0 flex-col bg-background">
-      {/* Logo */}
-      <div className="px-4 py-5">
-        <Image src="/logo.svg" alt="Afina" width={80} height={24} priority />
+    <aside className={cn("flex h-screen w-[120px] shrink-0 flex-col justify-between transition-colors", flyoutOpen ? "bg-card" : "bg-background")}>
+      {/* Верхняя группа: лого + навигация */}
+      <div className="flex flex-col gap-5">
+        {/* Logo */}
+        <div className="p-5">
+          <Image src="/logo.svg" alt="Afina" width={80} height={24} priority />
+        </div>
+
+        <nav className="flex flex-col gap-6 px-2">
+          {/* Запустить */}
+          <button
+            onClick={onLaunchOpen}
+            className="flex h-[68px] flex-col items-center gap-1 rounded-md py-3 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+          >
+            <CirclePlus className="h-6 w-6" />
+            <span className="text-xs font-medium">Запустить</span>
+          </button>
+
+          {/* Основная навигация */}
+          <div className="flex flex-col">
+            {navItems.map(({ icon: Icon, label }) => (
+              <button
+                key={label}
+                onClick={() => onNavChange?.(label)}
+                className={cn(
+                  "relative flex h-[68px] flex-col items-center gap-1 rounded-md py-3 transition-colors",
+                  activeNav === label
+                    ? "bg-accent text-accent-foreground"
+                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                )}
+              >
+                <Icon className="h-6 w-6" />
+                <span className="text-xs font-medium">{label}</span>
+              </button>
+            ))}
+          </div>
+        </nav>
       </div>
 
-      <nav className="flex flex-col px-2">
-        {/* Запустить — первый, отбит отступом снизу */}
-        <button
-          onClick={onLaunchOpen}
-          className="mb-6 flex flex-col items-center gap-1 rounded-md px-3 py-3 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-        >
-          <Rocket className="h-6 w-6" />
-          <span className="text-xs font-medium">Запустить</span>
-        </button>
-
-        {/* Основная навигация */}
-        {navItems.map(({ icon: Icon, label, badge }) => (
-          <button
-            key={label}
-            onClick={() => onNavChange?.(label)}
-            className={cn(
-              "relative flex flex-col items-center gap-1 rounded-md px-3 py-3 transition-colors",
-              activeNav === label
-                ? "bg-accent text-accent-foreground"
-                : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-            )}
-          >
-            <span className="relative">
-              <Icon className="h-6 w-6" />
-              {badge !== undefined && (
-                <Badge className="absolute -right-2.5 -top-2 h-4 min-w-4 px-1 text-[10px] leading-none">
-                  {badge}
-                </Badge>
-              )}
-            </span>
-            <span className="text-xs font-medium">{label}</span>
-          </button>
-        ))}
-      </nav>
-
-      <div className="flex-1" />
-
       {/* Подвал */}
-      <div className="px-2 py-3">
-        <div className="mb-3 px-3">
+      <div className="flex flex-col gap-3 pt-3">
+        <div className="flex flex-col gap-0.5 px-5">
           <p className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground">
             Баланс
           </p>
-          <p className="mt-0.5 text-sm font-semibold text-foreground">
+          <p className="text-sm font-semibold text-foreground">
             ₽ 24 800
           </p>
         </div>
 
         <DropdownMenu>
-          <DropdownMenuTrigger className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 transition-colors hover:bg-accent">
+          <DropdownMenuTrigger className="flex w-full items-center justify-between rounded-md px-5 py-2 transition-colors hover:bg-accent">
             <Avatar className="h-7 w-7 shrink-0">
               <AvatarFallback className="text-xs bg-primary text-primary-foreground">
                 АК
               </AvatarFallback>
             </Avatar>
-            <div className="flex-1 overflow-hidden text-left">
+            <div className="flex-1 overflow-hidden px-2.5 text-left">
               <p className="truncate text-xs font-medium text-foreground">
                 Арслан К.
               </p>

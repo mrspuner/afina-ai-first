@@ -1,7 +1,7 @@
 // src/app/page.tsx
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { Mic, ChevronRight } from "lucide-react";
 import { AppSidebar } from "@/components/app-sidebar";
@@ -70,8 +70,23 @@ export default function Home() {
 
   const isWorkflow = activeNav === "Кампании" && selectedCampaign !== null;
 
+  // Detect transition into workflow → animate Step 2 badge border green
+  const [stepTwoNew, setStepTwoNew] = useState(false);
+  const prevIsWorkflow = useRef(false);
+  useEffect(() => {
+    if (isWorkflow && !prevIsWorkflow.current) {
+      setStepTwoNew(true);
+      const t = setTimeout(() => setStepTwoNew(false), 1400);
+      prevIsWorkflow.current = true;
+      return () => clearTimeout(t);
+    }
+    if (!isWorkflow) {
+      prevIsWorkflow.current = false;
+    }
+  }, [isWorkflow]);
+
   const welcomeSteps = [
-    { n: 1, label: "Получение сигнала",   active: activeNav === null },
+    { n: 1, label: "Получение сигнала",   active: activeNav === null || (activeNav === "Кампании" && !selectedCampaign) },
     { n: 2, label: "Запуск кампании",     active: isWorkflow && !workflowLaunched },
     { n: 3, label: "Статистика кампании", active: workflowLaunched },
   ];
@@ -161,7 +176,7 @@ export default function Home() {
                   </PromptInputFooter>
                 </PromptInput>
 
-                {/* Step badges — always visible */}
+                {/* Step badges */}
                 <div className="flex gap-2">
                   {welcomeSteps.map(({ n, label, active }) => (
                     <button
@@ -169,7 +184,7 @@ export default function Home() {
                       type="button"
                       disabled={!active}
                       onClick={
-                        n === 1 && active
+                        n === 1 && active && activeNav === null
                           ? () => setActiveNav("Кампании")
                           : undefined
                       }
@@ -179,6 +194,11 @@ export default function Home() {
                           ? "cursor-pointer border-border bg-card hover:bg-accent"
                           : "cursor-not-allowed border-border/40 bg-card/40 opacity-35"
                       )}
+                      style={
+                        stepTwoNew && n === 2
+                          ? { animation: "step-badge-pulse 1.4s ease-in-out" }
+                          : undefined
+                      }
                     >
                       <span className="shrink-0 text-[11px] font-semibold text-muted-foreground">
                         Шаг {n}
@@ -191,6 +211,14 @@ export default function Home() {
                     </button>
                   ))}
                 </div>
+
+                <style>{`
+                  @keyframes step-badge-pulse {
+                    0%, 100% { border-color: #1e1e1e; box-shadow: none; }
+                    20%, 60% { border-color: #4ade80; box-shadow: 0 0 8px rgba(74,222,128,0.35); }
+                    40%, 80% { border-color: #1e1e1e; box-shadow: none; }
+                  }
+                `}</style>
               </div>
             </motion.div>
           )}
