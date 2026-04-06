@@ -76,9 +76,9 @@ export function CampaignTypeView({ onSelect, campaign, noSignal }: CampaignTypeV
         {/* Campaign type selection */}
         {!noSignal && <div>
           {campaign ? (
-            <p className="mb-4 text-sm font-medium text-foreground">Создать ещё одну кампанию</p>
+            <p className="mb-4 text-center text-sm font-medium text-foreground">Создать ещё одну кампанию</p>
           ) : (
-            <p className="mb-4 text-sm font-medium text-foreground">Выберите тип кампании</p>
+            <p className="mb-4 text-center text-sm font-medium text-foreground">Выберите тип кампании</p>
           )}
           <div className="grid grid-cols-3 gap-3">
             {CAMPAIGNS.map((c) => (
