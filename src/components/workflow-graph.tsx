@@ -2,7 +2,7 @@
 
 import "@xyflow/react/dist/style.css";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -20,11 +20,18 @@ const nodeTypes = { workflowNode: WorkflowNodeComponent };
 interface WorkflowGraphProps {
   nodes: WorkflowNode[];
   edges: WorkflowEdge[];
+  compact?: boolean;
 }
 
-function GraphInner({ nodes, edges }: WorkflowGraphProps) {
+function GraphInner({ nodes, edges, compact }: WorkflowGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const { getNodes } = useReactFlow();
+  const { getNodes, fitView } = useReactFlow();
+
+  // Re-fit when container shrinks (launched → compact mode)
+  useEffect(() => {
+    const t = setTimeout(() => fitView({ padding: 0.15, duration: 400 }), 60);
+    return () => clearTimeout(t);
+  }, [compact, fitView]);
   const [fades, setFades] = useState({ left: false, right: false });
 
   const updateFades = useCallback(
@@ -84,10 +91,10 @@ function GraphInner({ nodes, edges }: WorkflowGraphProps) {
   );
 }
 
-export function WorkflowGraph({ nodes, edges }: WorkflowGraphProps) {
+export function WorkflowGraph({ nodes, edges, compact }: WorkflowGraphProps) {
   return (
     <ReactFlowProvider>
-      <GraphInner nodes={nodes} edges={edges} />
+      <GraphInner nodes={nodes} edges={edges} compact={compact} />
     </ReactFlowProvider>
   );
 }

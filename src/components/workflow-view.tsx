@@ -76,7 +76,7 @@ export function WorkflowView({
           flexShrink: 0,
         }}
       >
-        <WorkflowGraph nodes={graph.nodes} edges={graph.edges} />
+        <WorkflowGraph nodes={graph.nodes} edges={graph.edges} compact={launched} />
       </div>
 
       {/* Status — fills the remaining 45% */}
@@ -88,7 +88,7 @@ export function WorkflowView({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
             transition={{ duration: 0.4, ease: [0.32, 0.72, 0, 1], delay: 0.2 }}
-            className="flex flex-1 flex-col items-center justify-center"
+            className="flex flex-1 flex-col items-center justify-center pb-[200px]"
           >
             <WorkflowStatus onGoToStats={onGoToStats} />
           </motion.div>
