@@ -57,7 +57,7 @@ export function Step4Limit({ data, onNext }: StepProps) {
               className="pr-9 text-lg"
             />
             <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm font-medium text-muted-foreground">
-              $
+              ₽
             </span>
           </div>
           <p className="text-sm text-muted-foreground">

@@ -16,10 +16,10 @@ const SCENARIO_NAMES: Record<string, string> = {
 };
 
 const SEGMENT_NAMES: Record<string, string> = {
-  max: "Максимальный (€ 0.45 / сигнал)",
-  "very-high": "Очень высокий (€ 0.35 / сигнал)",
-  high: "Высокий (€ 0.25 / сигнал)",
-  medium: "Средний и ниже (€ 0.07 / сигнал)",
+  max: "Максимальный (₽ 0.45 / сигнал)",
+  "very-high": "Очень высокий (₽ 0.35 / сигнал)",
+  high: "Высокий (₽ 0.25 / сигнал)",
+  medium: "Средний и ниже (₽ 0.07 / сигнал)",
 };
 
 const SEGMENT_PRICES: Record<string, number> = {
@@ -99,7 +99,7 @@ export function Step6Summary({ data, onNext, onGoToStep }: StepProps) {
           />
           <SummaryRow
             label="Максимальный бюджет"
-            value={budget ? `€ ${budget.toFixed(2)}` : "—"}
+            value={budget ? `₽ ${budget.toFixed(2)}` : "—"}
             onClick={goto ? () => goto(4) : undefined}
           />
           <SummaryRow

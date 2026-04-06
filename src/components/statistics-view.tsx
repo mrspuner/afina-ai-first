@@ -33,8 +33,8 @@ interface DateGroup {
 }
 
 const DEFAULT_ROW: RowData = {
-  expenses: "1\u00a0509,00$",
-  income: "20\u00a0084,50$",
+  expenses: "1\u00a0509,00\u20bd",
+  income: "20\u00a0084,50\u20bd",
   sends: 19872,
   actions: 1512,
   holds: 582,

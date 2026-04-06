@@ -46,7 +46,7 @@ export function AppSidebar({
       <div className="flex flex-col gap-5">
         {/* Logo */}
         <div className="p-5">
-          <Image src="/logo.svg" alt="Afina" width={80} height={24} priority />
+          <Image src="/logo.svg" alt="Afina" width={80} height={20} priority />
         </div>
 
         <nav className="flex flex-col gap-6 px-2">

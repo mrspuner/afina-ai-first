@@ -95,7 +95,7 @@ export function Step3Segments({ data, onNext }: StepProps) {
                 </div>
               </div>
               <span className="ml-4 shrink-0 text-sm font-medium text-foreground">
-                € {seg.price.toFixed(2)} / сигнал
+                ₽ {seg.price.toFixed(2)} / сигнал
               </span>
             </button>
           );
