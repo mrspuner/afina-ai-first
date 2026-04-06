@@ -146,8 +146,9 @@ export default function Home() {
   }
 
   const chatPlaceholder =
-    isWorkflow              ? "Опишите изменение сценария..." :
-    flowPhase === "campaign"? "Опишите вашу кампанию..."      :
+    isWorkflow               ? "Опишите изменение сценария..."                :
+    flowPhase === "campaign" ? "Опишите вашу кампанию..."                     :
+    flowPhase === "signal"   ? "Введите ваши параметры или задайте вопрос"    :
                               "Выберите шаг или задайте вопрос…";
 
   const showBottomBar = true;

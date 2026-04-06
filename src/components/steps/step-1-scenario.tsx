@@ -1,6 +1,5 @@
 "use client";
 
-import { usePromptInputController } from "@/components/ai-elements/prompt-input";
 import { StepContent } from "@/components/steps/step-content";
 import { StepProps } from "@/types/campaign";
 import { cn } from "@/lib/utils";
@@ -39,24 +38,21 @@ const SCENARIOS = [
 ];
 
 export function Step1Scenario({ data, onNext }: StepProps) {
-  const { textInput } = usePromptInputController();
-
-  function handleSelect(id: string, name: string) {
-    textInput.setInput(`Сценарий: ${name}. `);
+  function handleSelect(id: string) {
     onNext({ scenario: id });
   }
 
   return (
     <StepContent
-      title="Создайте новую кампанию"
-      subtitle="Выберите сценарий — мы зададим нужные вопросы"
+      title="Выберите тип сигнала"
+      subtitle="Выберите сценарий, мы зададим нужные вопросы"
     >
       <div className="grid grid-cols-3 gap-3">
         {SCENARIOS.map((s) => (
           <button
             key={s.id}
             type="button"
-            onClick={() => handleSelect(s.id, s.name)}
+            onClick={() => handleSelect(s.id)}
             className={cn(
               "flex flex-col items-start rounded-lg border p-4 text-left transition-all",
               data.scenario === s.id
