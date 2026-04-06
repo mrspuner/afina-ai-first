@@ -62,7 +62,7 @@ function shiftRight(nodes: WorkflowNode[], fromX: number, amount: number): Workf
 export function createBaseNodes(): WorkflowNode[] {
   return [
     makeNode("signals",  "Сигналы + сегменты", "default",   0,    0,  "Вход из предыдущего шага"),
-    makeNode("split",    "Split по сегментам",  "split",   220,   0,  "HL / L / M"),
+    makeNode("split",    "Split по сегментам",  "split",   220,   0,  "Максимальный / Оч. высокий / Высокий"),
     makeNode("push",     "Push",                "channel", 440,  -80, "Мягкий"),
     makeNode("email",    "Email",               "channel", 440,   0,  "Рассылка"),
     makeNode("sms",      "SMS",                 "channel", 440,   80, "Сообщение"),
@@ -76,9 +76,9 @@ export function createBaseNodes(): WorkflowNode[] {
 export function createBaseEdges(): WorkflowEdge[] {
   return [
     makeEdge("signals",  "split"),
-    makeEdge("split",    "push",     "HL"),
-    makeEdge("split",    "email",    "L"),
-    makeEdge("split",    "sms",      "M"),
+    makeEdge("split",    "push",     "Максимальный"),
+    makeEdge("split",    "email",    "Оч. высокий"),
+    makeEdge("split",    "sms",      "Высокий"),
     makeEdge("push",     "check"),
     makeEdge("email",    "check"),
     makeEdge("sms",      "check"),
