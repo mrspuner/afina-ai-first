@@ -22,6 +22,7 @@ import {
   PromptInputSubmit,
   PromptInputTextarea,
   PromptInputTools,
+  usePromptInputController,
 } from "@/components/ai-elements/prompt-input";
 import { cn } from "@/lib/utils";
 
@@ -35,6 +36,34 @@ interface SelectedCampaign {
   name: string;
 }
 
+function AttachmentEffect({
+  flowPhase,
+  selectedCampaign,
+  signalScenarioId,
+}: {
+  flowPhase: FlowPhase;
+  selectedCampaign: { id: string; name: string } | null;
+  signalScenarioId: string;
+}) {
+  const { attachments } = usePromptInputController();
+
+  useEffect(() => {
+    if (flowPhase === "campaign" && !selectedCampaign && signalScenarioId) {
+      const content = JSON.stringify({ scenario: signalScenarioId });
+      const file = new File(
+        [content],
+        `сигнал_${signalScenarioId}.json`,
+        { type: "application/json" }
+      );
+      attachments.add([file]);
+    } else {
+      attachments.clear();
+    }
+  }, [flowPhase, selectedCampaign, signalScenarioId]);
+
+  return null;
+}
+
 export default function Home() {
   const [activeNav,        setActiveNav]        = useState<string | null>(null);
   const [launchOpen,       setLaunchOpen]       = useState(false);
@@ -45,6 +74,7 @@ export default function Home() {
   const [signalDone,       setSignalDone]       = useState(false);
   const [campaignDone,     setCampaignDone]     = useState(false);
   const [initialScenario,  setInitialScenario]  = useState<{ id: string; name: string } | null>(null);
+  const [signalScenarioId, setSignalScenarioId] = useState<string>("");
 
   // Sidebar navigation — exits guided flow, goes to standalone section
   function handleNavChange(nav: string) {
@@ -63,8 +93,9 @@ export default function Home() {
   }
 
   // Step 8 activates (counter shows) → animate Step 2 badge
-  function handleStep8Reached() {
+  function handleStep8Reached(scenarioId: string) {
     setSignalDone(true);
+    setSignalScenarioId(scenarioId);
     setFlowPhase("awaiting-campaign");
   }
 
@@ -158,19 +189,24 @@ export default function Home() {
       return <CampaignTypeView onSelect={handleCampaignSelect} />;
     }
     if (flowPhase === "campaign" && selectedCampaign) {
+      const signalFileName = signalScenarioId ? `сигнал_${signalScenarioId}.json` : undefined;
       return (
         <WorkflowView
           launched={workflowLaunched}
           pendingCommand={workflowCommand}
           onCommandHandled={handleCommandHandled}
           onGoToStats={handleGoToStats}
+          signalName={signalFileName}
         />
       );
     }
     // Direct sidebar sections
     if (activeNav === "Статистика") return <StatisticsView />;
     if (activeNav === "Сигналы")    return <SignalTypeView onCreateSignal={handleStep1Click} />;
-    if (activeNav === "Кампании")   return <CampaignTypeView onSelect={handleCampaignSelect} />;
+    if (activeNav === "Кампании") {
+      if (!signalDone) return <SignalTypeView onCreateSignal={handleStep1Click} />;
+      return <CampaignTypeView onSelect={handleCampaignSelect} />;
+    }
     // Welcome
     return <WelcomeView onStep1Click={handleStep1Click} />;
   }
@@ -198,6 +234,11 @@ export default function Home() {
           onClose={() => setLaunchOpen(false)}
           onSignalSelect={handleLaunchSignal}
           onCampaignSelect={handleLaunchCampaign}
+        />
+        <AttachmentEffect
+          flowPhase={flowPhase}
+          selectedCampaign={selectedCampaign}
+          signalScenarioId={signalScenarioId}
         />
 
         <div className="relative flex flex-1 flex-col overflow-hidden">
