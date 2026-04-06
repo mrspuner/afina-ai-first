@@ -235,6 +235,7 @@ export default function Home() {
       return (
         <CampaignTypeView
           onSelect={handleCampaignSelect}
+          noSignal={!signalDone}
           campaign={campaignDone && selectedCampaign ? { typeName: selectedCampaign.name, launchedAt: campaignLaunchedAt } : null}
         />
       );

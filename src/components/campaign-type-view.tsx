@@ -38,9 +38,10 @@ interface CampaignCardData {
 interface CampaignTypeViewProps {
   onSelect?: (id: string, name: string) => void;
   campaign?: CampaignCardData | null;
+  noSignal?: boolean;
 }
 
-export function CampaignTypeView({ onSelect, campaign }: CampaignTypeViewProps) {
+export function CampaignTypeView({ onSelect, campaign, noSignal }: CampaignTypeViewProps) {
   return (
     <div className="flex flex-1 flex-col overflow-y-auto px-8 pb-40 pt-[140px]">
       <div className="mx-auto flex w-full max-w-2xl flex-col">
@@ -49,8 +50,18 @@ export function CampaignTypeView({ onSelect, campaign }: CampaignTypeViewProps) 
           Кампании
         </h1>
 
+        {/* No signal empty state */}
+        {noSignal && (
+          <div className="fixed inset-0 left-[120px] flex flex-col items-center justify-center">
+            <p className="mb-1 text-sm font-medium text-foreground">Нет сигналов</p>
+            <p className="max-w-sm text-center text-sm text-muted-foreground">
+              Сначала получите сигнал — на его основе будет запущена кампания.
+            </p>
+          </div>
+        )}
+
         {/* Campaign card */}
-        {campaign && (
+        {!noSignal && campaign && (
           <div className="mb-6 rounded-xl border border-border bg-card p-5">
             <div className="flex items-center gap-2">
               <p className="text-sm font-semibold text-foreground">{campaign.typeName}</p>
@@ -63,7 +74,7 @@ export function CampaignTypeView({ onSelect, campaign }: CampaignTypeViewProps) 
         )}
 
         {/* Campaign type selection */}
-        <div>
+        {!noSignal && <div>
           {campaign ? (
             <p className="mb-4 text-sm font-medium text-foreground">Создать ещё одну кампанию</p>
           ) : (
@@ -87,7 +98,7 @@ export function CampaignTypeView({ onSelect, campaign }: CampaignTypeViewProps) 
               </button>
             ))}
           </div>
-        </div>
+        </div>}
       </div>
     </div>
   );
