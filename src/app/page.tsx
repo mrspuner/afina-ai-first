@@ -62,12 +62,12 @@ export default function Home() {
 
   // Step 8 activates (counter shows) → animate Step 2 badge
   function handleStep8Reached() {
+    setSignalDone(true);
     setFlowPhase("awaiting-campaign");
   }
 
   // Step 8 "Запустить кампанию" button → go to campaign selection
   function handleSignalComplete() {
-    setSignalDone(true);
     setFlowPhase("campaign");
   }
 
