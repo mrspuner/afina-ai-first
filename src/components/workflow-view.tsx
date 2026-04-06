@@ -22,6 +22,7 @@ interface WorkflowViewProps {
   pendingCommand: string | null;
   onCommandHandled: () => void;
   onGoToStats: () => void;
+  signalName?: string;
 }
 
 export function WorkflowView({
@@ -29,9 +30,10 @@ export function WorkflowView({
   pendingCommand,
   onCommandHandled,
   onGoToStats,
+  signalName,
 }: WorkflowViewProps) {
   const [graph, setGraph] = useState<GraphState>({
-    nodes: createBaseNodes(),
+    nodes: createBaseNodes(signalName),
     edges: createBaseEdges(),
   });
   const [unknownCmd, setUnknownCmd] = useState<string | null>(null);
