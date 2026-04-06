@@ -1,19 +1,75 @@
 "use client";
 
-import { StepContent } from "@/components/steps/step-content";
+const SCENARIO_NAMES: Record<string, string> = {
+  registration: "Регистрация",
+  "first-deal":  "Первая сделка",
+  upsell:        "Апсейл",
+  retention:     "Удержание",
+  return:        "Возврат",
+  reactivation:  "Реактивация",
+};
+
+interface SignalCardData {
+  scenarioId: string;
+  count: number;
+  createdAt: string;
+}
 
 interface SignalTypeViewProps {
   onCreateSignal: () => void;
+  signal?: SignalCardData | null;
+  onLaunchCampaign?: () => void;
 }
 
-export function SignalTypeView({ onCreateSignal }: SignalTypeViewProps) {
+export function SignalTypeView({ onCreateSignal, signal, onLaunchCampaign }: SignalTypeViewProps) {
+  const scenarioName = signal
+    ? (SCENARIO_NAMES[signal.scenarioId] ?? signal.scenarioId)
+    : null;
+
   return (
-    <div className="flex flex-1 flex-col items-center justify-center px-8 pb-40 pt-10">
-      <StepContent
-        title="Нет сигналов"
-        subtitle="Вы не создали ещё ни одного сигнала. Перед тем как запустить кампанию, сформируйте первый сигнал."
-      >
-        <div className="flex justify-center">
+    <div className="flex flex-1 flex-col overflow-y-auto px-8 pb-40 pt-10">
+      {/* Section header */}
+      <div className="mb-6">
+        <h1 className="text-[38px] font-semibold leading-[46px] tracking-tight">
+          Сигналы
+        </h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {signal ? "1 сигнал" : "Нет сигналов"}
+        </p>
+      </div>
+
+      {/* Signal card */}
+      {signal && (
+        <div className="mb-4 rounded-xl border border-border bg-card p-5">
+          <p className="text-sm font-semibold text-foreground">
+            {scenarioName} · {signal.count.toLocaleString("ru-RU")} сигналов
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">{signal.createdAt}</p>
+          <div className="mt-4 flex gap-2">
+            <button
+              type="button"
+              className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+            >
+              Скачать сигналы
+            </button>
+            <button
+              type="button"
+              onClick={onLaunchCampaign}
+              className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90"
+            >
+              Запустить кампанию
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Empty state / create button */}
+      {!signal ? (
+        <div className="flex flex-1 flex-col items-center justify-center">
+          <p className="mb-4 max-w-sm text-center text-sm text-muted-foreground">
+            Вы не создали ещё ни одного сигнала. Перед тем как запустить кампанию,
+            сформируйте первый сигнал.
+          </p>
           <button
             type="button"
             onClick={onCreateSignal}
@@ -22,7 +78,15 @@ export function SignalTypeView({ onCreateSignal }: SignalTypeViewProps) {
             Создать сигнал
           </button>
         </div>
-      </StepContent>
+      ) : (
+        <button
+          type="button"
+          onClick={onCreateSignal}
+          className="self-start rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+        >
+          + Создать сигнал
+        </button>
+      )}
     </div>
   );
 }

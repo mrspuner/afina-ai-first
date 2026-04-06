@@ -94,6 +94,7 @@ export default function Home() {
   const [campaignDone,     setCampaignDone]     = useState(false);
   const [initialScenario,  setInitialScenario]  = useState<{ id: string; name: string } | null>(null);
   const [signalScenarioId, setSignalScenarioId] = useState<string>("");
+  const [signalCreatedAt,  setSignalCreatedAt]  = useState<string>("");
 
   // Sidebar navigation — exits guided flow, goes to standalone section
   function handleNavChange(nav: string) {
@@ -115,6 +116,7 @@ export default function Home() {
   function handleStep8Reached(scenarioId: string) {
     setSignalDone(true);
     setSignalScenarioId(scenarioId);
+    setSignalCreatedAt(new Date().toLocaleDateString("ru-RU"));
     setFlowPhase("awaiting-campaign");
   }
 
@@ -221,9 +223,21 @@ export default function Home() {
     }
     // Direct sidebar sections
     if (activeNav === "Статистика") return <StatisticsView />;
-    if (activeNav === "Сигналы")    return <SignalTypeView onCreateSignal={handleStep1Click} />;
+    if (activeNav === "Сигналы")    return (
+      <SignalTypeView
+        onCreateSignal={handleStep1Click}
+        signal={signalDone && signalScenarioId ? { scenarioId: signalScenarioId, count: 4312, createdAt: signalCreatedAt } : null}
+        onLaunchCampaign={handleStep2Click}
+      />
+    );
     if (activeNav === "Кампании") {
-      if (!signalDone) return <SignalTypeView onCreateSignal={handleStep1Click} />;
+      if (!signalDone) return (
+        <SignalTypeView
+          onCreateSignal={handleStep1Click}
+          signal={null}
+          onLaunchCampaign={undefined}
+        />
+      );
       return <CampaignTypeView onSelect={handleCampaignSelect} />;
     }
     // Welcome
