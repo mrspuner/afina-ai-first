@@ -17,11 +17,12 @@ export interface WorkflowNodeData extends Record<string, unknown> {
 export type WorkflowNode = Node<WorkflowNodeData, "workflowNode">;
 export type WorkflowEdge = Edge;
 
-/** A command updater returns new nodes/edges given current state, or null if command not recognised. */
 export type CommandUpdater = (
   nodes: WorkflowNode[],
   edges: WorkflowEdge[]
 ) => { nodes: WorkflowNode[]; edges: WorkflowEdge[] };
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function makeNode(
   id: string,
@@ -29,62 +30,26 @@ function makeNode(
   nodeType: WorkflowNodeType,
   x: number,
   y: number,
-  sublabel?: string
+  sublabel?: string,
 ): WorkflowNode {
-  return {
-    id,
-    type: "workflowNode",
-    position: { x, y },
-    data: { label, nodeType, sublabel },
-  };
+  return { id, type: "workflowNode", position: { x, y }, data: { label, nodeType, sublabel } };
 }
 
-function makeEdge(source: string, target: string): WorkflowEdge {
+const LABEL_STYLE = { fill: "#555", fontSize: 10, fontWeight: 500 };
+const LABEL_BG    = { fill: "transparent", fillOpacity: 0 };
+
+function makeEdge(source: string, target: string, label?: string): WorkflowEdge {
   return {
     id: `${source}-${target}`,
     source,
     target,
-    style: { stroke: "#2a2a2a" },
+    type: "smoothstep",
+    style: { stroke: "#2a2a2a", strokeWidth: 1.5 },
+    ...(label ? { label, labelStyle: LABEL_STYLE, labelBgStyle: LABEL_BG } : {}),
   };
 }
 
-/** Base reactivation pipeline — shown on first render. */
-export function createBaseNodes(): WorkflowNode[] {
-  return [
-    makeNode("signals", "Сигналы", "default",   0,    0, "источник"),
-    makeNode("split",   "Сплит",   "split",    200,   0, "HL / L / M"),
-    makeNode("push",    "Push",    "channel",  400, -80),
-    makeNode("email",   "Email",   "channel",  400,   0),
-    makeNode("sms",     "SMS",     "channel",  400,  80),
-    makeNode("check",   "Проверка","default",  600,   0, "отклик"),
-    makeNode("engaged", "Engaged", "result",   800, -40, "YES"),
-    makeNode("retarget","Retarget","retarget", 800,  40, "NO"),
-    makeNode("result",  "Результат","result", 1000,   0),
-  ];
-}
-
-export function createBaseEdges(): WorkflowEdge[] {
-  return [
-    makeEdge("signals", "split"),
-    makeEdge("split",   "push"),
-    makeEdge("split",   "email"),
-    makeEdge("split",   "sms"),
-    makeEdge("push",    "check"),
-    makeEdge("email",   "check"),
-    makeEdge("sms",     "check"),
-    makeEdge("check",   "engaged"),
-    makeEdge("check",   "retarget"),
-    makeEdge("engaged", "result"),
-    makeEdge("retarget","result"),
-  ];
-}
-
-/** Shift all nodes whose x >= fromX rightward by amount. */
-function shiftRight(
-  nodes: WorkflowNode[],
-  fromX: number,
-  amount: number
-): WorkflowNode[] {
+function shiftRight(nodes: WorkflowNode[], fromX: number, amount: number): WorkflowNode[] {
   return nodes.map((n) =>
     n.position.x >= fromX
       ? { ...n, position: { ...n.position, x: n.position.x + amount } }
@@ -92,76 +57,157 @@ function shiftRight(
   );
 }
 
-/**
- * Parse a natural-language command and return an updater function,
- * or null when the command is not recognised.
- */
+// ── Base graph (Шаг 1 — базовый workflow) ────────────────────────────────────
+
+export function createBaseNodes(): WorkflowNode[] {
+  return [
+    makeNode("signals",  "Сигналы + сегменты", "default",   0,    0,  "Вход из предыдущего шага"),
+    makeNode("split",    "Split по сегментам",  "split",   220,   0,  "HL / L / M"),
+    makeNode("push",     "Push",                "channel", 440,  -80, "Мягкий"),
+    makeNode("email",    "Email",               "channel", 440,   0,  "Рассылка"),
+    makeNode("sms",      "SMS",                 "channel", 440,   80, "Сообщение"),
+    makeNode("check",    "Проверка отклика",    "new",     660,   0,  "Реакция / нет"),
+    makeNode("engaged",  "Engaged flow",        "result",  880,  -40, "Баннер + доп. push"),
+    makeNode("retarget", "Retarget flow",       "retarget",880,   40, "Смена канала + оффер"),
+    makeNode("result",   "Результат",           "default",1080,   0,  "Reactivated / cold"),
+  ];
+}
+
+export function createBaseEdges(): WorkflowEdge[] {
+  return [
+    makeEdge("signals",  "split"),
+    makeEdge("split",    "push",     "HL"),
+    makeEdge("split",    "email",    "L"),
+    makeEdge("split",    "sms",      "M"),
+    makeEdge("push",     "check"),
+    makeEdge("email",    "check"),
+    makeEdge("sms",      "check"),
+    makeEdge("check",    "engaged",  "YES"),
+    makeEdge("check",    "retarget", "NO"),
+    makeEdge("engaged",  "result"),
+    makeEdge("retarget", "result"),
+  ];
+}
+
+// ── Command parser ────────────────────────────────────────────────────────────
+
 export function parseWorkflowCommand(msg: string): CommandUpdater | null {
   const lower = msg.toLowerCase();
 
-  // 1. Remove SMS channel
+  // 1. Replace SMS with Push (M) — mark changed in amber, update retarget sublabel
   if (lower.includes("убери sms") || lower.includes("удали sms") || lower.includes("убрать sms")) {
     return (nodes, edges) => ({
-      nodes: nodes.filter((n) => n.id !== "sms"),
-      edges: edges.filter((e) => e.source !== "sms" && e.target !== "sms"),
+      nodes: nodes.map((n) => {
+        if (n.id === "sms")
+          return { ...n, data: { label: "Push", sublabel: "M — вместо SMS", nodeType: "new" as WorkflowNodeType } };
+        if (n.id === "retarget")
+          return { ...n, data: { ...n.data, sublabel: "Push / баннер, без SMS" } };
+        return n;
+      }),
+      // edge split→sms keeps label "M" — now points to Push(M), correct
+      edges,
     });
   }
 
-  // 2. Add activity filter before split
+  // 2. Add activity filter between signals and split
   if (lower.includes("добавь фильтр") || lower.includes("фильтр активности") || lower.includes("добавить фильтр")) {
     return (nodes, edges) => {
-      if (nodes.find((n) => n.id === "filter")) return { nodes, edges }; // idempotent
+      if (nodes.find((n) => n.id === "filter")) return { nodes, edges };
       const signalsNode = nodes.find((n) => n.id === "signals");
       if (!signalsNode) return { nodes, edges };
-      const filterX = signalsNode.position.x + 200;
-      const shifted = shiftRight(nodes, filterX, 200);
-      const filterNode = makeNode(
-        "filter", "Фильтр 24ч", "new", filterX, signalsNode.position.y
-      );
-      const filteredEdges = edges.filter(
-        (e) => !(e.source === "signals" && e.target === "split")
-      );
-      return { nodes: [...shifted, filterNode], edges: [...filteredEdges, makeEdge("signals", "filter"), makeEdge("filter", "split")] };
+      const filterX  = signalsNode.position.x + 220;
+      const shifted  = shiftRight(nodes, filterX, 220);
+      const filterNode = makeNode("filter", "Filter: Activity", "new", filterX, signalsNode.position.y, "Исключить активных за 24h");
+      const filteredEdges = edges.filter((e) => !(e.source === "signals" && e.target === "split"));
+      return {
+        nodes: [...shifted, filterNode],
+        edges: [...filteredEdges, makeEdge("signals", "filter"), makeEdge("filter", "split")],
+      };
     };
   }
 
-  // 3. Add delay in retarget branch
+  // 3. Add delay (before retarget) + Повторная проверка (after retarget)
   if (lower.includes("добавь задержку") || lower.includes("delay")) {
     return (nodes, edges) => {
       if (nodes.find((n) => n.id === "delay")) return { nodes, edges };
       const retargetNode = nodes.find((n) => n.id === "retarget");
-      const resultNode   = nodes.find((n) => n.id === "result");
-      if (!retargetNode || !resultNode) return { nodes, edges };
-      const delayX = (retargetNode.position.x + resultNode.position.x) / 2;
-      const delayNode = makeNode(
-        "delay", "Задержка 24ч", "new", delayX, retargetNode.position.y
-      );
+      if (!retargetNode) return { nodes, edges };
+
+      const step     = 200;
+      const delayX   = retargetNode.position.x;
+      const retX     = delayX + step;
+      const recheckX = retX + step;
+      const resultX  = recheckX + step;
+      const y        = retargetNode.position.y;
+
+      const updatedNodes = nodes.map((n) => {
+        if (n.id === "retarget") return { ...n, position: { x: retX, y } };
+        if (n.id === "result")   return { ...n, position: { x: Math.max(n.position.x, resultX), y: n.position.y } };
+        return n;
+      });
+
+      const delayNode   = makeNode("delay",   "Delay 24h",          "new", delayX,   y, "Ожидание");
+      const recheckNode = makeNode("recheck", "Повторная проверка", "new", recheckX, y, "Реакция / нет");
+
       const filteredEdges = edges.filter(
-        (e) => !(e.source === "retarget" && e.target === "result")
+        (e) =>
+          !(e.source === "check"    && e.target === "retarget") &&
+          !(e.source === "retarget" && e.target === "result")
       );
-      return { nodes: [...nodes, delayNode], edges: [...filteredEdges, makeEdge("retarget", "delay"), makeEdge("delay", "result")] };
+
+      return {
+        nodes: [...updatedNodes, delayNode, recheckNode],
+        edges: [
+          ...filteredEdges,
+          makeEdge("check",    "delay",   "NO"),
+          makeEdge("delay",    "retarget"),
+          makeEdge("retarget", "recheck"),
+          makeEdge("recheck",  "result"),
+        ],
+      };
     };
   }
 
-  // 4. Add email-opened condition inside engaged branch
-  if (
-    lower.includes("условие email") ||
-    lower.includes("email открыт") ||
-    lower.includes("добавь условие")
-  ) {
+  // 4. Replace Engaged flow with Email-открыт? decision + two banner branches
+  if (lower.includes("условие email") || lower.includes("email открыт") || lower.includes("добавь условие")) {
     return (nodes, edges) => {
       if (nodes.find((n) => n.id === "email-condition")) return { nodes, edges };
       const engagedNode = nodes.find((n) => n.id === "engaged");
-      const resultNode  = nodes.find((n) => n.id === "result");
-      if (!engagedNode || !resultNode) return { nodes, edges };
-      const condX = (engagedNode.position.x + resultNode.position.x) / 2;
-      const condNode = makeNode(
-        "email-condition", "Email открыт?", "new", condX, engagedNode.position.y
-      );
+      if (!engagedNode) return { nodes, edges };
+
+      const condX   = engagedNode.position.x;
+      const condY   = engagedNode.position.y;
+      const bannerX = condX + 200;
+
+      const condNode  = makeNode("email-condition", "Email открыт?", "new",    condX,   condY,       "Проверка события");
+      const bannerYes = makeNode("banner-yes",      "Баннер",        "result", bannerX, condY - 55,  "Без push");
+      const bannerNo  = makeNode("banner-no",       "Баннер",        "result", bannerX, condY + 25,  "+ push");
+
+      const updatedNodes = nodes
+        .filter((n) => n.id !== "engaged")
+        .map((n) =>
+          n.id === "result"
+            ? { ...n, position: { x: Math.max(n.position.x, bannerX + 200), y: n.position.y } }
+            : n
+        );
+
       const filteredEdges = edges.filter(
-        (e) => !(e.source === "engaged" && e.target === "result")
+        (e) =>
+          !(e.source === "check"   && e.target === "engaged") &&
+          !(e.source === "engaged" && e.target === "result")
       );
-      return { nodes: [...nodes, condNode], edges: [...filteredEdges, makeEdge("engaged", "email-condition"), makeEdge("email-condition", "result")] };
+
+      return {
+        nodes: [...updatedNodes, condNode, bannerYes, bannerNo],
+        edges: [
+          ...filteredEdges,
+          makeEdge("check",           "email-condition", "YES"),
+          makeEdge("email-condition", "banner-yes",      "YES"),
+          makeEdge("email-condition", "banner-no",       "NO"),
+          makeEdge("banner-yes",      "result"),
+          makeEdge("banner-no",       "result"),
+        ],
+      };
     };
   }
 
