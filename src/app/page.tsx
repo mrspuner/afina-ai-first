@@ -150,7 +150,7 @@ export default function Home() {
     flowPhase === "campaign"? "Опишите вашу кампанию..."      :
                               "Выберите шаг или задайте вопрос…";
 
-  const showBottomBar = !workflowLaunched;
+  const showBottomBar = true;
   const floatBottom   = onWelcome ? "40%" : "3%";
 
   return (
