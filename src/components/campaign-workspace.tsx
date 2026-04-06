@@ -19,7 +19,7 @@ function WorkspaceInner({
   initialScenario,
 }: {
   onSignalComplete?: () => void;
-  onStep8Reached?: () => void;
+  onStep8Reached?: (scenarioId: string) => void;
   initialScenario?: { id: string; name: string };
 }) {
   const startStep = initialScenario ? 2 : 1;
@@ -54,7 +54,7 @@ function WorkspaceInner({
         setMaxStep(next);
         setAnimatingStep(next);
         setCurrentStep(next);
-        if (next === 8) onStep8Reached?.();
+        if (next === 8) onStep8Reached?.(stepData.scenario ?? "");
       } else {
         setAnimatingStep(null);
         setCurrentStep(next);
@@ -139,7 +139,7 @@ export function CampaignWorkspace({
   initialScenario,
 }: {
   onSignalComplete?: () => void;
-  onStep8Reached?: () => void;
+  onStep8Reached?: (scenarioId: string) => void;
   initialScenario?: { id: string; name: string };
 } = {}) {
   return (
