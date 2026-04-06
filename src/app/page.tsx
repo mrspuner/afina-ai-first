@@ -285,12 +285,13 @@ export default function Home() {
 
           {showBottomBar && (
             <motion.div
-              className="fixed left-[120px] right-0 z-30 px-8"
+              className="fixed left-[120px] right-0 z-30 px-8 pb-4"
               initial={false}
               animate={{ bottom: floatBottom }}
               transition={{ duration: 0.55, ease: [0.32, 0.72, 0, 1] }}
             >
-              <div className="mx-auto flex w-full max-w-2xl flex-col gap-2">
+              <div className="pointer-events-none absolute inset-x-0 -top-10 h-10 bg-gradient-to-t from-background to-transparent" />
+              <div className="relative mx-auto flex w-full max-w-2xl flex-col gap-2 bg-background pt-2">
 
                 {/* Launch button — only while editing the workflow graph */}
                 {isWorkflow && !workflowLaunched && (
@@ -367,6 +368,7 @@ export default function Home() {
                     40%, 80% { border-color: #1e1e1e; box-shadow: none; }
                   }
                 `}</style>
+              </div>
               </div>
             </motion.div>
           )}
