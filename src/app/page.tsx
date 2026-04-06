@@ -18,10 +18,12 @@ import {
   PromptInputBody,
   PromptInputButton,
   PromptInputFooter,
+  PromptInputHeader,
   PromptInputProvider,
   PromptInputSubmit,
   PromptInputTextarea,
   PromptInputTools,
+  usePromptInputAttachments,
   usePromptInputController,
 } from "@/components/ai-elements/prompt-input";
 import { cn } from "@/lib/utils";
@@ -34,6 +36,23 @@ type FlowPhase = "signal" | "awaiting-campaign" | "campaign" | null;
 interface SelectedCampaign {
   id: string;
   name: string;
+}
+
+function AttachmentFileList() {
+  const { files } = usePromptInputAttachments();
+  if (files.length === 0) return null;
+  return (
+    <PromptInputHeader>
+      {files.map((f) => (
+        <div
+          key={f.id}
+          className="flex items-center gap-1.5 rounded-md border border-border bg-muted px-2.5 py-1 text-xs text-foreground"
+        >
+          <span className="max-w-[200px] truncate">{f.filename}</span>
+        </div>
+      ))}
+    </PromptInputHeader>
+  );
 }
 
 function AttachmentEffect({
@@ -267,6 +286,7 @@ export default function Home() {
                 )}
 
                 <PromptInput onSubmit={handlePromptSubmit}>
+                  <AttachmentFileList />
                   <PromptInputBody>
                     <PromptInputTextarea placeholder={chatPlaceholder} />
                   </PromptInputBody>
