@@ -10,6 +10,7 @@ import { StatisticsView } from "@/components/statistics-view";
 import { LaunchFlyout } from "@/components/launch-flyout";
 import { WelcomeView } from "@/components/welcome-view";
 import { CampaignTypeView } from "@/components/campaign-type-view";
+import { SignalTypeView } from "@/components/signal-type-view";
 import { WorkflowView } from "@/components/workflow-view";
 import type { PromptInputMessage } from "@/components/ai-elements/prompt-input";
 import {
@@ -32,18 +33,23 @@ interface SelectedCampaign {
 export default function Home() {
   const [activeNav,        setActiveNav]        = useState<string | null>(null);
   const [launchOpen,       setLaunchOpen]       = useState(false);
+  const [selectedSignal,   setSelectedSignal]   = useState<SelectedCampaign | null>(null);
   const [selectedCampaign, setSelectedCampaign] = useState<SelectedCampaign | null>(null);
   const [workflowLaunched, setWorkflowLaunched] = useState(false);
   const [workflowCommand,  setWorkflowCommand]  = useState<string | null>(null);
 
   function handleNavChange(nav: string | null) {
     setActiveNav(nav);
-    // Reset workflow state when leaving campaigns
     if (nav !== "Кампании") {
+      setSelectedSignal(null);
       setSelectedCampaign(null);
       setWorkflowLaunched(false);
       setWorkflowCommand(null);
     }
+  }
+
+  function handleSignalSelect(id: string, name: string) {
+    setSelectedSignal({ id, name });
   }
 
   function handleCampaignSelect(id: string, name: string) {
@@ -64,30 +70,33 @@ export default function Home() {
 
   function handleGoToStats() {
     setActiveNav("Статистика");
+    setSelectedSignal(null);
     setSelectedCampaign(null);
     setWorkflowLaunched(false);
   }
 
-  const isWorkflow = activeNav === "Кампании" && selectedCampaign !== null;
+  const isSignalFlow = activeNav === "Кампании" && !selectedSignal;
+  const isWorkflow   = activeNav === "Кампании" && selectedCampaign !== null;
+  const isCampaignFlow = activeNav === "Кампании" && selectedSignal !== null && !selectedCampaign;
 
-  // Detect transition into workflow → animate Step 2 badge border green
+  // Detect signal selected → animate Step 2 badge border green
   const [stepTwoNew, setStepTwoNew] = useState(false);
-  const prevIsWorkflow = useRef(false);
+  const prevHasSignal = useRef(false);
   useEffect(() => {
-    if (isWorkflow && !prevIsWorkflow.current) {
+    if (selectedSignal && !prevHasSignal.current) {
       setStepTwoNew(true);
       const t = setTimeout(() => setStepTwoNew(false), 1400);
-      prevIsWorkflow.current = true;
+      prevHasSignal.current = true;
       return () => clearTimeout(t);
     }
-    if (!isWorkflow) {
-      prevIsWorkflow.current = false;
+    if (!selectedSignal) {
+      prevHasSignal.current = false;
     }
-  }, [isWorkflow]);
+  }, [selectedSignal]);
 
   const welcomeSteps = [
-    { n: 1, label: "Получение сигнала",   active: activeNav === null || (activeNav === "Кампании" && !selectedCampaign) },
-    { n: 2, label: "Запуск кампании",     active: isWorkflow && !workflowLaunched },
+    { n: 1, label: "Получение сигнала",   active: activeNav === null || isSignalFlow },
+    { n: 2, label: "Запуск кампании",     active: (isCampaignFlow || isWorkflow) && !workflowLaunched },
     { n: 3, label: "Статистика кампании", active: workflowLaunched },
   ];
 
@@ -98,10 +107,13 @@ export default function Home() {
     if (activeNav === "Статистика") {
       return <StatisticsView />;
     }
-    if (activeNav === "Кампании" && selectedCampaign === null) {
+    if (activeNav === "Кампании" && !selectedSignal) {
+      return <SignalTypeView onSelect={handleSignalSelect} />;
+    }
+    if (activeNav === "Кампании" && selectedSignal && !selectedCampaign) {
       return <CampaignTypeView onSelect={handleCampaignSelect} />;
     }
-    if (activeNav === "Кампании" && selectedCampaign !== null) {
+    if (activeNav === "Кампании" && selectedCampaign) {
       return (
         <WorkflowView
           launched={workflowLaunched}
@@ -116,7 +128,7 @@ export default function Home() {
 
   // Derive chat placeholder
   const chatPlaceholder =
-    activeNav === null
+    activeNav === null || isSignalFlow
       ? "Выберите шаг или задайте вопрос…"
       : isWorkflow
       ? "Опишите изменение сценария..."
