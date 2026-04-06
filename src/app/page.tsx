@@ -42,6 +42,8 @@ export default function Home() {
   const [selectedCampaign, setSelectedCampaign] = useState<SelectedCampaign | null>(null);
   const [workflowLaunched, setWorkflowLaunched] = useState(false);
   const [workflowCommand,  setWorkflowCommand]  = useState<string | null>(null);
+  const [signalDone,       setSignalDone]       = useState(false);
+  const [campaignDone,     setCampaignDone]     = useState(false);
 
   // Sidebar navigation — exits guided flow, goes to standalone section
   function handleNavChange(nav: string) {
@@ -65,6 +67,7 @@ export default function Home() {
 
   // Step 8 "Запустить кампанию" button → go to campaign selection
   function handleSignalComplete() {
+    setSignalDone(true);
     setFlowPhase("campaign");
   }
 
@@ -114,9 +117,9 @@ export default function Home() {
   }, [flowPhase]);
 
   const onWelcome   = flowPhase === null && activeNav === null;
-  const step1Active = onWelcome || flowPhase === "signal";
-  const step2Active = flowPhase === "awaiting-campaign" || (flowPhase === "campaign" && !workflowLaunched);
-  const step3Active = workflowLaunched;
+  const step1Active = !signalDone;
+  const step2Active = signalDone && !campaignDone;
+  const step3Active = campaignDone;
 
   function renderMain() {
     // Guided signal flow (CampaignWorkspace persists through awaiting-campaign so step 8 stays visible)
@@ -182,7 +185,7 @@ export default function Home() {
                   <div className="flex justify-end">
                     <button
                       type="button"
-                      onClick={() => setWorkflowLaunched(true)}
+                      onClick={() => { setWorkflowLaunched(true); setCampaignDone(true); }}
                       className="rounded-lg bg-foreground px-5 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90"
                     >
                       Начать кампанию →
