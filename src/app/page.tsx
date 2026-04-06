@@ -300,7 +300,8 @@ export default function Home() {
                   </PromptInputFooter>
                 </PromptInput>
 
-                {/* Step badges */}
+                {/* Step badges — hidden after onboarding complete */}
+                {!campaignDone && (
                 <div className="flex gap-2">
                   {([
                     { n: 1, label: "Получение сигнала",   active: step1Active, onClick: onWelcome ? handleStep1Click : undefined },
@@ -337,6 +338,7 @@ export default function Home() {
                     </button>
                   ))}
                 </div>
+                )}
 
                 <style>{`
                   @keyframes step-badge-pulse {
