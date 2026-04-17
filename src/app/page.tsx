@@ -8,7 +8,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { CampaignWorkspace } from "@/components/campaign-workspace";
 import { StatisticsView } from "@/components/statistics-view";
 import { LaunchFlyout } from "@/components/launch-flyout";
-import { WelcomeView } from "@/components/welcome-view";
+import { WelcomeView } from "@/sections/welcome/welcome-view";
 import { CampaignTypeView } from "@/components/campaign-type-view";
 import { SignalTypeView } from "@/components/signal-type-view";
 import { WorkflowView } from "@/components/workflow-view";
