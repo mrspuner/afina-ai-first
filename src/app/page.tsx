@@ -6,7 +6,7 @@ import { motion } from "motion/react";
 import { Mic, ChevronRight } from "lucide-react";
 import { AppSidebar } from "@/sections/shell/app-sidebar";
 import { CampaignWorkspace } from "@/sections/signals/campaign-workspace";
-import { StatisticsView } from "@/sections/statistics/statistics-view";
+import { StatisticsSection } from "@/sections/statistics/statistics-section";
 import { LaunchFlyout } from "@/sections/shell/launch-flyout";
 import { WelcomeSection } from "@/sections/welcome/welcome-section";
 import { CampaignTypeView } from "@/sections/campaigns/campaign-type-view";
@@ -139,7 +139,7 @@ export default function Home() {
       );
     }
     if (view.kind === "section") {
-      if (view.name === "Статистика") return <StatisticsView />;
+      if (view.name === "Статистика") return <StatisticsSection />;
       if (view.name === "Сигналы") {
         return (
           <SignalTypeView
