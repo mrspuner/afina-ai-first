@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Onest } from "next/font/google";
 import "./globals.css";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { AppStateProvider } from "@/state/app-state-context";
 
 const onest = Onest({
   variable: "--font-sans",
@@ -28,7 +29,9 @@ export default function RootLayout({
         <script src="https://mcp.figma.com/mcp/html-to-design/capture.js" async></script>
       </head>
       <body className="min-h-full flex flex-col">
-        <TooltipProvider>{children}</TooltipProvider>
+        <TooltipProvider>
+          <AppStateProvider>{children}</AppStateProvider>
+        </TooltipProvider>
       </body>
     </html>
   );
