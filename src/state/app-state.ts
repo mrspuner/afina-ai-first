@@ -25,6 +25,7 @@ export type AppState = {
   launchedCampaign: CampaignFact | null;
   workflowCommand: string | null;
   launchFlyoutOpen: boolean;
+  activeSection: SectionName | null;
 };
 
 export type Action =
@@ -49,6 +50,7 @@ export const initialState: AppState = {
   launchedCampaign: null,
   workflowCommand: null,
   launchFlyoutOpen: false,
+  activeSection: null,
 };
 
 export function appReducer(state: AppState, action: Action): AppState {
@@ -58,6 +60,7 @@ export function appReducer(state: AppState, action: Action): AppState {
         ...state,
         view: { kind: "guided-signal", initialScenario: action.initialScenario },
         launchFlyoutOpen: false,
+        activeSection: null,
       };
 
     case "signal_step8_reached": {
@@ -77,6 +80,7 @@ export function appReducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         view: { kind: "workflow", campaign: action.campaign, launched: false },
+        activeSection: null,
       };
 
     case "campaign_launched": {
@@ -102,6 +106,7 @@ export function appReducer(state: AppState, action: Action): AppState {
         ...state,
         view: { kind: "section", name: "Статистика" },
         workflowCommand: null,
+        activeSection: "Статистика",
       };
 
     case "sidebar_nav":
@@ -109,6 +114,7 @@ export function appReducer(state: AppState, action: Action): AppState {
         ...state,
         view: { kind: "section", name: action.section },
         workflowCommand: null,
+        activeSection: action.section,
       };
 
     case "flyout_open":
@@ -125,6 +131,7 @@ export function appReducer(state: AppState, action: Action): AppState {
           initialScenario: { id: action.id, name: action.name },
         },
         launchFlyoutOpen: false,
+        activeSection: null,
       };
 
     case "flyout_campaign_select":
@@ -134,6 +141,7 @@ export function appReducer(state: AppState, action: Action): AppState {
         view: state.signal
           ? { kind: "campaign-select" }
           : { kind: "section", name: "Сигналы" },
+        activeSection: state.signal ? null : "Сигналы",
       };
   }
 }

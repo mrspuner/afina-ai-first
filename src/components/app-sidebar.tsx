@@ -20,10 +20,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import type { SectionName } from "@/state/app-state";
 
 interface AppSidebarProps {
-  activeNav?: string;
-  onNavChange?: (nav: string) => void;
+  activeNav?: SectionName;
+  onNavChange?: (nav: SectionName) => void;
   onLaunchOpen?: () => void;
   flyoutOpen?: boolean;
 }
@@ -38,7 +39,7 @@ export function AppSidebar({
     { icon: Bell, label: "Сигналы" },
     { icon: Megaphone, label: "Кампании" },
     { icon: BarChart2, label: "Статистика" },
-  ];
+  ] as const satisfies ReadonlyArray<{ icon: typeof Bell; label: SectionName }>;
 
   return (
     <aside className={cn("flex h-screen w-[120px] shrink-0 flex-col justify-between transition-colors", flyoutOpen ? "bg-card" : "bg-background")}>

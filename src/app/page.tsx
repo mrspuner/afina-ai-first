@@ -176,16 +176,14 @@ export default function Home() {
 
   const floatBottom = isOnWelcome(state) ? "40%" : "3%";
 
-  const activeNav = view.kind === "section" ? view.name : undefined;
+  const activeNav = state.activeSection ?? undefined;
 
   return (
     <PromptInputProvider>
       <div className="flex h-screen overflow-hidden bg-background">
         <AppSidebar
           activeNav={activeNav}
-          onNavChange={(nav) =>
-            dispatch({ type: "sidebar_nav", section: nav as "Статистика" | "Сигналы" | "Кампании" })
-          }
+          onNavChange={(nav) => dispatch({ type: "sidebar_nav", section: nav })}
           onLaunchOpen={() => dispatch({ type: "flyout_open" })}
           flyoutOpen={launchFlyoutOpen}
         />
