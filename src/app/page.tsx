@@ -4,10 +4,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { Mic, ChevronRight } from "lucide-react";
-import { AppSidebar } from "@/components/app-sidebar";
+import { AppSidebar } from "@/sections/shell/app-sidebar";
 import { CampaignWorkspace } from "@/components/campaign-workspace";
 import { StatisticsView } from "@/sections/statistics/statistics-view";
-import { LaunchFlyout } from "@/components/launch-flyout";
+import { LaunchFlyout } from "@/sections/shell/launch-flyout";
 import { WelcomeView } from "@/sections/welcome/welcome-view";
 import { CampaignTypeView } from "@/components/campaign-type-view";
 import { SignalTypeView } from "@/components/signal-type-view";
