@@ -8,7 +8,7 @@ import { AppSidebar } from "@/sections/shell/app-sidebar";
 import { CampaignWorkspace } from "@/sections/signals/campaign-workspace";
 import { StatisticsView } from "@/sections/statistics/statistics-view";
 import { LaunchFlyout } from "@/sections/shell/launch-flyout";
-import { WelcomeView } from "@/sections/welcome/welcome-view";
+import { WelcomeSection } from "@/sections/welcome/welcome-section";
 import { CampaignTypeView } from "@/sections/campaigns/campaign-type-view";
 import { SignalTypeView } from "@/sections/signals/signal-type-view";
 import { WorkflowView } from "@/sections/campaigns/workflow-view";
@@ -165,7 +165,7 @@ export default function Home() {
         );
       }
     }
-    return <WelcomeView onStep1Click={() => dispatch({ type: "start_signal_flow" })} />;
+    return <WelcomeSection />;
   }
 
   const chatPlaceholder =
