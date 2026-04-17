@@ -1,6 +1,6 @@
 "use client";
 
-import { StepContent } from "@/components/steps/step-content";
+import { StepContent } from "@/sections/signals/steps/step-content";
 import { StepProps } from "@/types/campaign";
 import { cn } from "@/lib/utils";
 

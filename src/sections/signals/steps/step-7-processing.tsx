@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
-import { StepContent } from "@/components/steps/step-content";
+import { StepContent } from "@/sections/signals/steps/step-content";
 import { StepProps } from "@/types/campaign";
 
 const TOTAL_DURATION = 4000; // ms

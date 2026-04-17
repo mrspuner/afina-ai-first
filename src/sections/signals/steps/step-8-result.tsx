@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Download, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { StepContent } from "@/components/steps/step-content";
+import { StepContent } from "@/sections/signals/steps/step-content";
 import { StepProps } from "@/types/campaign";
 
 export function Step8Result({ data, onNext }: StepProps) {

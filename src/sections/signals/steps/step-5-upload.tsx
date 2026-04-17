@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { StepContent } from "@/components/steps/step-content";
+import { StepContent } from "@/sections/signals/steps/step-content";
 import { StepProps } from "@/types/campaign";
 import { useTypewriter } from "@/hooks/use-typewriter";
 import { cn } from "@/lib/utils";

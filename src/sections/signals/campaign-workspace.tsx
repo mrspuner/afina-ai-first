@@ -2,16 +2,16 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
-import { CampaignStepper } from "@/components/campaign-stepper";
+import { CampaignStepper } from "@/sections/signals/campaign-stepper";
 import { StepData, initialStepData } from "@/types/campaign";
-import { Step1Scenario } from "@/components/steps/step-1-scenario";
-import { Step2Interests } from "@/components/steps/step-2-interests";
-import { Step3Segments } from "@/components/steps/step-3-segments";
-import { Step4Limit } from "@/components/steps/step-4-limit";
-import { Step5Upload } from "@/components/steps/step-5-upload";
-import { Step6Summary } from "@/components/steps/step-6-summary";
-import { Step7Processing } from "@/components/steps/step-7-processing";
-import { Step8Result } from "@/components/steps/step-8-result";
+import { Step1Scenario } from "@/sections/signals/steps/step-1-scenario";
+import { Step2Interests } from "@/sections/signals/steps/step-2-interests";
+import { Step3Segments } from "@/sections/signals/steps/step-3-segments";
+import { Step4Limit } from "@/sections/signals/steps/step-4-limit";
+import { Step5Upload } from "@/sections/signals/steps/step-5-upload";
+import { Step6Summary } from "@/sections/signals/steps/step-6-summary";
+import { Step7Processing } from "@/sections/signals/steps/step-7-processing";
+import { Step8Result } from "@/sections/signals/steps/step-8-result";
 
 function WorkspaceInner({
   onSignalComplete,
