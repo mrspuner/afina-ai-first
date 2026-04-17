@@ -1,7 +1,7 @@
 // src/app/page.tsx
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { Mic, ChevronRight } from "lucide-react";
 import { AppSidebar } from "@/sections/shell/app-sidebar";
@@ -9,9 +9,9 @@ import { GuidedSignalSection } from "@/sections/signals/guided-signal-section";
 import { StatisticsSection } from "@/sections/statistics/statistics-section";
 import { LaunchFlyout } from "@/sections/shell/launch-flyout";
 import { WelcomeSection } from "@/sections/welcome/welcome-section";
-import { CampaignTypeView } from "@/sections/campaigns/campaign-type-view";
+import { CampaignsSection } from "@/sections/campaigns/campaigns-section";
 import { SignalsSection } from "@/sections/signals/signals-section";
-import { WorkflowView } from "@/sections/campaigns/workflow-view";
+import { WorkflowSection } from "@/sections/campaigns/workflow-section";
 import type { PromptInputMessage } from "@/components/ai-elements/prompt-input";
 import {
   PromptInput,
@@ -82,10 +82,6 @@ export default function Home() {
   const { view, signal, launchFlyoutOpen } = state;
   const signalScenarioId = signal?.scenarioId ?? "";
 
-  const handleCommandHandled = useCallback(() => {
-    dispatch({ type: "workflow_command_handled" });
-  }, [dispatch]);
-
   function handlePromptSubmit(message: PromptInputMessage) {
     if (view.kind === "workflow" && !view.launched) {
       dispatch({ type: "workflow_command_submit", text: message.text ?? "" });
@@ -108,41 +104,12 @@ export default function Home() {
     if (view.kind === "guided-signal" || view.kind === "awaiting-campaign") {
       return <GuidedSignalSection />;
     }
-    if (view.kind === "campaign-select") {
-      return (
-        <CampaignTypeView
-          onSelect={(id, name) =>
-            dispatch({ type: "campaign_selected", campaign: { id, name } })
-          }
-        />
-      );
-    }
-    if (view.kind === "workflow") {
-      const signalFileName = signalScenarioId ? `сигнал_${signalScenarioId}.json` : undefined;
-      return (
-        <WorkflowView
-          launched={view.launched}
-          pendingCommand={state.workflowCommand}
-          onCommandHandled={handleCommandHandled}
-          onGoToStats={() => dispatch({ type: "goto_stats" })}
-          signalName={signalFileName}
-        />
-      );
-    }
+    if (view.kind === "campaign-select") return <CampaignsSection mode="guided" />;
+    if (view.kind === "workflow") return <WorkflowSection />;
     if (view.kind === "section") {
       if (view.name === "Статистика") return <StatisticsSection />;
       if (view.name === "Сигналы") return <SignalsSection />;
-      if (view.name === "Кампании") {
-        return (
-          <CampaignTypeView
-            onSelect={(id, name) =>
-              dispatch({ type: "campaign_selected", campaign: { id, name } })
-            }
-            noSignal={signal === null}
-            campaign={state.launchedCampaign}
-          />
-        );
-      }
+      if (view.name === "Кампании") return <CampaignsSection mode="standalone" />;
     }
     return <WelcomeSection />;
   }
