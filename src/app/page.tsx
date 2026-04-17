@@ -9,9 +9,9 @@ import { CampaignWorkspace } from "@/sections/signals/campaign-workspace";
 import { StatisticsView } from "@/sections/statistics/statistics-view";
 import { LaunchFlyout } from "@/sections/shell/launch-flyout";
 import { WelcomeView } from "@/sections/welcome/welcome-view";
-import { CampaignTypeView } from "@/components/campaign-type-view";
+import { CampaignTypeView } from "@/sections/campaigns/campaign-type-view";
 import { SignalTypeView } from "@/sections/signals/signal-type-view";
-import { WorkflowView } from "@/components/workflow-view";
+import { WorkflowView } from "@/sections/campaigns/workflow-view";
 import type { PromptInputMessage } from "@/components/ai-elements/prompt-input";
 import {
   PromptInput,

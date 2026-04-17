@@ -3,8 +3,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { WorkflowGraph } from "@/components/workflow-graph";
-import { WorkflowStatus } from "@/components/workflow-status";
+import { WorkflowGraph } from "@/sections/campaigns/workflow-graph";
+import { WorkflowStatus } from "@/sections/campaigns/workflow-status";
 import {
   createBaseNodes,
   createBaseEdges,

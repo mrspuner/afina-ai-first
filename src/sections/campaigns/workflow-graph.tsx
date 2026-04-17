@@ -11,7 +11,7 @@ import {
   PanOnScrollMode,
 } from "@xyflow/react";
 import { Controls } from "@/components/ai-elements/controls";
-import { WorkflowNodeComponent } from "@/components/workflow-node";
+import { WorkflowNodeComponent } from "@/sections/campaigns/workflow-node";
 import type { WorkflowNode, WorkflowEdge } from "@/types/workflow";
 
 // Defined outside component — React Flow requires stable nodeTypes reference
