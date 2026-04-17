@@ -5,12 +5,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { Mic, ChevronRight } from "lucide-react";
 import { AppSidebar } from "@/sections/shell/app-sidebar";
-import { CampaignWorkspace } from "@/sections/signals/campaign-workspace";
+import { GuidedSignalSection } from "@/sections/signals/guided-signal-section";
 import { StatisticsSection } from "@/sections/statistics/statistics-section";
 import { LaunchFlyout } from "@/sections/shell/launch-flyout";
 import { WelcomeSection } from "@/sections/welcome/welcome-section";
 import { CampaignTypeView } from "@/sections/campaigns/campaign-type-view";
-import { SignalTypeView } from "@/sections/signals/signal-type-view";
+import { SignalsSection } from "@/sections/signals/signals-section";
 import { WorkflowView } from "@/sections/campaigns/workflow-view";
 import type { PromptInputMessage } from "@/components/ai-elements/prompt-input";
 import {
@@ -106,16 +106,7 @@ export default function Home() {
 
   function renderMain() {
     if (view.kind === "guided-signal" || view.kind === "awaiting-campaign") {
-      const initial = view.kind === "guided-signal" ? view.initialScenario : undefined;
-      return (
-        <CampaignWorkspace
-          onSignalComplete={() => dispatch({ type: "signal_complete" })}
-          onStep8Reached={(scenarioId) =>
-            dispatch({ type: "signal_step8_reached", scenarioId })
-          }
-          initialScenario={initial}
-        />
-      );
+      return <GuidedSignalSection />;
     }
     if (view.kind === "campaign-select") {
       return (
@@ -140,19 +131,7 @@ export default function Home() {
     }
     if (view.kind === "section") {
       if (view.name === "Статистика") return <StatisticsSection />;
-      if (view.name === "Сигналы") {
-        return (
-          <SignalTypeView
-            onCreateSignal={() => dispatch({ type: "start_signal_flow" })}
-            signal={
-              signal
-                ? { scenarioId: signal.scenarioId, count: signal.count, createdAt: signal.createdAt }
-                : null
-            }
-            onLaunchCampaign={() => dispatch({ type: "step2_clicked" })}
-          />
-        );
-      }
+      if (view.name === "Сигналы") return <SignalsSection />;
       if (view.name === "Кампании") {
         return (
           <CampaignTypeView
