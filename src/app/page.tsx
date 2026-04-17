@@ -6,7 +6,7 @@ import { motion } from "motion/react";
 import { Mic, ChevronRight } from "lucide-react";
 import { AppSidebar } from "@/components/app-sidebar";
 import { CampaignWorkspace } from "@/components/campaign-workspace";
-import { StatisticsView } from "@/components/statistics-view";
+import { StatisticsView } from "@/sections/statistics/statistics-view";
 import { LaunchFlyout } from "@/components/launch-flyout";
 import { WelcomeView } from "@/sections/welcome/welcome-view";
 import { CampaignTypeView } from "@/components/campaign-type-view";
