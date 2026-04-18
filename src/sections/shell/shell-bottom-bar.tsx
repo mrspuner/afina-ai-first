@@ -74,8 +74,24 @@ function ClearOnLeaveWorkflowEffect({ viewKind }: { viewKind: View["kind"] }) {
   return null;
 }
 
-function escapeRegex(s: string) {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+/**
+ * Разбирает текст промпта на сегменты по @-тегам.
+ * "@A foo @B bar"  → [{ label: "A", text: "foo" }, { label: "B", text: "bar" }]
+ * "hello @A foo"   → [{ label: "A", text: "foo" }]  (прологовый текст игнорируется)
+ * "hello"          → []
+ */
+function parseTagSegments(
+  input: string
+): Array<{ label: string; text: string }> {
+  const out: Array<{ label: string; text: string }> = [];
+  const re = /@(\S+)\s*([^@]*)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(input)) !== null) {
+    const label = m[1];
+    const text = (m[2] ?? "").trim();
+    out.push({ label, text });
+  }
+  return out;
 }
 
 export function ShellBottomBar() {
@@ -99,21 +115,19 @@ export function ShellBottomBar() {
   function handlePromptSubmit(message: PromptInputMessage) {
     const rawText = message.text ?? "";
     if (view.kind === "workflow" && !view.launched) {
-      if (selectedWorkflowNode) {
-        const tag = `@${selectedWorkflowNode.label}`;
-        const pattern = new RegExp(`${escapeRegex(tag)}\\s?`, "g");
-        const stripped = rawText
-          .replace(pattern, "")
-          .replace(/\s{2,}/g, " ")
-          .trim();
+      const segments = parseTagSegments(rawText);
+      if (segments.length > 0) {
         dispatch({
           type: "workflow_node_command_submit",
-          nodeId: selectedWorkflowNode.id,
-          text: stripped,
+          commands: segments.map((s) => ({ nodeLabel: s.label, text: s.text })),
         });
+        const names = segments.map((s) => `@${s.label}`).join(", ");
         dispatch({
           type: "ai_reply_shown",
-          text: `Готово, обновил ноду @${selectedWorkflowNode.label}`,
+          text:
+            segments.length === 1
+              ? `Готово, обновил ноду ${names}.`
+              : `Готово, обновил ноды ${names}.`,
         });
       } else {
         dispatch({ type: "workflow_command_submit", text: rawText });

@@ -63,7 +63,7 @@ export type AppState = {
   signals: Signal[];
   campaigns: Campaign[];
   workflowCommand: string | null;
-  workflowNodeCommand: { nodeId: string; text: string } | null;
+  workflowNodeCommand: { commands: Array<{ nodeLabel: string; text: string }> } | null;
   selectedWorkflowNode: { id: string; label: string } | null;
   aiReply: string | null;
   launchFlyoutOpen: boolean;
@@ -89,7 +89,7 @@ export type Action =
   | { type: "workflow_command_handled" }
   | { type: "workflow_node_selected"; id: string; label: string }
   | { type: "workflow_node_deselected" }
-  | { type: "workflow_node_command_submit"; nodeId: string; text: string }
+  | { type: "workflow_node_command_submit"; commands: Array<{ nodeLabel: string; text: string }> }
   | { type: "workflow_node_command_handled" }
   | { type: "ai_reply_shown"; text: string }
   | { type: "ai_reply_dismissed" }
@@ -337,7 +337,8 @@ export function appReducer(state: AppState, action: Action): AppState {
     case "workflow_node_command_submit":
       return {
         ...state,
-        workflowNodeCommand: { nodeId: action.nodeId, text: action.text },
+        workflowNodeCommand: { commands: action.commands },
+        selectedWorkflowNode: null,
       };
 
     case "workflow_node_command_handled":

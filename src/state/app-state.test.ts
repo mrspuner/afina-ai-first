@@ -350,19 +350,38 @@ describe("appReducer — workflow node selection + AI cycle", () => {
     expect(next.selectedWorkflowNode).toBeNull();
   });
 
-  it("workflow_node_command_submit captures the command", () => {
+  it("workflow_node_command_submit captures the batch and deselects", () => {
+    const state: AppState = {
+      ...initialState,
+      selectedWorkflowNode: { id: "email", label: "Email" },
+    };
+    const next = appReducer(state, {
+      type: "workflow_node_command_submit",
+      commands: [{ nodeLabel: "Email", text: "Задержка 2 часа" }],
+    });
+    expect(next.workflowNodeCommand).toEqual({
+      commands: [{ nodeLabel: "Email", text: "Задержка 2 часа" }],
+    });
+    expect(next.selectedWorkflowNode).toBeNull();
+  });
+
+  it("workflow_node_command_submit accepts multi-node batch", () => {
     const next = appReducer(initialState, {
       type: "workflow_node_command_submit",
-      nodeId: "email",
-      text: "Задержка 2 часа",
+      commands: [
+        { nodeLabel: "СМС", text: "текст: привет" },
+        { nodeLabel: "Email", text: "тема: скидка" },
+      ],
     });
-    expect(next.workflowNodeCommand).toEqual({ nodeId: "email", text: "Задержка 2 часа" });
+    expect(next.workflowNodeCommand?.commands).toHaveLength(2);
   });
 
   it("workflow_node_command_handled clears the pending command", () => {
     const state: AppState = {
       ...initialState,
-      workflowNodeCommand: { nodeId: "email", text: "x" },
+      workflowNodeCommand: {
+        commands: [{ nodeLabel: "Email", text: "x" }],
+      },
     };
     const next = appReducer(state, { type: "workflow_node_command_handled" });
     expect(next.workflowNodeCommand).toBeNull();

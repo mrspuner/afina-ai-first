@@ -22,8 +22,9 @@ interface WorkflowViewProps {
   launched: boolean;
   pendingCommand: string | null;
   onCommandHandled: () => void;
-  nodeCommand?: { nodeId: string; text: string } | null;
+  nodeCommand?: Array<{ nodeId: string; text: string }> | null;
   onNodeCommandHandled?: () => void;
+  selectedNodeId?: string | null;
   signalType?: SignalType;
   signal?: Signal;
   onGraphChange?: (graph: GraphState) => void;
@@ -145,6 +146,7 @@ export function WorkflowView({
   onCommandHandled,
   nodeCommand,
   onNodeCommandHandled,
+  selectedNodeId,
   signalType,
   signal,
   onGraphChange,
@@ -184,39 +186,59 @@ export function WorkflowView({
   const aiTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   useEffect(() => {
-    if (!nodeCommand) return;
+    if (!nodeCommand || nodeCommand.length === 0) return;
     aiTimersRef.current.forEach(clearTimeout);
     aiTimersRef.current = [];
-    const { nodeId, text } = nodeCommand;
-    const currentNode = graph.nodes.find((x) => x.id === nodeId);
-    const { sublabel, paramsPatch } = deriveParamsPatch(
-      text,
-      currentNode?.data.params
-    );
-    setGraph((prev) => ({
-      ...prev,
-      nodes: patchNode(prev.nodes, nodeId, { processing: true }),
-    }));
+
+    // Pre-compute patches for each command against current graph snapshot.
+    const plans = nodeCommand.map(({ nodeId, text }) => {
+      const currentNode = graph.nodes.find((x) => x.id === nodeId);
+      const { sublabel, paramsPatch } = deriveParamsPatch(
+        text,
+        currentNode?.data.params
+      );
+      return { nodeId, sublabel, paramsPatch };
+    });
+
+    // Phase 0 — mark every targeted node as processing.
+    setGraph((prev) => {
+      let nodes = prev.nodes;
+      for (const p of plans) {
+        nodes = patchNode(nodes, p.nodeId, { processing: true });
+      }
+      return { ...prev, nodes };
+    });
+
+    // Phase 1 (t=1000ms) — flip to justUpdated + apply sublabel/params.
     const t1 = setTimeout(() => {
       setGraph((prev) => {
-        let nodes = patchNode(prev.nodes, nodeId, {
-          processing: false,
-          justUpdated: true,
-          needsAttention: false,
-          ...(sublabel ? { sublabel } : {}),
-        });
-        if (paramsPatch) {
-          nodes = patchNodeParams(nodes, nodeId, paramsPatch);
+        let nodes = prev.nodes;
+        for (const p of plans) {
+          nodes = patchNode(nodes, p.nodeId, {
+            processing: false,
+            justUpdated: true,
+            needsAttention: false,
+            ...(p.sublabel ? { sublabel: p.sublabel } : {}),
+          });
+          if (p.paramsPatch) {
+            nodes = patchNodeParams(nodes, p.nodeId, p.paramsPatch);
+          }
         }
         return { ...prev, nodes };
       });
     }, 1000);
+
+    // Phase 2 (t=2200ms) — clear justUpdated flash.
     const t2 = setTimeout(() => {
-      setGraph((prev) => ({
-        ...prev,
-        nodes: patchNode(prev.nodes, nodeId, { justUpdated: false }),
-      }));
+      setGraph((prev) => {
+        let nodes = prev.nodes;
+        for (const p of plans) {
+          nodes = patchNode(nodes, p.nodeId, { justUpdated: false });
+        }
+        return { ...prev, nodes };
+      });
     }, 2200);
+
     aiTimersRef.current.push(t1, t2);
     onNodeCommandHandled?.();
     // graph only needs to read current params at start; intentionally omitted from deps
@@ -250,7 +272,9 @@ export function WorkflowView({
         }}
       >
         <WorkflowGraph
-          nodes={graph.nodes}
+          nodes={graph.nodes.map((n) =>
+            n.id === selectedNodeId ? { ...n, selected: true } : { ...n, selected: false }
+          )}
           edges={graph.edges}
           compact={launched}
           onNodeClick={onNodeClick}

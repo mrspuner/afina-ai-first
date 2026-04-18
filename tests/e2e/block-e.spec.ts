@@ -46,10 +46,13 @@ test.describe("Block E — Node control + AI cycle", () => {
     await expect(page.getByTestId("node-control-panel")).toBeVisible();
 
     const textarea = page.getByRole("textbox").first();
-    await textarea.fill("@demo Задержка 2 часа");
+    // Wait for auto-inserted @tag then append instruction (preserve the real label).
+    await expect(textarea).toHaveValue(/^@/);
+    const tagValue = await textarea.inputValue();
+    await textarea.fill(`${tagValue}Задержка 2 часа`);
     await textarea.press("Enter");
 
-    await expect(page.getByText(/AI: Готово, обновил ноду/)).toBeVisible({ timeout: 2_000 });
+    await expect(page.getByText(/Готово, обновил ноду/)).toBeVisible({ timeout: 2_000 });
     // Дождаться applied sublabel — для задержки шаблон выдаёт "Задержка 2 ч"
     await expect(page.locator('text="Задержка 2 ч"').first()).toBeVisible({ timeout: 4_000 });
   });
@@ -133,9 +136,13 @@ test.describe("Block E — Node control + AI cycle", () => {
     await expect(panel.getByText("Текст", { exact: true }).first()).toBeVisible();
 
     const textarea = page.getByRole("textbox").first();
-    await textarea.fill("текст: новое сообщение");
+    await textarea.fill("@СМС текст: новое сообщение");
     await textarea.press("Enter");
 
+    // Submit clears selection → panel closes. Wait for AI-cycle and re-open.
+    await expect(panel).toBeHidden({ timeout: 4_000 });
+    await page.waitForTimeout(1300);
+    await smsNode.click();
     await expect(panel).toContainText("новое сообщение", { timeout: 4_000 });
   });
 
@@ -172,9 +179,13 @@ test.describe("Block E — Node control + AI cycle", () => {
     await expect(panel).toBeVisible();
 
     const textarea = page.getByRole("textbox").first();
-    await textarea.fill("задержка 2 часа");
+    await textarea.fill("@Задержка задержка 2 часа");
     await textarea.press("Enter");
 
+    // Submit clears selection → panel closes. Wait and re-open.
+    await expect(panel).toBeHidden({ timeout: 4_000 });
+    await page.waitForTimeout(1300);
+    await waitNode.click();
     await expect(panel).toContainText("2 ч", { timeout: 4_000 });
   });
 });

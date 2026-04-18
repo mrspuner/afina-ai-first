@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence } from "motion/react";
-import { X } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
+import { Sparkles, X } from "lucide-react";
 import { useAppState, useAppDispatch } from "@/state/app-state-context";
 import { CanvasHeader, type CanvasHeaderToast } from "./canvas-header";
 import { NodeControlPanel } from "./node-control-panel";
@@ -101,6 +101,23 @@ export function WorkflowSection() {
     // graphTick ensures re-evaluation after AI cycle mutates node data
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedWorkflowNode, graphTick]);
+
+  // Resolve node-command labels → ids via the current graph snapshot.
+  // Tags pointing to unknown labels are silently skipped.
+  const resolvedNodeCommands = useMemo(() => {
+    if (!workflowNodeCommand) return null;
+    const g = graphRef.current;
+    if (!g) return null;
+    const resolved: Array<{ nodeId: string; text: string }> = [];
+    for (const cmd of workflowNodeCommand.commands) {
+      const node = g.nodes.find(
+        (n) => (n.data as WorkflowNodeData).label === cmd.nodeLabel
+      );
+      if (node) resolved.push({ nodeId: node.id, text: cmd.text });
+    }
+    return resolved.length > 0 ? resolved : null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workflowNodeCommand, graphTick]);
 
   if (view.kind !== "workflow") return null;
 
@@ -208,8 +225,9 @@ export function WorkflowSection() {
           launched={view.launched}
           pendingCommand={workflowCommand}
           onCommandHandled={handleCommandHandled}
-          nodeCommand={workflowNodeCommand}
+          nodeCommand={resolvedNodeCommands}
           onNodeCommandHandled={handleNodeCommandHandled}
+          selectedNodeId={selectedWorkflowNode?.id ?? null}
           signalType={currentSignal?.type}
           signal={currentSignal ?? undefined}
           onGraphChange={handleGraphChange}
@@ -227,25 +245,43 @@ export function WorkflowSection() {
         )}
       </AnimatePresence>
 
-      {aiReply && (
-        <div className="pointer-events-auto fixed inset-x-0 bottom-[230px] z-30 px-8">
-          <div
-            role="status"
-            aria-live="polite"
-            className="mx-auto flex w-full max-w-2xl items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary/10 px-4 py-2 text-xs text-primary shadow"
+      <AnimatePresence>
+        {aiReply && (
+          <motion.div
+            key="ai-reply"
+            initial={{ y: 10, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 10, opacity: 0 }}
+            transition={{ duration: 0.25, ease: [0.32, 0.72, 0, 1] }}
+            className="pointer-events-auto fixed left-[120px] right-0 z-30 px-8"
+            style={{ bottom: "calc(var(--promptbar-height, 140px) + 8px)" }}
           >
-            <span>AI: {aiReply}</span>
-            <button
-              type="button"
-              aria-label="Закрыть ответ AI"
-              onClick={() => dispatch({ type: "ai_reply_dismissed" })}
-              className="rounded-md p-1 opacity-70 hover:opacity-100"
+            <div
+              role="status"
+              aria-live="polite"
+              className="mx-auto flex w-full max-w-2xl items-start gap-3 rounded-xl border border-border bg-card/95 px-4 py-3 shadow-lg backdrop-blur-sm"
             >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        </div>
-      )}
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+                <Sparkles className="h-4 w-4" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground/80">
+                  AI
+                </p>
+                <p className="mt-0.5 text-sm text-foreground">{aiReply}</p>
+              </div>
+              <button
+                type="button"
+                aria-label="Закрыть ответ AI"
+                onClick={() => dispatch({ type: "ai_reply_dismissed" })}
+                className="rounded-md p-1 text-muted-foreground opacity-70 hover:bg-accent hover:text-foreground hover:opacity-100"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
