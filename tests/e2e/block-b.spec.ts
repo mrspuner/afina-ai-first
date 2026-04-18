@@ -103,3 +103,25 @@ test.describe("Block B — Campaigns", () => {
     await expect(page.locator(".react-flow")).toBeVisible({ timeout: 5_000 });
   });
 });
+
+test.describe("Block A3 — contextual chat placeholders", () => {
+  test("Сигналы section shows contextual placeholder", async ({ page }) => {
+    await page.goto("/");
+    await applyPreset(page, "mid");
+    await page.getByRole("button", { name: "Сигналы", exact: true }).click();
+
+    await expect(
+      page.getByPlaceholder("Напишите, что вы хотите сделать")
+    ).toBeVisible();
+  });
+
+  test("Кампании section shows contextual placeholder", async ({ page }) => {
+    await page.goto("/");
+    await applyPreset(page, "mid");
+    await page.getByRole("button", { name: "Кампании", exact: true }).click();
+
+    await expect(
+      page.getByPlaceholder("Напишите, что вы хотите сделать")
+    ).toBeVisible();
+  });
+});
