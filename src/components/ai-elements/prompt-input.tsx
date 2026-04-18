@@ -191,6 +191,30 @@ export interface TextInputContext {
   value: string;
   setInput: (v: string) => void;
   clear: () => void;
+  insertAtCursor: (
+    text: string,
+    options?: { separator?: "smart" | "none" }
+  ) => void;
+  __registerTextarea: (
+    ref: React.RefObject<HTMLTextAreaElement | null>
+  ) => void;
+}
+
+/**
+ * Remove "empty" @-tags from an input string.
+ *
+ * An empty tag is `@word` followed (possibly with whitespace) by either
+ * another `@` or the end of the string — i.e. no meaningful text follows.
+ *
+ * Examples:
+ * - `@A `            -> ``
+ * - `@A hello`       -> `@A hello` (has content after tag)
+ * - `@A @B `         -> ``
+ * - `@A hello @B `   -> `@A hello ` (trailing @B is empty)
+ * - `привет @A `     -> `привет ` ("привет" preserved)
+ */
+export function stripEmptyTags(input: string): string {
+  return input.replace(/@\S+\s*(?=@|$)/g, "").replace(/\s{2,}/g, " ");
 }
 
 export interface PromptInputControllerProps {
@@ -252,6 +276,60 @@ export const PromptInputProvider = ({
   // ----- textInput state
   const [textInput, setTextInput] = useState(initialTextInput);
   const clearInput = useCallback(() => setTextInput(""), []);
+
+  // ----- textarea registration (for caret-aware insertions)
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const __registerTextarea = useCallback(
+    (ref: RefObject<HTMLTextAreaElement | null>) => {
+      textareaRef.current = ref.current;
+    },
+    []
+  );
+
+  const insertAtCursor = useCallback(
+    (text: string, options?: { separator?: "smart" | "none" }) => {
+      const separator = options?.separator ?? "smart";
+      setTextInput((prev) => {
+        // 1. Clean empty @-tags from current input.
+        const cleaned = stripEmptyTags(prev);
+
+        const el = textareaRef.current;
+        const hasFocus = !!el && typeof document !== "undefined" && document.activeElement === el;
+
+        // No caret context → append to end.
+        if (!el || !hasFocus) {
+          if (cleaned.length === 0) return text;
+          if (separator === "none") return cleaned + text;
+          return cleaned.endsWith(" ") ? cleaned + text : cleaned + " " + text;
+        }
+
+        // Cleanup mutated the string → DOM selection is no longer valid.
+        if (cleaned !== prev) {
+          if (cleaned.length === 0) return text;
+          if (separator === "none") return cleaned + text;
+          return cleaned.endsWith(" ") ? cleaned + text : cleaned + " " + text;
+        }
+
+        // Caret-aware insert.
+        const start = el.selectionStart ?? cleaned.length;
+        const end = el.selectionEnd ?? cleaned.length;
+        const before = cleaned.slice(0, start);
+        const after = cleaned.slice(end);
+        let prefix = "";
+        if (separator === "smart" && before.length > 0 && !before.endsWith(" ")) {
+          prefix = " ";
+        }
+        const next = before + prefix + text + after;
+        queueMicrotask(() => {
+          const pos = before.length + prefix.length + text.length;
+          el.setSelectionRange(pos, pos);
+          el.focus();
+        });
+        return next;
+      });
+    },
+    []
+  );
 
   // ----- attachments state (global when wrapped)
   const [attachmentFiles, setAttachmentFiles] = useState<
@@ -348,12 +426,21 @@ export const PromptInputProvider = ({
       __registerFileInput,
       attachments,
       textInput: {
+        __registerTextarea,
         clear: clearInput,
+        insertAtCursor,
         setInput: setTextInput,
         value: textInput,
       },
     }),
-    [textInput, clearInput, attachments, __registerFileInput]
+    [
+      textInput,
+      clearInput,
+      attachments,
+      __registerFileInput,
+      __registerTextarea,
+      insertAtCursor,
+    ]
   );
 
   return (
@@ -963,6 +1050,12 @@ export const PromptInputTextarea = ({
   const controller = useOptionalPromptInputController();
   const attachments = usePromptInputAttachments();
   const [isComposing, setIsComposing] = useState(false);
+  const innerRef = useRef<HTMLTextAreaElement | null>(null);
+
+  // Register textarea with provider (if any) for caret-aware insertions.
+  useEffect(() => {
+    controller?.textInput.__registerTextarea?.(innerRef);
+  }, [controller]);
 
   const handleKeyDown: KeyboardEventHandler<HTMLTextAreaElement> = useCallback(
     (e) => {
@@ -1062,6 +1155,7 @@ export const PromptInputTextarea = ({
       onKeyDown={handleKeyDown}
       onPaste={handlePaste}
       placeholder={placeholder}
+      ref={innerRef}
       {...props}
       {...controlledProps}
     />
