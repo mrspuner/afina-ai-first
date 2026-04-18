@@ -58,12 +58,18 @@ test("happy path: welcome → guided signal → campaign type → launch → sta
   // 12. CanvasHeader → Запустить (scoped: avoid sidebar's Запустить button)
   await page.locator('[data-slot="button"]').filter({ hasText: /^Запустить$/ }).click();
 
-  // 13. WorkflowStatus: status visible
-  await expect(page.getByText("Кампания запущена")).toBeVisible({ timeout: 5_000 });
+  // 13. Wait for campaign to be active (header shows active-state buttons)
+  await expect(
+    page.getByRole("button", { name: "Посмотреть статистику" })
+  ).toBeVisible({ timeout: 5_000 });
 
-  // 14. Click Посмотреть статистику
-  await page.getByRole("button", { name: /Посмотреть статистику/ }).click();
+  // 14. Click header button "Посмотреть статистику"
+  await page
+    .getByRole("button", { name: "Посмотреть статистику" })
+    .click();
 
-  // 15. StatisticsView visible
-  await expect(page.getByRole("heading", { name: "Сводный за период" })).toBeVisible();
+  // 15. StatisticsView visible (scoped to a campaign → campaign-stats heading)
+  await expect(
+    page.getByRole("heading", { name: "Статистика кампании" })
+  ).toBeVisible();
 });

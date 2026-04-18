@@ -142,6 +142,41 @@ export function WorkflowSection() {
     });
   }
 
+  function handlePause() {
+    if (!currentCampaign) return;
+    dispatch({
+      type: "campaign_status_changed",
+      id: currentCampaign.id,
+      status: "paused",
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  function handleResume() {
+    if (!currentCampaign) return;
+    dispatch({
+      type: "campaign_status_changed",
+      id: currentCampaign.id,
+      status: "active",
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  function handleDuplicate() {
+    if (!currentCampaign) return;
+    dispatch({ type: "campaign_duplicated", id: currentCampaign.id });
+  }
+
+  function handleGoToStats() {
+    if (!currentCampaign) return;
+    dispatch({ type: "goto_stats", campaignId: currentCampaign.id });
+  }
+
+  function handleCancelSchedule() {
+    if (!currentCampaign) return;
+    dispatch({ type: "campaign_schedule_cancelled", id: currentCampaign.id });
+  }
+
   if (!currentCampaign) {
     return (
       <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
@@ -158,6 +193,11 @@ export function WorkflowSection() {
         onRename={handleRename}
         onSaveDraft={handleSaveDraft}
         onLaunch={handleLaunch}
+        onPause={handlePause}
+        onResume={handleResume}
+        onDuplicate={handleDuplicate}
+        onGoToStats={handleGoToStats}
+        onCancelSchedule={handleCancelSchedule}
         toast={toast}
         onDismissToast={dismissToast}
       />
@@ -169,7 +209,6 @@ export function WorkflowSection() {
           onCommandHandled={handleCommandHandled}
           nodeCommand={workflowNodeCommand}
           onNodeCommandHandled={handleNodeCommandHandled}
-          onGoToStats={() => dispatch({ type: "goto_stats" })}
           signalType={currentSignal?.type}
           onGraphChange={handleGraphChange}
           onNodeClick={handleNodeClick}

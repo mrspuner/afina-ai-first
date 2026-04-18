@@ -2,9 +2,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { motion, AnimatePresence } from "motion/react";
 import { WorkflowGraph } from "@/sections/campaigns/workflow-graph";
-import { WorkflowStatus } from "@/sections/campaigns/workflow-status";
 import {
   createBaseNodes,
   createBaseEdges,
@@ -25,7 +23,6 @@ interface WorkflowViewProps {
   onCommandHandled: () => void;
   nodeCommand?: { nodeId: string; text: string } | null;
   onNodeCommandHandled?: () => void;
-  onGoToStats: () => void;
   signalType?: SignalType;
   onGraphChange?: (graph: GraphState) => void;
   onNodeClick?: (id: string, label: string) => void;
@@ -64,7 +61,6 @@ export function WorkflowView({
   onCommandHandled,
   nodeCommand,
   onNodeCommandHandled,
-  onGoToStats,
   signalType,
   onGraphChange,
   onNodeClick,
@@ -149,15 +145,14 @@ export function WorkflowView({
 
   return (
     <div className="relative flex flex-1 flex-col overflow-hidden">
-      {/* Graph — shrinks via CSS height transition when launched */}
+      {/* Graph — occupies the full workflow area */}
       <div
         ref={graphRef}
         style={{
-          height: launched ? "55%" : "100%",
-          transition: "height 0.55s cubic-bezier(0.32, 0.72, 0, 1)",
+          height: "100%",
           display: "flex",
           flexDirection: "column",
-          flexShrink: 0,
+          flex: 1,
         }}
       >
         <WorkflowGraph
@@ -168,22 +163,6 @@ export function WorkflowView({
           onPaneClick={onPaneClick}
         />
       </div>
-
-      {/* Status — fills the remaining 45% */}
-      <AnimatePresence>
-        {launched && (
-          <motion.div
-            key="status"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            transition={{ duration: 0.4, ease: [0.32, 0.72, 0, 1], delay: 0.2 }}
-            className="flex flex-1 flex-col items-center justify-center pb-[200px]"
-          >
-            <WorkflowStatus onGoToStats={onGoToStats} />
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Unknown command feedback */}
       {unknownCmd && (
