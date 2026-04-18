@@ -211,3 +211,108 @@ describe("appReducer — preset_applied", () => {
     expect(next.launchFlyoutOpen).toBe(true);
   });
 });
+
+describe("appReducer — campaign_from_signal", () => {
+  it("creates a new draft campaign tied to the signal", () => {
+    const signal = makeSignal({ id: "sig_A", type: "Апсейл" });
+    const state: AppState = { ...initialState, signals: [signal] };
+    const next = appReducer(state, { type: "campaign_from_signal", signalId: "sig_A" });
+    expect(next.campaigns).toHaveLength(1);
+    const c = next.campaigns[0];
+    expect(c.signalId).toBe("sig_A");
+    expect(c.status).toBe("draft");
+    expect(c.name).toBe("Апсейл #1");
+    expect(c.id).toMatch(/^cmp_/);
+    expect(typeof c.createdAt).toBe("string");
+  });
+
+  it("numbers the second campaign per signal as #2", () => {
+    const signal = makeSignal({ id: "sig_A", type: "Апсейл" });
+    const existing = makeCampaign({ id: "cmp_old", signalId: "sig_A", name: "Апсейл #1" });
+    const state: AppState = { ...initialState, signals: [signal], campaigns: [existing] };
+    const next = appReducer(state, { type: "campaign_from_signal", signalId: "sig_A" });
+    expect(next.campaigns).toHaveLength(2);
+    expect(next.campaigns[1].name).toBe("Апсейл #2");
+  });
+
+  it("navigates to workflow view with launched=false", () => {
+    const signal = makeSignal({ id: "sig_A" });
+    const state: AppState = { ...initialState, signals: [signal] };
+    const next = appReducer(state, { type: "campaign_from_signal", signalId: "sig_A" });
+    expect(next.view.kind).toBe("workflow");
+    if (next.view.kind !== "workflow") throw new Error("unreachable");
+    expect(next.view.launched).toBe(false);
+    expect(next.view.campaign.id).toBe(next.campaigns[0].id);
+    expect(next.view.campaign.name).toBe("Регистрация #1");
+  });
+
+  it("is a no-op when signalId is unknown", () => {
+    const state: AppState = { ...initialState, signals: [makeSignal({ id: "sig_A" })] };
+    const next = appReducer(state, { type: "campaign_from_signal", signalId: "sig_unknown" });
+    expect(next).toBe(state);
+  });
+
+  it("clears activeSection so the workflow fills the pane", () => {
+    const state: AppState = {
+      ...initialState,
+      signals: [makeSignal({ id: "sig_A" })],
+      activeSection: "Сигналы",
+    };
+    const next = appReducer(state, { type: "campaign_from_signal", signalId: "sig_A" });
+    expect(next.activeSection).toBeNull();
+  });
+});
+
+describe("appReducer — campaign_opened", () => {
+  it("opens draft campaign in workflow view with launched=false", () => {
+    const c = makeCampaign({ id: "cmp_A", name: "Draft A", status: "draft" });
+    const state: AppState = { ...initialState, campaigns: [c] };
+    const next = appReducer(state, { type: "campaign_opened", id: "cmp_A" });
+    expect(next.view).toEqual({
+      kind: "workflow",
+      campaign: { id: "cmp_A", name: "Draft A" },
+      launched: false,
+    });
+  });
+
+  it("opens active campaign with launched=true", () => {
+    const c = makeCampaign({ id: "cmp_A", name: "Running", status: "active" });
+    const state: AppState = { ...initialState, campaigns: [c] };
+    const next = appReducer(state, { type: "campaign_opened", id: "cmp_A" });
+    if (next.view.kind !== "workflow") throw new Error("unreachable");
+    expect(next.view.launched).toBe(true);
+  });
+
+  it("opens completed campaign with launched=true", () => {
+    const c = makeCampaign({ id: "cmp_A", name: "Done", status: "completed" });
+    const state: AppState = { ...initialState, campaigns: [c] };
+    const next = appReducer(state, { type: "campaign_opened", id: "cmp_A" });
+    if (next.view.kind !== "workflow") throw new Error("unreachable");
+    expect(next.view.launched).toBe(true);
+  });
+
+  it("opens scheduled campaign with launched=false", () => {
+    const c = makeCampaign({ id: "cmp_A", name: "Plan", status: "scheduled" });
+    const state: AppState = { ...initialState, campaigns: [c] };
+    const next = appReducer(state, { type: "campaign_opened", id: "cmp_A" });
+    if (next.view.kind !== "workflow") throw new Error("unreachable");
+    expect(next.view.launched).toBe(false);
+  });
+
+  it("is a no-op when id is unknown", () => {
+    const state: AppState = { ...initialState, campaigns: [makeCampaign()] };
+    const next = appReducer(state, { type: "campaign_opened", id: "cmp_missing" });
+    expect(next).toBe(state);
+  });
+
+  it("clears activeSection so the workflow fills the pane", () => {
+    const c = makeCampaign({ id: "cmp_A" });
+    const state: AppState = {
+      ...initialState,
+      campaigns: [c],
+      activeSection: "Кампании",
+    };
+    const next = appReducer(state, { type: "campaign_opened", id: "cmp_A" });
+    expect(next.activeSection).toBeNull();
+  });
+});

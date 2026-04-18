@@ -1,3 +1,5 @@
+import { nanoid } from "nanoid";
+
 export type SignalType =
   | "Регистрация"
   | "Первая сделка"
@@ -65,6 +67,8 @@ export type Action =
   | { type: "signal_complete" }
   | { type: "step2_clicked" }
   | { type: "campaign_selected"; campaign: { id: string; name: string } }
+  | { type: "campaign_from_signal"; signalId: string }
+  | { type: "campaign_opened"; id: string }
   | { type: "campaign_created"; campaign: Campaign }
   | { type: "campaign_status_changed"; id: string; status: CampaignStatus; timestamp: string }
   | { type: "preset_applied"; preset: Preset }
@@ -113,6 +117,44 @@ export function appReducer(state: AppState, action: Action): AppState {
         view: { kind: "workflow", campaign: action.campaign, launched: false },
         activeSection: null,
       };
+
+    case "campaign_from_signal": {
+      const signal = state.signals.find((s) => s.id === action.signalId);
+      if (!signal) return state;
+      const n =
+        state.campaigns.filter((c) => c.signalId === signal.id).length + 1;
+      const newCampaign: Campaign = {
+        id: `cmp_${nanoid(6)}`,
+        name: `${signal.type} #${n}`,
+        signalId: signal.id,
+        status: "draft",
+        createdAt: new Date().toISOString(),
+      };
+      return {
+        ...state,
+        campaigns: [...state.campaigns, newCampaign],
+        view: {
+          kind: "workflow",
+          campaign: { id: newCampaign.id, name: newCampaign.name },
+          launched: false,
+        },
+        activeSection: null,
+      };
+    }
+
+    case "campaign_opened": {
+      const c = state.campaigns.find((cc) => cc.id === action.id);
+      if (!c) return state;
+      return {
+        ...state,
+        view: {
+          kind: "workflow",
+          campaign: { id: c.id, name: c.name },
+          launched: c.status === "active" || c.status === "completed",
+        },
+        activeSection: null,
+      };
+    }
 
     case "campaign_created":
       return {
