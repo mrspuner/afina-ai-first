@@ -1,7 +1,8 @@
-// SCENARIO_TO_TYPE stays — used by the signal-creation wizard to build Signal
-// objects from wizard output. TYPE_TO_SCENARIO is adapter code (Block A.5):
-// it maps new SignalType back to old scenarioId strings for views that still
-// expect scenarioId. Removed in Block B when those views are rewritten.
+// SCENARIO_TO_TYPE — used by the signal-creation wizard to build Signal
+// objects from wizard output.
+// TYPE_TO_SCENARIO — still used by the legacy workflow file-attachment paths
+// in workflow-section.tsx and shell-bottom-bar.tsx. Will be removed in
+// Block D when Canvas stores its own workflow graph per campaign.
 
 import type { SignalType } from "./app-state";
 
