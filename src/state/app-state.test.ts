@@ -324,6 +324,55 @@ describe("appReducer — campaign_saved_draft", () => {
   });
 });
 
+describe("appReducer — workflow node selection + AI cycle", () => {
+  it("workflow_node_selected stores id and label", () => {
+    const next = appReducer(initialState, {
+      type: "workflow_node_selected",
+      id: "email",
+      label: "Email",
+    });
+    expect(next.selectedWorkflowNode).toEqual({ id: "email", label: "Email" });
+  });
+
+  it("workflow_node_deselected clears the selection", () => {
+    const state: AppState = {
+      ...initialState,
+      selectedWorkflowNode: { id: "x", label: "X" },
+    };
+    const next = appReducer(state, { type: "workflow_node_deselected" });
+    expect(next.selectedWorkflowNode).toBeNull();
+  });
+
+  it("workflow_node_command_submit captures the command", () => {
+    const next = appReducer(initialState, {
+      type: "workflow_node_command_submit",
+      nodeId: "email",
+      text: "Задержка 2 часа",
+    });
+    expect(next.workflowNodeCommand).toEqual({ nodeId: "email", text: "Задержка 2 часа" });
+  });
+
+  it("workflow_node_command_handled clears the pending command", () => {
+    const state: AppState = {
+      ...initialState,
+      workflowNodeCommand: { nodeId: "email", text: "x" },
+    };
+    const next = appReducer(state, { type: "workflow_node_command_handled" });
+    expect(next.workflowNodeCommand).toBeNull();
+  });
+
+  it("ai_reply_shown stores the text", () => {
+    const next = appReducer(initialState, { type: "ai_reply_shown", text: "Готово" });
+    expect(next.aiReply).toBe("Готово");
+  });
+
+  it("ai_reply_dismissed clears the text", () => {
+    const state: AppState = { ...initialState, aiReply: "Hello" };
+    const next = appReducer(state, { type: "ai_reply_dismissed" });
+    expect(next.aiReply).toBeNull();
+  });
+});
+
 describe("appReducer — campaign_opened", () => {
   it("opens draft campaign in workflow view with launched=false", () => {
     const c = makeCampaign({ id: "cmp_A", name: "Draft A", status: "draft" });

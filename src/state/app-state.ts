@@ -57,6 +57,9 @@ export type AppState = {
   signals: Signal[];
   campaigns: Campaign[];
   workflowCommand: string | null;
+  workflowNodeCommand: { nodeId: string; text: string } | null;
+  selectedWorkflowNode: { id: string; label: string } | null;
+  aiReply: string | null;
   launchFlyoutOpen: boolean;
   activeSection: SectionName | null;
 };
@@ -76,6 +79,12 @@ export type Action =
   | { type: "preset_applied"; preset: Preset }
   | { type: "workflow_command_submit"; text: string }
   | { type: "workflow_command_handled" }
+  | { type: "workflow_node_selected"; id: string; label: string }
+  | { type: "workflow_node_deselected" }
+  | { type: "workflow_node_command_submit"; nodeId: string; text: string }
+  | { type: "workflow_node_command_handled" }
+  | { type: "ai_reply_shown"; text: string }
+  | { type: "ai_reply_dismissed" }
   | { type: "goto_stats" }
   | { type: "sidebar_nav"; section: SectionName }
   | { type: "flyout_open" }
@@ -88,6 +97,9 @@ export const initialState: AppState = {
   signals: [],
   campaigns: [],
   workflowCommand: null,
+  workflowNodeCommand: null,
+  selectedWorkflowNode: null,
+  aiReply: null,
   launchFlyoutOpen: false,
   activeSection: null,
 };
@@ -257,6 +269,30 @@ export function appReducer(state: AppState, action: Action): AppState {
 
     case "workflow_command_handled":
       return { ...state, workflowCommand: null };
+
+    case "workflow_node_selected":
+      return {
+        ...state,
+        selectedWorkflowNode: { id: action.id, label: action.label },
+      };
+
+    case "workflow_node_deselected":
+      return { ...state, selectedWorkflowNode: null };
+
+    case "workflow_node_command_submit":
+      return {
+        ...state,
+        workflowNodeCommand: { nodeId: action.nodeId, text: action.text },
+      };
+
+    case "workflow_node_command_handled":
+      return { ...state, workflowNodeCommand: null };
+
+    case "ai_reply_shown":
+      return { ...state, aiReply: action.text };
+
+    case "ai_reply_dismissed":
+      return { ...state, aiReply: null };
 
     case "goto_stats":
       return {
