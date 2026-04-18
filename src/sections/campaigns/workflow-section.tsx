@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence } from "motion/react";
 import { X } from "lucide-react";
 import { useAppState, useAppDispatch } from "@/state/app-state-context";
 import { CanvasHeader, type CanvasHeaderToast } from "./canvas-header";
@@ -216,12 +217,14 @@ export function WorkflowSection() {
         />
       </div>
 
-      {selectedNode && (
-        <NodeControlPanel
-          node={selectedNode}
-          onClose={() => dispatch({ type: "workflow_node_deselected" })}
-        />
-      )}
+      <AnimatePresence>
+        {selectedNode && (
+          <NodeControlPanel
+            node={selectedNode}
+            onClose={() => dispatch({ type: "workflow_node_deselected" })}
+          />
+        )}
+      </AnimatePresence>
 
       {aiReply && (
         <div className="pointer-events-auto fixed inset-x-0 bottom-[230px] z-30 px-8">

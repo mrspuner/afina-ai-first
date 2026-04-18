@@ -1,6 +1,7 @@
 "use client";
 
 import { X } from "lucide-react";
+import { motion } from "motion/react";
 import {
   usePromptInputController,
 } from "@/components/ai-elements/prompt-input";
@@ -17,13 +18,13 @@ const TYPE_LABEL: Record<WorkflowNodeType, string> = {
   success: "Успех",
   end: "Конец",
   split: "Сплиттер",
-  wait: "Ожидание",
+  wait: "Задержка",
   condition: "Условие",
   merge: "Слияние",
-  sms: "SMS",
+  sms: "СМС",
   email: "Email",
   push: "Push",
-  ivr: "IVR / Звонок",
+  ivr: "Звонок",
   storefront: "Витрина",
   landing: "Лендинг",
   default: "Нода",
@@ -49,20 +50,27 @@ export function NodeControlPanel({ node, onClose }: NodeControlPanelProps) {
   const { textInput } = usePromptInputController();
 
   function insertChip(chipText: string) {
-    const prefix = `@${data.label} `;
-    textInput.setInput(`${prefix}${chipText}`);
+    textInput.insertAtCursor(chipText, { separator: "smart" });
   }
 
   return (
-    <div className="pointer-events-auto fixed inset-x-0 bottom-[120px] z-30 px-8">
+    <motion.div
+      key="node-control-panel"
+      initial={{ y: 20, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      exit={{ y: 20, opacity: 0 }}
+      transition={{ duration: 0.25, ease: [0.32, 0.72, 0, 1] }}
+      className="pointer-events-auto fixed left-[120px] right-0 z-30 px-8"
+      style={{ bottom: "var(--promptbar-height, 120px)" }}
+    >
       <div
         role="region"
         aria-label="Управление нодой"
         data-testid="node-control-panel"
-        className="mx-auto flex w-full max-w-2xl flex-col gap-2 rounded-lg border border-border bg-card/95 px-4 py-3 text-sm shadow-lg backdrop-blur"
+        className="mx-auto flex w-full max-w-2xl flex-col gap-2 rounded-t-lg border border-b-0 border-border bg-card/95 px-4 py-3 text-sm backdrop-blur-sm"
       >
         <div className="flex items-start gap-3">
-          <div className="flex-1 min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="mb-1 flex flex-wrap items-center gap-2">
               <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
                 {typeLabel}
@@ -103,6 +111,6 @@ export function NodeControlPanel({ node, onClose }: NodeControlPanelProps) {
           </div>
         )}
       </div>
-    </div>
+    </motion.div>
   );
 }
