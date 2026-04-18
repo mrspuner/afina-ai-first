@@ -118,6 +118,7 @@ export function WorkflowSection() {
         onCommandHandled={handleCommandHandled}
         onGoToStats={() => dispatch({ type: "goto_stats" })}
         signalName={signalFileName}
+        signalType={currentSignal?.type}
         onGraphChange={handleGraphChange}
       />
     </div>
