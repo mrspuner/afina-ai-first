@@ -1,5 +1,6 @@
 "use client";
 
+import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { Mic, ChevronRight } from "lucide-react";
@@ -53,13 +54,29 @@ function SelectedNodeEffect({
   const { textInput } = usePromptInputController();
   useEffect(() => {
     if (selected) {
-      textInput.setInput(`@${selected.label} `);
-    } else if (textInput.value.startsWith("@")) {
-      textInput.clear();
+      textInput.insertAtCursor(`@${selected.label} `, { separator: "smart" });
     }
+    // NB: on deselect we intentionally do NOT clear the input — any stale
+    // empty tag will be stripped on the next insertAtCursor call.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected?.id]);
   return null;
+}
+
+function ClearOnLeaveWorkflowEffect({ viewKind }: { viewKind: View["kind"] }) {
+  const { textInput } = usePromptInputController();
+  const prevKind = useRef<View["kind"] | null>(null);
+  useEffect(() => {
+    if (prevKind.current === "workflow" && viewKind !== "workflow") {
+      textInput.clear();
+    }
+    prevKind.current = viewKind;
+  }, [viewKind, textInput]);
+  return null;
+}
+
+function escapeRegex(s: string) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 export function ShellBottomBar() {
@@ -84,9 +101,12 @@ export function ShellBottomBar() {
     const rawText = message.text ?? "";
     if (view.kind === "workflow" && !view.launched) {
       if (selectedWorkflowNode) {
-        const stripped = rawText.startsWith(`@${selectedWorkflowNode.label}`)
-          ? rawText.slice(`@${selectedWorkflowNode.label}`.length).trimStart()
-          : rawText;
+        const tag = `@${selectedWorkflowNode.label}`;
+        const pattern = new RegExp(`${escapeRegex(tag)}\\s?`, "g");
+        const stripped = rawText
+          .replace(pattern, "")
+          .replace(/\s{2,}/g, " ")
+          .trim();
         dispatch({
           type: "workflow_node_command_submit",
           nodeId: selectedWorkflowNode.id,
@@ -106,20 +126,29 @@ export function ShellBottomBar() {
     isWorkflowView(state) ? "Опишите изменение сценария..." :
     view.kind === "campaign-select" ? "Опишите вашу кампанию..." :
     view.kind === "guided-signal" ? "Введите ваши параметры или задайте вопрос" :
+    view.kind === "section" && (view.name === "Сигналы" || view.name === "Кампании") ? "Напишите, что вы хотите сделать" :
     "Выберите шаг или задайте вопрос…";
 
-  const floatBottom = isOnWelcome(state) ? "40%" : "3%";
+  const isWorkflow = isWorkflowView(state);
+  const floatBottom = isOnWelcome(state) ? "40%" : isWorkflow ? "0%" : "3%";
 
   return (
     <>
       <SelectedNodeEffect selected={selectedWorkflowNode} />
+      <ClearOnLeaveWorkflowEffect viewKind={view.kind} />
       <motion.div
-        className="fixed left-[120px] right-0 z-30 bg-background px-8 pb-4"
+        className={cn(
+          "fixed left-[120px] right-0 z-30 px-8 pb-4",
+          isWorkflow ? "bg-background/80 backdrop-blur-sm" : "bg-background"
+        )}
+        style={{ "--promptbar-height": "120px" } as React.CSSProperties}
         initial={false}
         animate={{ bottom: floatBottom }}
         transition={{ duration: 0.55, ease: [0.32, 0.72, 0, 1] }}
       >
-        <div className="pointer-events-none absolute inset-x-0 -top-10 h-10 bg-gradient-to-t from-background to-transparent" />
+        {!isWorkflow && (
+          <div className="pointer-events-none absolute inset-x-0 -top-10 h-10 bg-gradient-to-t from-background to-transparent" />
+        )}
         <div className="relative mx-auto flex w-full max-w-2xl flex-col gap-2 pt-2">
           <PromptInput onSubmit={handlePromptSubmit}>
             <AttachmentFileList />
