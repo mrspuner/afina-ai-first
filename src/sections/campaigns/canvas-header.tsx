@@ -46,28 +46,25 @@ export function CanvasHeader({
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    setDraftName(campaign.name);
-  }, [campaign.name]);
-
-  useEffect(() => {
     if (editing && inputRef.current) {
       inputRef.current.focus();
       inputRef.current.select();
     }
   }, [editing]);
 
+  function startEdit() {
+    setDraftName(campaign.name);
+    setEditing(true);
+  }
+
   function commit() {
     const next = draftName.trim();
     setEditing(false);
-    if (!next || next === campaign.name) {
-      setDraftName(campaign.name);
-      return;
-    }
+    if (!next || next === campaign.name) return;
     onRename(next);
   }
 
   function cancel() {
-    setDraftName(campaign.name);
     setEditing(false);
   }
 
@@ -95,7 +92,7 @@ export function CanvasHeader({
           ) : (
             <button
               type="button"
-              onClick={() => setEditing(true)}
+              onClick={startEdit}
               aria-label="Переименовать кампанию"
               className="group flex items-center gap-2 self-start rounded-md text-left text-xl font-semibold text-foreground hover:text-foreground/80"
             >
