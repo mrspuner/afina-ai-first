@@ -113,12 +113,39 @@ export function appReducer(state: AppState, action: Action): AppState {
     case "step2_clicked":
       return { ...state, view: { kind: "campaign-select" } };
 
-    case "campaign_selected":
+    case "campaign_selected": {
+      const existing = state.campaigns.find((c) => c.id === action.campaign.id);
+      if (existing) {
+        return {
+          ...state,
+          view: {
+            kind: "workflow",
+            campaign: action.campaign,
+            launched:
+              existing.status === "active" || existing.status === "completed",
+          },
+          activeSection: null,
+        };
+      }
+      const latestSignal = state.signals[state.signals.length - 1];
+      const newCampaign: Campaign | null = latestSignal
+        ? {
+            id: action.campaign.id,
+            name: action.campaign.name,
+            signalId: latestSignal.id,
+            status: "draft",
+            createdAt: new Date().toISOString(),
+          }
+        : null;
       return {
         ...state,
+        campaigns: newCampaign
+          ? [...state.campaigns, newCampaign]
+          : state.campaigns,
         view: { kind: "workflow", campaign: action.campaign, launched: false },
         activeSection: null,
       };
+    }
 
     case "campaign_from_signal": {
       const signal = state.signals.find((s) => s.id === action.signalId);

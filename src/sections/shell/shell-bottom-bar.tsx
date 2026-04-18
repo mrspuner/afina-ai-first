@@ -116,33 +116,6 @@ export function ShellBottomBar() {
       >
         <div className="pointer-events-none absolute inset-x-0 -top-10 h-10 bg-gradient-to-t from-background to-transparent" />
         <div className="relative mx-auto flex w-full max-w-2xl flex-col gap-2 pt-2">
-          {view.kind === "workflow" && !view.launched && (
-            <div className="flex justify-end">
-              <button
-                type="button"
-                disabled={!latestSignal}
-                onClick={() => {
-                  if (!latestSignal) return;
-                  const now = new Date().toISOString();
-                  dispatch({
-                    type: "campaign_created",
-                    campaign: {
-                      id: view.campaign.id,
-                      name: view.campaign.name,
-                      signalId: latestSignal.id,
-                      status: "active",
-                      createdAt: now,
-                      launchedAt: now,
-                    },
-                  });
-                }}
-                className="rounded-lg bg-foreground px-5 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                Начать кампанию →
-              </button>
-            </div>
-          )}
-
           <PromptInput onSubmit={handlePromptSubmit}>
             <AttachmentFileList />
             <PromptInputBody>

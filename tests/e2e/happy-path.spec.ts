@@ -55,8 +55,8 @@ test("happy path: welcome → guided signal → campaign type → launch → sta
   await expect(page.getByText("Выберите тип кампании")).toBeVisible();
   await page.getByRole("button", { name: /Возврат брошенных действий/ }).click();
 
-  // 12. WorkflowView → Начать кампанию
-  await page.getByRole("button", { name: /Начать кампанию/ }).click();
+  // 12. CanvasHeader → Запустить (scoped: avoid sidebar's Запустить button)
+  await page.locator('[data-slot="button"]').filter({ hasText: /^Запустить$/ }).click();
 
   // 13. WorkflowStatus: status visible
   await expect(page.getByText("Кампания запущена")).toBeVisible({ timeout: 5_000 });
