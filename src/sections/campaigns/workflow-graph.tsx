@@ -11,7 +11,10 @@ import {
   PanOnScrollMode,
 } from "@xyflow/react";
 import { Controls } from "@/components/ai-elements/controls";
-import { WorkflowNodeComponent } from "@/sections/campaigns/workflow-node";
+import {
+  WorkflowNodeComponent,
+  WORKFLOW_NODE_STATE_CSS,
+} from "@/sections/campaigns/workflow-node";
 import type { WorkflowNode, WorkflowEdge } from "@/types/workflow";
 
 // Defined outside component — React Flow requires stable nodeTypes reference
@@ -53,6 +56,7 @@ function GraphInner({ nodes, edges, compact, onNodeClick, onPaneClick }: Workflo
 
   return (
     <div ref={containerRef} className="relative h-full w-full">
+      <style>{WORKFLOW_NODE_STATE_CSS}</style>
       {/* Left fade */}
       <div
         className="pointer-events-none absolute inset-y-0 left-0 z-10 w-20 transition-opacity duration-300"
