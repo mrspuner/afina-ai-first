@@ -21,7 +21,7 @@ interface UploadSignalDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-function buildSignalFromFile(_file: File): Signal {
+function buildSignalFromFile(): Signal {
   const count = Math.floor(Math.random() * 4500) + 500;
   const now = new Date().toISOString();
   return {
@@ -46,7 +46,7 @@ export function UploadSignalDialog({ open, onOpenChange }: UploadSignalDialogPro
 
   function handleHashingComplete() {
     if (!file) return;
-    const signal = buildSignalFromFile(file);
+    const signal = buildSignalFromFile();
     dispatch({ type: "signal_added", signal });
     dispatch({ type: "sidebar_nav", section: "Сигналы" });
     setFile(null);

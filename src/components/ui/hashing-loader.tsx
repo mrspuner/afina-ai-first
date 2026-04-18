@@ -15,7 +15,9 @@ export function HashingLoader({ onComplete }: { onComplete: () => void }) {
   const stage = HASHING_STAGES[stageIndex];
   const { displayed, isDone } = useTypewriter(stage.text, 30);
   const onCompleteRef = useRef(onComplete);
-  onCompleteRef.current = onComplete;
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
 
   useEffect(() => {
     if (!isDone) return;
@@ -28,7 +30,6 @@ export function HashingLoader({ onComplete }: { onComplete: () => void }) {
       }
     }, Math.max(remaining, 300));
     return () => clearTimeout(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDone, stageIndex, stage.duration, stage.text.length]);
 
   return (
