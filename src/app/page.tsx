@@ -11,6 +11,7 @@ import { SignalsSection } from "@/sections/signals/signals-section";
 import { CampaignsSection } from "@/sections/campaigns/campaigns-section";
 import { WorkflowSection } from "@/sections/campaigns/workflow-section";
 import { StatisticsSection } from "@/sections/statistics/statistics-section";
+import { DevPanel } from "@/components/dev/dev-panel";
 
 export default function Home() {
   const { view, launchFlyoutOpen, activeSection } = useAppState();
@@ -50,6 +51,7 @@ export default function Home() {
         <div className="relative flex flex-1 flex-col overflow-hidden">
           {renderMain()}
           <ShellBottomBar />
+          {process.env.NODE_ENV === "development" && <DevPanel />}
         </div>
       </div>
     </PromptInputProvider>
