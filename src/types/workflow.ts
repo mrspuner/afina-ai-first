@@ -25,6 +25,94 @@ export type WorkflowNodeType =
   | "result"
   | "new";
 
+// ── Node params (internal schema per node type) ───────────────────────────────
+
+export type SmsParams = {
+  kind: "sms";
+  text: string;
+  alphaName: string;
+  scheduledAt: "immediate" | string;
+  link?: string;
+};
+
+export type EmailParams = {
+  kind: "email";
+  subject: string;
+  body: string;
+  sender: string;
+  link?: string;
+};
+
+export type PushParams = {
+  kind: "push";
+  title: string;
+  body: string;
+  deeplink?: string;
+};
+
+export type IvrParams = {
+  kind: "ivr";
+  scenario: string;
+  voiceType: "male" | "female" | "neutral";
+};
+
+export type WaitParams = {
+  kind: "wait";
+  mode: "duration" | "until_event";
+  durationHours?: number;
+  untilEvent?: string;
+};
+
+export type ConditionParams = {
+  kind: "condition";
+  trigger:
+    | "delivered" | "not_delivered"
+    | "opened" | "not_opened"
+    | "clicked" | "not_clicked";
+};
+
+export type SplitParams = {
+  kind: "split";
+  by: "segment" | "random";
+  branches: number;
+};
+
+export type MergeParams = { kind: "merge" };
+
+export type SignalParams = {
+  kind: "signal";
+  fileName: string;
+  count: number;
+  segments: { max: number; high: number; mid: number; low: number };
+};
+
+export type SuccessParams = {
+  kind: "success";
+  goal: string;
+};
+
+export type EndParams = {
+  kind: "end";
+  reason?: string;
+};
+
+export type StorefrontParams = {
+  kind: "storefront";
+  offers: string[];
+};
+
+export type LandingParams = {
+  kind: "landing";
+  cta: string;
+  offerTitle: string;
+};
+
+export type NodeParams =
+  | SmsParams | EmailParams | PushParams | IvrParams
+  | WaitParams | ConditionParams | SplitParams | MergeParams
+  | SignalParams | SuccessParams | EndParams
+  | StorefrontParams | LandingParams;
+
 export interface WorkflowNodeData extends Record<string, unknown> {
   label: string;
   sublabel?: string;
@@ -33,6 +121,25 @@ export interface WorkflowNodeData extends Record<string, unknown> {
   isSuccess?: boolean;
   processing?: boolean;
   justUpdated?: boolean;
+  params?: NodeParams;
+}
+
+export function patchNodeParams<N extends { id: string; data: WorkflowNodeData }>(
+  nodes: N[],
+  id: string,
+  paramsPatch: Partial<NodeParams>
+): N[] {
+  return nodes.map((n) => {
+    if (n.id !== id) return n;
+    if (!n.data.params) return n;
+    return {
+      ...n,
+      data: {
+        ...n.data,
+        params: { ...n.data.params, ...paramsPatch } as NodeParams,
+      },
+    };
+  });
 }
 
 export type NodeCategory = "endpoint" | "logic" | "communication" | "web" | "legacy";
@@ -89,8 +196,10 @@ function makeNode(
   };
 }
 
-const LABEL_STYLE = { fill: "rgba(255,255,255,0.65)", fontSize: 10, fontWeight: 500 };
-const LABEL_BG    = { fill: "transparent", fillOpacity: 0 };
+const LABEL_STYLE = { fill: "rgba(255,255,255,0.9)", fontSize: 10, fontWeight: 500 };
+const LABEL_BG_STYLE = { fill: "#141414", fillOpacity: 0.92, stroke: "#2a2a2a", strokeWidth: 1 };
+const LABEL_BG_PADDING: [number, number] = [4, 2];
+const LABEL_BG_BORDER_RADIUS = 4;
 
 function makeEdge(source: string, target: string, label?: string): WorkflowEdge {
   return {
@@ -99,7 +208,15 @@ function makeEdge(source: string, target: string, label?: string): WorkflowEdge 
     target,
     type: "default",
     style: { stroke: "#2a2a2a", strokeWidth: 1.5 },
-    ...(label ? { label, labelStyle: LABEL_STYLE, labelBgStyle: LABEL_BG } : {}),
+    ...(label
+      ? {
+          label,
+          labelStyle: LABEL_STYLE,
+          labelBgStyle: LABEL_BG_STYLE,
+          labelBgPadding: LABEL_BG_PADDING,
+          labelBgBorderRadius: LABEL_BG_BORDER_RADIUS,
+        }
+      : {}),
   };
 }
 
