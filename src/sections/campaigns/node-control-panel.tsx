@@ -5,7 +5,7 @@ import { motion } from "motion/react";
 import {
   usePromptInputController,
 } from "@/components/ai-elements/prompt-input";
-import type { WorkflowNodeData, WorkflowNodeType } from "@/types/workflow";
+import type { NodeParams, WorkflowNodeData, WorkflowNodeType } from "@/types/workflow";
 import { NODE_CATEGORY, type NodeCategory } from "@/types/workflow";
 
 interface NodeControlPanelProps {
@@ -41,6 +41,102 @@ const CATEGORY_CHIPS: Record<NodeCategory, string[]> = {
   endpoint: ["Изменить цель"],
   legacy: ["Переименовать", "Обновить"],
 };
+
+type ParamRow = { label: string; value: string };
+
+const PARAM_RENDERERS: {
+  [K in NodeParams["kind"]]: (p: Extract<NodeParams, { kind: K }>) => ParamRow[];
+} = {
+  sms: (p) => [
+    { label: "Текст", value: p.text || "—" },
+    { label: "Alpha-name", value: p.alphaName || "—" },
+    { label: "Время", value: p.scheduledAt === "immediate" ? "Сразу" : p.scheduledAt },
+    ...(p.link ? [{ label: "Ссылка", value: p.link }] : []),
+  ],
+  email: (p) => [
+    { label: "Тема", value: p.subject || "—" },
+    { label: "Текст", value: p.body || "—" },
+    { label: "Отправитель", value: p.sender || "—" },
+    ...(p.link ? [{ label: "Ссылка", value: p.link }] : []),
+  ],
+  push: (p) => [
+    { label: "Заголовок", value: p.title || "—" },
+    { label: "Текст", value: p.body || "—" },
+    ...(p.deeplink ? [{ label: "Deeplink", value: p.deeplink }] : []),
+  ],
+  ivr: (p) => [
+    { label: "Сценарий", value: p.scenario || "—" },
+    {
+      label: "Голос",
+      value:
+        p.voiceType === "male"
+          ? "Мужской"
+          : p.voiceType === "female"
+            ? "Женский"
+            : "Нейтральный",
+    },
+  ],
+  wait: (p) => [
+    { label: "Режим", value: p.mode === "duration" ? "Длительность" : "До события" },
+    ...(p.mode === "duration" && p.durationHours !== undefined
+      ? [{ label: "Длительность", value: formatDuration(p.durationHours) }]
+      : []),
+    ...(p.mode === "until_event" && p.untilEvent
+      ? [{ label: "Событие", value: p.untilEvent }]
+      : []),
+  ],
+  condition: (p) => [
+    { label: "Триггер", value: conditionTriggerLabel(p.trigger) },
+  ],
+  split: (p) => [
+    { label: "По", value: p.by === "segment" ? "Сегменту" : "Случайно" },
+    { label: "Ветки", value: String(p.branches) },
+  ],
+  merge: () => [],
+  signal: (p) => [
+    { label: "Файл", value: p.fileName },
+    { label: "Сигналов", value: String(p.count) },
+    {
+      label: "Сегменты",
+      value: `${p.segments.max}/${p.segments.high}/${p.segments.mid}/${p.segments.low}`,
+    },
+  ],
+  success: (p) => [{ label: "Цель", value: p.goal }],
+  end: (p) => (p.reason ? [{ label: "Причина", value: p.reason }] : []),
+  storefront: (p) => [
+    { label: "Офферы", value: p.offers.length > 0 ? p.offers.join(", ") : "—" },
+  ],
+  landing: (p) => [
+    { label: "CTA", value: p.cta },
+    { label: "Оффер", value: p.offerTitle },
+  ],
+};
+
+function formatDuration(hours: number): string {
+  if (hours < 1) return `${Math.round(hours * 60)} мин`;
+  if (hours < 24) return `${hours} ч`;
+  const days = Math.round(hours / 24);
+  return `${days} ${days === 1 ? "день" : days < 5 ? "дня" : "дней"}`;
+}
+
+function conditionTriggerLabel(t: string): string {
+  switch (t) {
+    case "delivered":
+      return "Доставлено";
+    case "not_delivered":
+      return "Не доставлено";
+    case "opened":
+      return "Открыто";
+    case "not_opened":
+      return "Не открыто";
+    case "clicked":
+      return "Кликнуто";
+    case "not_clicked":
+      return "Не кликнуто";
+    default:
+      return t;
+  }
+}
 
 export function NodeControlPanel({ node, onClose }: NodeControlPanelProps) {
   const { id, data } = node;
@@ -96,6 +192,36 @@ export function NodeControlPanel({ node, onClose }: NodeControlPanelProps) {
             <X className="h-4 w-4" />
           </button>
         </div>
+        {data.params && (() => {
+          const params = data.params;
+          const renderer = PARAM_RENDERERS[params.kind];
+          // @ts-expect-error — mapped-type narrowing limitation for discriminated union
+          const rows: ParamRow[] = renderer(params);
+          if (rows.length === 0) return null;
+          return (
+            <>
+              <div className="my-1 border-t border-border" />
+              <div className="flex flex-col gap-1">
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/70">
+                  Параметры
+                </p>
+                <dl className="grid grid-cols-[minmax(80px,max-content)_1fr] gap-x-3 gap-y-1 text-xs">
+                  {rows.map((row) => (
+                    <div key={row.label} className="contents">
+                      <dt className="text-muted-foreground">{row.label}</dt>
+                      <dd
+                        className="truncate text-foreground"
+                        title={row.value}
+                      >
+                        {row.value}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            </>
+          );
+        })()}
         {chips.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
             {chips.map((chip) => (
