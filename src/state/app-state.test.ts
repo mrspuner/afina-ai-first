@@ -263,6 +263,67 @@ describe("appReducer — campaign_from_signal", () => {
   });
 });
 
+describe("appReducer — campaign_renamed", () => {
+  it("updates name on the matching campaign", () => {
+    const c = makeCampaign({ id: "cmp_A", name: "Original" });
+    const state: AppState = { ...initialState, campaigns: [c] };
+    const next = appReducer(state, { type: "campaign_renamed", id: "cmp_A", name: "New name" });
+    expect(next.campaigns[0].name).toBe("New name");
+  });
+
+  it("trims whitespace", () => {
+    const c = makeCampaign({ id: "cmp_A", name: "Original" });
+    const state: AppState = { ...initialState, campaigns: [c] };
+    const next = appReducer(state, { type: "campaign_renamed", id: "cmp_A", name: "  Trimmed  " });
+    expect(next.campaigns[0].name).toBe("Trimmed");
+  });
+
+  it("is a no-op when id is unknown", () => {
+    const state: AppState = { ...initialState, campaigns: [makeCampaign({ id: "cmp_A" })] };
+    const next = appReducer(state, { type: "campaign_renamed", id: "cmp_missing", name: "x" });
+    expect(next).toBe(state);
+  });
+
+  it("is a no-op when name is empty after trim", () => {
+    const state: AppState = { ...initialState, campaigns: [makeCampaign({ id: "cmp_A" })] };
+    const next = appReducer(state, { type: "campaign_renamed", id: "cmp_A", name: "   " });
+    expect(next).toBe(state);
+  });
+
+  it("updates view.campaign.name when workflow view points to the same id", () => {
+    const c = makeCampaign({ id: "cmp_A", name: "Original" });
+    const state: AppState = {
+      ...initialState,
+      campaigns: [c],
+      view: { kind: "workflow", campaign: { id: "cmp_A", name: "Original" }, launched: false },
+    };
+    const next = appReducer(state, { type: "campaign_renamed", id: "cmp_A", name: "Next" });
+    if (next.view.kind !== "workflow") throw new Error("unreachable");
+    expect(next.view.campaign.name).toBe("Next");
+  });
+
+  it("does not update view when workflow view points to a different id", () => {
+    const target = makeCampaign({ id: "cmp_A" });
+    const other = makeCampaign({ id: "cmp_B", name: "Other" });
+    const state: AppState = {
+      ...initialState,
+      campaigns: [target, other],
+      view: { kind: "workflow", campaign: { id: "cmp_B", name: "Other" }, launched: false },
+    };
+    const next = appReducer(state, { type: "campaign_renamed", id: "cmp_A", name: "Next" });
+    if (next.view.kind !== "workflow") throw new Error("unreachable");
+    expect(next.view.campaign.name).toBe("Other");
+  });
+});
+
+describe("appReducer — campaign_saved_draft", () => {
+  it("returns the same state reference (no-op)", () => {
+    const state: AppState = { ...initialState, campaigns: [makeCampaign({ id: "cmp_A" })] };
+    const next = appReducer(state, { type: "campaign_saved_draft", id: "cmp_A" });
+    expect(next).toBe(state);
+  });
+});
+
 describe("appReducer — campaign_opened", () => {
   it("opens draft campaign in workflow view with launched=false", () => {
     const c = makeCampaign({ id: "cmp_A", name: "Draft A", status: "draft" });

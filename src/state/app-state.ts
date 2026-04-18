@@ -69,6 +69,8 @@ export type Action =
   | { type: "campaign_selected"; campaign: { id: string; name: string } }
   | { type: "campaign_from_signal"; signalId: string }
   | { type: "campaign_opened"; id: string }
+  | { type: "campaign_renamed"; id: string; name: string }
+  | { type: "campaign_saved_draft"; id: string }
   | { type: "campaign_created"; campaign: Campaign }
   | { type: "campaign_status_changed"; id: string; status: CampaignStatus; timestamp: string }
   | { type: "preset_applied"; preset: Preset }
@@ -155,6 +157,25 @@ export function appReducer(state: AppState, action: Action): AppState {
         activeSection: null,
       };
     }
+
+    case "campaign_renamed": {
+      const name = action.name.trim();
+      if (!name) return state;
+      if (!state.campaigns.some((c) => c.id === action.id)) return state;
+      return {
+        ...state,
+        campaigns: state.campaigns.map((c) =>
+          c.id === action.id ? { ...c, name } : c
+        ),
+        view:
+          state.view.kind === "workflow" && state.view.campaign.id === action.id
+            ? { ...state.view, campaign: { ...state.view.campaign, name } }
+            : state.view,
+      };
+    }
+
+    case "campaign_saved_draft":
+      return state;
 
     case "campaign_created":
       return {
