@@ -15,10 +15,14 @@ export function DevPanel() {
   const { signals, campaigns } = useAppState();
   const dispatch = useAppDispatch();
 
+  // Hydration-safe: read localStorage after mount. setActiveKey + dispatch
+  // below is a one-time initialization cascade, not the render loop the lint
+  // rule usually catches.
   useEffect(() => {
     if (typeof window === "undefined") return;
     const saved = window.localStorage.getItem(STORAGE_KEY);
     if (saved === "empty" || saved === "mid" || saved === "full") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setActiveKey(saved);
       dispatch({ type: "preset_applied", preset: PRESETS[saved] });
     }

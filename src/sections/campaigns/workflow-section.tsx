@@ -1,5 +1,9 @@
 "use client";
 
+// Adapter (Block A.5): derives the scenarioId-based file name expected by
+// WorkflowView from the new Signal / Campaign collections. Replaced in Block D
+// when Canvas stores its own workflow graph per campaign.
+
 import { useCallback } from "react";
 import { useAppState, useAppDispatch } from "@/state/app-state-context";
 import { TYPE_TO_SCENARIO } from "@/state/scenario-map";

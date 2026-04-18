@@ -1,5 +1,9 @@
 "use client";
 
+// Adapter (Block A.5): renders the most recently added signal via the
+// single-item SignalTypeView. Replaced in Block B with a real list of
+// signal cards.
+
 import { useAppState, useAppDispatch } from "@/state/app-state-context";
 import { TYPE_TO_SCENARIO } from "@/state/scenario-map";
 import { SignalTypeView } from "./signal-type-view";

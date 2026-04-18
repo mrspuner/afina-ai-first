@@ -1,5 +1,9 @@
 "use client";
 
+// Adapter (Block A.5): in standalone mode, shows the first active/completed
+// campaign via the legacy CampaignTypeView. Replaced in Block B with a real
+// list of campaign cards (active / completed / scheduled / draft).
+
 import { useAppState, useAppDispatch } from "@/state/app-state-context";
 import { CampaignTypeView } from "./campaign-type-view";
 

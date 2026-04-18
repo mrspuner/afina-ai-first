@@ -144,9 +144,11 @@ export function appReducer(state: AppState, action: Action): AppState {
       };
 
     case "preset_applied": {
+      const workflowCampaignId =
+        state.view.kind === "workflow" ? state.view.campaign.id : null;
       const keepWorkflow =
-        state.view.kind === "workflow" &&
-        action.preset.campaigns.some((c) => c.id === (state.view as { campaign: { id: string; name: string }; launched: boolean; kind: "workflow" }).campaign.id);
+        workflowCampaignId !== null &&
+        action.preset.campaigns.some((c) => c.id === workflowCampaignId);
       return {
         ...state,
         signals: action.preset.signals,
