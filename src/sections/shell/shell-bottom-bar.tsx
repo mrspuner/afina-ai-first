@@ -27,7 +27,6 @@ import {
   isWorkflowView,
   type View,
 } from "@/state/app-state";
-import { TYPE_TO_SCENARIO } from "@/state/scenario-map";
 
 function AttachmentFileList() {
   const { files } = usePromptInputAttachments();
@@ -44,32 +43,6 @@ function AttachmentFileList() {
       ))}
     </PromptInputHeader>
   );
-}
-
-function AttachmentEffect({
-  view,
-  signalScenarioId,
-}: {
-  view: View;
-  signalScenarioId: string;
-}) {
-  const { attachments } = usePromptInputController();
-  const inCampaignSelect = view.kind === "campaign-select";
-
-  useEffect(() => {
-    if (inCampaignSelect && signalScenarioId) {
-      const content = JSON.stringify({ scenario: signalScenarioId });
-      const file = new File([content], `сигнал_${signalScenarioId}.json`, {
-        type: "application/json",
-      });
-      attachments.add([file]);
-    } else {
-      attachments.clear();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inCampaignSelect, signalScenarioId]);
-
-  return null;
 }
 
 function SelectedNodeEffect({
@@ -94,7 +67,6 @@ export function ShellBottomBar() {
   const dispatch = useAppDispatch();
   const { view, signals, selectedWorkflowNode } = state;
   const latestSignal = signals.length > 0 ? signals[signals.length - 1] : null;
-  const signalScenarioId = latestSignal ? TYPE_TO_SCENARIO[latestSignal.type] ?? "" : "";
 
   const [stepTwoNew, setStepTwoNew] = useState(false);
   const prevViewKind = useRef<View["kind"] | null>(null);
@@ -140,7 +112,6 @@ export function ShellBottomBar() {
 
   return (
     <>
-      <AttachmentEffect view={view} signalScenarioId={signalScenarioId} />
       <SelectedNodeEffect selected={selectedWorkflowNode} />
       <motion.div
         className="fixed left-[120px] right-0 z-30 bg-background px-8 pb-4"

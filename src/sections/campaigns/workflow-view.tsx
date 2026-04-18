@@ -26,16 +26,15 @@ interface WorkflowViewProps {
   nodeCommand?: { nodeId: string; text: string } | null;
   onNodeCommandHandled?: () => void;
   onGoToStats: () => void;
-  signalName?: string;
   signalType?: SignalType;
   onGraphChange?: (graph: GraphState) => void;
   onNodeClick?: (id: string, label: string) => void;
   onPaneClick?: () => void;
 }
 
-function initialGraph(signalType?: SignalType, signalName?: string): GraphState {
+function initialGraph(signalType?: SignalType): GraphState {
   if (signalType) return createTemplate(signalType);
-  return { nodes: createBaseNodes(signalName), edges: createBaseEdges() };
+  return { nodes: createBaseNodes(), edges: createBaseEdges() };
 }
 
 function deriveSublabel(text: string): string {
@@ -66,14 +65,13 @@ export function WorkflowView({
   nodeCommand,
   onNodeCommandHandled,
   onGoToStats,
-  signalName,
   signalType,
   onGraphChange,
   onNodeClick,
   onPaneClick,
 }: WorkflowViewProps) {
   const [graph, setGraph] = useState<GraphState>(() =>
-    initialGraph(signalType, signalName)
+    initialGraph(signalType)
   );
 
   useEffect(() => {
@@ -106,6 +104,8 @@ export function WorkflowView({
 
   useEffect(() => {
     if (!nodeCommand) return;
+    aiTimersRef.current.forEach(clearTimeout);
+    aiTimersRef.current = [];
     const { nodeId, text } = nodeCommand;
     const sublabel = deriveSublabel(text);
     setGraph((prev) => ({
