@@ -1,4 +1,10 @@
-import type { WorkflowNodeType } from "@/types/workflow";
+import type {
+  WorkflowNodeType,
+  WorkflowNode,
+  WorkflowEdge,
+  NodeParams,
+} from "@/types/workflow";
+import { NODE_ACTIONS } from "./node-actions";
 
 export type Placement =
   | { mode: "after"; ref: string }
@@ -20,6 +26,9 @@ export type StructuralOp =
       newType: WorkflowNodeType;
       inlineParams?: string;
     };
+
+export type AppliedOp = { op: StructuralOp; description: string };
+export type SkippedOp = { op: StructuralOp; reason: string };
 
 const TYPE_LOOKUP: Record<string, WorkflowNodeType> = {
   "смс": "sms",
@@ -186,4 +195,450 @@ export function parseStructuralCommands(input: string): {
     else if (seg.trim().length > 0) unrecognized.push(seg);
   }
   return { ops, unrecognized };
+}
+
+// ── applyOps ──────────────────────────────────────────────────────────────────
+
+type GraphState = { nodes: WorkflowNode[]; edges: WorkflowEdge[] };
+
+const TYPE_LABEL: Record<WorkflowNodeType, string> = {
+  signal: "Сигнал",
+  success: "Успех",
+  end: "Конец",
+  split: "Сплиттер",
+  wait: "Задержка",
+  condition: "Условие",
+  merge: "Слияние",
+  sms: "СМС",
+  email: "Email",
+  push: "Push",
+  ivr: "Звонок",
+  storefront: "Витрина",
+  landing: "Лендинг",
+  default: "Нода",
+  channel: "Канал",
+  retarget: "Ретаргет",
+  result: "Результат",
+  new: "Новая",
+};
+
+function findNodeByLabel(
+  nodes: WorkflowNode[],
+  ref: string
+): WorkflowNode | null {
+  const trimmed = ref.trim();
+  return (
+    nodes.find((n) => (n.data as { label: string }).label === trimmed) ?? null
+  );
+}
+
+function uniqueLabel(
+  nodes: WorkflowNode[],
+  baseType: WorkflowNodeType
+): string {
+  const base = TYPE_LABEL[baseType];
+  const sameType = nodes.filter(
+    (n) => (n.data as { nodeType: WorkflowNodeType }).nodeType === baseType
+  );
+  if (sameType.length === 0) return base;
+  let maxN = 1;
+  for (const n of sameType) {
+    const lbl = (n.data as { label: string }).label;
+    if (lbl === base) {
+      maxN = Math.max(maxN, 1);
+      continue;
+    }
+    const m = lbl.match(new RegExp(`^${base} (\\d+)$`));
+    if (m) maxN = Math.max(maxN, parseInt(m[1], 10));
+  }
+  return `${base} ${maxN + 1}`;
+}
+
+function defaultParamsFor(kind: WorkflowNodeType): NodeParams | undefined {
+  switch (kind) {
+    case "sms":
+      return {
+        kind: "sms",
+        text: "",
+        alphaName: "BRAND",
+        scheduledAt: "immediate",
+      };
+    case "email":
+      return {
+        kind: "email",
+        subject: "",
+        body: "",
+        sender: "noreply@brand.com",
+      };
+    case "push":
+      return { kind: "push", title: "", body: "" };
+    case "ivr":
+      return { kind: "ivr", scenario: "", voiceType: "neutral" };
+    case "wait":
+      return { kind: "wait", mode: "duration", durationHours: 24 };
+    case "storefront":
+      return { kind: "storefront", offers: [] };
+    case "landing":
+      return { kind: "landing", cta: "Подробнее", offerTitle: "" };
+    case "success":
+      return { kind: "success", goal: "Конверсия" };
+    case "end":
+      return { kind: "end", reason: "Без конверсии" };
+    default:
+      return undefined;
+  }
+}
+
+function nanoId(): string {
+  return Math.random().toString(36).slice(2, 10);
+}
+
+function applyInlineParams(
+  current: NodeParams,
+  inlineParams: string
+): { params: NodeParams; matched: boolean } {
+  const actions = NODE_ACTIONS[current.kind] ?? [];
+  let matched = false;
+  const merged: Partial<NodeParams> = {};
+  for (const action of actions) {
+    const p = (
+      action.parse as (
+        t: string,
+        c: NodeParams
+      ) => Partial<NodeParams> | null
+    )(inlineParams, current);
+    if (p) {
+      Object.assign(merged, p);
+      matched = true;
+    }
+  }
+  return {
+    params: matched ? ({ ...current, ...merged } as NodeParams) : current,
+    matched,
+  };
+}
+
+function applyAdd(
+  graph: GraphState,
+  op: Extract<StructuralOp, { kind: "add" }>
+): { graph: GraphState; description: string } | { error: string } {
+  const newId = `n_${nanoId()}`;
+  const label = uniqueLabel(graph.nodes, op.nodeType);
+  let params = defaultParamsFor(op.nodeType);
+  let needsAttention = true;
+  let attentionReason: string | undefined =
+    "Заполните параметры — нода добавлена пустой";
+
+  if (op.inlineParams && params) {
+    const res = applyInlineParams(params, op.inlineParams);
+    if (res.matched) {
+      params = res.params;
+      needsAttention = false;
+      attentionReason = undefined;
+    } else {
+      attentionReason = "Не разобрал параметры — заполните вручную";
+    }
+  }
+
+  // Resolve placement.
+  let srcId: string | null = null;
+  let tgtId: string | null = null;
+  if (op.placement.mode === "after") {
+    const src = findNodeByLabel(graph.nodes, op.placement.ref);
+    if (!src) return { error: `«${op.placement.ref}» — нет такой ноды` };
+    srcId = src.id;
+  } else if (op.placement.mode === "before") {
+    const tgt = findNodeByLabel(graph.nodes, op.placement.ref);
+    if (!tgt) return { error: `«${op.placement.ref}» — нет такой ноды` };
+    tgtId = tgt.id;
+  } else if (op.placement.mode === "between") {
+    const a = findNodeByLabel(graph.nodes, op.placement.refA);
+    const b = findNodeByLabel(graph.nodes, op.placement.refB);
+    if (!a || !b) {
+      return {
+        error: `Не нашёл одну из нод: «${op.placement.refA}» / «${op.placement.refB}»`,
+      };
+    }
+    srcId = a.id;
+    tgtId = b.id;
+    const edge = graph.edges.find(
+      (e) => e.source === a.id && e.target === b.id
+    );
+    if (!edge) {
+      return {
+        error: `Между «${op.placement.refA}» и «${op.placement.refB}» нет связи`,
+      };
+    }
+  } else {
+    // auto
+    const terminal = graph.nodes.find(
+      (n) =>
+        (n.data as { isSuccess?: boolean; nodeType: WorkflowNodeType })
+          .isSuccess ||
+        (n.data as { nodeType: WorkflowNodeType }).nodeType === "end"
+    );
+    if (!terminal) {
+      return {
+        error: "Нет терминальной ноды (Успех/Конец) для auto-вставки",
+      };
+    }
+    tgtId = terminal.id;
+  }
+
+  // Compute position.
+  const srcNode = srcId ? graph.nodes.find((n) => n.id === srcId) : null;
+  const tgtNode = tgtId ? graph.nodes.find((n) => n.id === tgtId) : null;
+  let position = { x: 0, y: 0 };
+  if (srcNode && tgtNode) {
+    position = {
+      x: (srcNode.position.x + tgtNode.position.x) / 2,
+      y: (srcNode.position.y + tgtNode.position.y) / 2,
+    };
+  } else if (srcNode) {
+    position = { x: srcNode.position.x + 180, y: srcNode.position.y };
+  } else if (tgtNode) {
+    position = { x: tgtNode.position.x - 180, y: tgtNode.position.y };
+  }
+
+  const newNode: WorkflowNode = {
+    id: newId,
+    type: "workflowNode",
+    position,
+    data: {
+      label,
+      nodeType: op.nodeType,
+      ...(params ? { params } : {}),
+      ...(needsAttention ? { needsAttention: true } : {}),
+      ...(attentionReason ? { attentionReason } : {}),
+    } as WorkflowNode["data"],
+  };
+
+  let edges = graph.edges;
+  const nodes = [...graph.nodes, newNode];
+
+  if (op.placement.mode === "between" && srcId && tgtId) {
+    edges = edges.filter(
+      (e) => !(e.source === srcId && e.target === tgtId)
+    );
+    edges = [
+      ...edges,
+      { id: `e_${nanoId()}`, source: srcId, target: newId, type: "default" },
+      { id: `e_${nanoId()}`, source: newId, target: tgtId, type: "default" },
+    ];
+  } else if (op.placement.mode === "after" && srcId) {
+    const outgoing = edges.filter((e) => e.source === srcId);
+    edges = edges.filter((e) => e.source !== srcId);
+    edges.push({
+      id: `e_${nanoId()}`,
+      source: srcId,
+      target: newId,
+      type: "default",
+    });
+    for (const o of outgoing) {
+      edges.push({
+        id: `e_${nanoId()}`,
+        source: newId,
+        target: o.target,
+        type: "default",
+      });
+    }
+  } else if (op.placement.mode === "before" && tgtId) {
+    const incoming = edges.filter((e) => e.target === tgtId);
+    edges = edges.filter((e) => e.target !== tgtId);
+    for (const i of incoming) {
+      edges.push({
+        id: `e_${nanoId()}`,
+        source: i.source,
+        target: newId,
+        type: "default",
+      });
+    }
+    edges.push({
+      id: `e_${nanoId()}`,
+      source: newId,
+      target: tgtId,
+      type: "default",
+    });
+  } else if (op.placement.mode === "auto" && tgtId) {
+    const incoming = edges.filter((e) => e.target === tgtId);
+    edges = edges.filter((e) => e.target !== tgtId);
+    for (const i of incoming) {
+      edges.push({
+        id: `e_${nanoId()}`,
+        source: i.source,
+        target: newId,
+        type: "default",
+      });
+    }
+    edges.push({
+      id: `e_${nanoId()}`,
+      source: newId,
+      target: tgtId,
+      type: "default",
+    });
+  }
+
+  return {
+    graph: { nodes, edges },
+    description: `Добавил ${TYPE_LABEL[op.nodeType]} ${describePlacement(
+      op.placement
+    )}`,
+  };
+}
+
+function describePlacement(p: Placement): string {
+  switch (p.mode) {
+    case "after":
+      return `после ${p.ref}`;
+    case "before":
+      return `перед ${p.ref}`;
+    case "between":
+      return `между ${p.refA} и ${p.refB}`;
+    case "auto":
+      return "перед терминалом";
+  }
+}
+
+function applyRemove(
+  graph: GraphState,
+  op: Extract<StructuralOp, { kind: "remove" }>
+): { graph: GraphState; description: string } | { error: string } {
+  const node = findNodeByLabel(graph.nodes, op.ref);
+  if (!node) return { error: `«${op.ref}» — нет такой ноды` };
+  const nodeType = (node.data as { nodeType: WorkflowNodeType }).nodeType;
+  if (nodeType === "signal") {
+    return { error: `Сигнал — точка входа, удалять нельзя` };
+  }
+  const incoming = graph.edges.filter((e) => e.target === node.id);
+  const outgoing = graph.edges.filter((e) => e.source === node.id);
+  const N = incoming.length;
+  const M = outgoing.length;
+
+  const newEdges = graph.edges.filter(
+    (e) => e.source !== node.id && e.target !== node.id
+  );
+  let needsAttentionIds: string[] = [];
+
+  for (const inc of incoming) {
+    for (const out of outgoing) {
+      newEdges.push({
+        id: `e_${nanoId()}`,
+        source: inc.source,
+        target: out.target,
+        type: "default",
+      });
+    }
+  }
+
+  if (N > 1 || M > 1) {
+    needsAttentionIds = [
+      ...new Set([
+        ...incoming.map((e) => e.source),
+        ...outgoing.map((e) => e.target),
+      ]),
+    ];
+  }
+
+  const newNodes = graph.nodes
+    .filter((n) => n.id !== node.id)
+    .map((n) => {
+      if (needsAttentionIds.includes(n.id)) {
+        return {
+          ...n,
+          data: {
+            ...n.data,
+            needsAttention: true,
+            attentionReason:
+              "Перепроверь связи: после удаления соседа изменилась маршрутизация",
+          },
+        };
+      }
+      return n;
+    });
+
+  return {
+    graph: { nodes: newNodes, edges: newEdges },
+    description: `Убрал ${op.ref}`,
+  };
+}
+
+function applyReplace(
+  graph: GraphState,
+  op: Extract<StructuralOp, { kind: "replace" }>
+): { graph: GraphState; description: string } | { error: string } {
+  const node = findNodeByLabel(graph.nodes, op.ref);
+  if (!node) return { error: `«${op.ref}» — нет такой ноды` };
+  const oldKind = (node.data as { nodeType: WorkflowNodeType }).nodeType;
+  if (oldKind === "signal") return { error: `Сигнал заменить нельзя` };
+
+  const remainingNodes = graph.nodes.filter((n) => n.id !== node.id);
+  const newLabel = uniqueLabel(remainingNodes, op.newType);
+  let params = defaultParamsFor(op.newType);
+  let needsAttention = true;
+  let attentionReason: string | undefined =
+    "Поля сброшены — заполните параметры заново";
+
+  if (op.inlineParams && params) {
+    const res = applyInlineParams(params, op.inlineParams);
+    if (res.matched) {
+      params = res.params;
+      needsAttention = false;
+      attentionReason = undefined;
+    } else {
+      attentionReason = "Не разобрал параметры — заполните вручную";
+    }
+  }
+
+  const newNode: WorkflowNode = {
+    ...node,
+    data: {
+      label: newLabel,
+      nodeType: op.newType,
+      ...(params ? { params } : {}),
+      ...(needsAttention ? { needsAttention: true } : {}),
+      ...(attentionReason ? { attentionReason } : {}),
+    } as WorkflowNode["data"],
+  };
+
+  return {
+    graph: {
+      nodes: graph.nodes.map((n) => (n.id === node.id ? newNode : n)),
+      edges: graph.edges,
+    },
+    description: `Заменил ${op.ref} на ${TYPE_LABEL[op.newType]}`,
+  };
+}
+
+export function applyOps(
+  graph: GraphState,
+  ops: StructuralOp[]
+): { graph: GraphState; applied: AppliedOp[]; skipped: SkippedOp[] } {
+  let g = graph;
+  const applied: AppliedOp[] = [];
+  const skipped: SkippedOp[] = [];
+
+  for (const op of ops) {
+    let result:
+      | { graph: GraphState; description: string }
+      | { error: string };
+    switch (op.kind) {
+      case "add":
+        result = applyAdd(g, op);
+        break;
+      case "remove":
+        result = applyRemove(g, op);
+        break;
+      case "replace":
+        result = applyReplace(g, op);
+        break;
+    }
+    if ("error" in result) {
+      skipped.push({ op, reason: result.error });
+    } else {
+      g = result.graph;
+      applied.push({ op, description: result.description });
+    }
+  }
+
+  return { graph: g, applied, skipped };
 }

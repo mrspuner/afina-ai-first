@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { parseStructuralCommands } from "./structural-commands";
+import { parseStructuralCommands, applyOps } from "./structural-commands";
+import type { WorkflowNode, WorkflowEdge } from "@/types/workflow";
 
 describe("parseStructuralCommands", () => {
   it("parses simple add after", () => {
@@ -117,5 +118,196 @@ describe("parseStructuralCommands", () => {
   it("case-insensitive verbs and types", () => {
     const r = parseStructuralCommands("ДОБАВЬ email ПОСЛЕ смс");
     expect(r.ops[0]).toMatchObject({ kind: "add", nodeType: "email" });
+  });
+});
+
+function makeGraph(): { nodes: WorkflowNode[]; edges: WorkflowEdge[] } {
+  return {
+    nodes: [
+      {
+        id: "signal",
+        type: "workflowNode",
+        position: { x: 0, y: 0 },
+        data: {
+          label: "Сигнал",
+          nodeType: "signal",
+          params: {
+            kind: "signal",
+            fileName: "x.json",
+            count: 0,
+            segments: { max: 0, high: 0, mid: 0, low: 0 },
+          },
+        },
+      },
+      {
+        id: "sms1",
+        type: "workflowNode",
+        position: { x: 200, y: 0 },
+        data: {
+          label: "СМС",
+          nodeType: "sms",
+          params: {
+            kind: "sms",
+            text: "hi",
+            alphaName: "BRAND",
+            scheduledAt: "immediate",
+          },
+        },
+      },
+      {
+        id: "success",
+        type: "workflowNode",
+        position: { x: 400, y: 0 },
+        data: {
+          label: "Успех",
+          nodeType: "success",
+          isSuccess: true,
+          params: { kind: "success", goal: "Test" },
+        },
+      },
+    ],
+    edges: [
+      { id: "e1", source: "signal", target: "sms1", type: "default" },
+      { id: "e2", source: "sms1", target: "success", type: "default" },
+    ],
+  };
+}
+
+describe("applyOps", () => {
+  it("ADD after — splits the outgoing edge through new node", () => {
+    const r = applyOps(makeGraph(), [
+      {
+        kind: "add",
+        nodeType: "email",
+        placement: { mode: "after", ref: "СМС" },
+      },
+    ]);
+    expect(r.applied).toHaveLength(1);
+    expect(r.graph.nodes).toHaveLength(4);
+    const newEdges = r.graph.edges;
+    expect(
+      newEdges.find((e) => e.source === "sms1" && e.target === "success")
+    ).toBeUndefined();
+    const newEmail = r.graph.nodes.find((n) => n.data.nodeType === "email")!;
+    expect(
+      newEdges.find((e) => e.source === "sms1" && e.target === newEmail.id)
+    ).toBeDefined();
+    expect(
+      newEdges.find((e) => e.source === newEmail.id && e.target === "success")
+    ).toBeDefined();
+  });
+
+  it("ADD before — splits incoming edges", () => {
+    const r = applyOps(makeGraph(), [
+      {
+        kind: "add",
+        nodeType: "push",
+        placement: { mode: "before", ref: "Успех" },
+      },
+    ]);
+    expect(r.applied).toHaveLength(1);
+    const push = r.graph.nodes.find((n) => n.data.nodeType === "push")!;
+    expect(
+      r.graph.edges.find((e) => e.source === push.id && e.target === "success")
+    ).toBeDefined();
+  });
+
+  it("ADD between — replaces specific edge", () => {
+    const r = applyOps(makeGraph(), [
+      {
+        kind: "add",
+        nodeType: "wait",
+        placement: { mode: "between", refA: "Сигнал", refB: "СМС" },
+      },
+    ]);
+    expect(r.applied).toHaveLength(1);
+  });
+
+  it("ADD with inline params disables needsAttention", () => {
+    const r = applyOps(makeGraph(), [
+      {
+        kind: "add",
+        nodeType: "wait",
+        placement: { mode: "after", ref: "СМС" },
+        inlineParams: "2 часа",
+      },
+    ]);
+    const wait = r.graph.nodes.find((n) => n.data.nodeType === "wait")!;
+    expect(wait.data.needsAttention).toBeFalsy();
+  });
+
+  it("ADD without inline params sets needsAttention", () => {
+    const r = applyOps(makeGraph(), [
+      {
+        kind: "add",
+        nodeType: "email",
+        placement: { mode: "after", ref: "СМС" },
+      },
+    ]);
+    const email = r.graph.nodes.find((n) => n.data.nodeType === "email")!;
+    expect(email.data.needsAttention).toBe(true);
+    expect(email.data.attentionReason).toContain("Заполните параметры");
+  });
+
+  it("REMOVE simple 1×1 → clean bypass", () => {
+    const r = applyOps(makeGraph(), [{ kind: "remove", ref: "СМС" }]);
+    expect(r.applied).toHaveLength(1);
+    expect(r.graph.nodes.find((n) => n.id === "sms1")).toBeUndefined();
+    expect(
+      r.graph.edges.find((e) => e.source === "signal" && e.target === "success")
+    ).toBeDefined();
+  });
+
+  it("REMOVE Сигнал → skipped", () => {
+    const r = applyOps(makeGraph(), [{ kind: "remove", ref: "Сигнал" }]);
+    expect(r.applied).toHaveLength(0);
+    expect(r.skipped).toHaveLength(1);
+    expect(r.skipped[0].reason).toContain("точка входа");
+  });
+
+  it("REMOVE unknown ref → skipped", () => {
+    const r = applyOps(makeGraph(), [{ kind: "remove", ref: "Виноват" }]);
+    expect(r.applied).toHaveLength(0);
+    expect(r.skipped[0].reason).toContain("нет такой ноды");
+  });
+
+  it("REPLACE keeps id and edges", () => {
+    const r = applyOps(makeGraph(), [
+      { kind: "replace", ref: "СМС", newType: "email" },
+    ]);
+    expect(r.applied).toHaveLength(1);
+    const email = r.graph.nodes.find((n) => n.id === "sms1")!;
+    expect(email.data.nodeType).toBe("email");
+    expect(
+      r.graph.edges.find((e) => e.source === "signal" && e.target === "sms1")
+    ).toBeDefined();
+    expect(
+      r.graph.edges.find((e) => e.source === "sms1" && e.target === "success")
+    ).toBeDefined();
+  });
+
+  it("REPLACE with inline params — no attention", () => {
+    const r = applyOps(makeGraph(), [
+      {
+        kind: "replace",
+        ref: "СМС",
+        newType: "email",
+        inlineParams: "тема: новая",
+      },
+    ]);
+    const email = r.graph.nodes.find((n) => n.id === "sms1")!;
+    expect(email.data.needsAttention).toBeFalsy();
+  });
+
+  it("multi-op accumulates in graph state", () => {
+    const r = applyOps(makeGraph(), [
+      {
+        kind: "add",
+        nodeType: "email",
+        placement: { mode: "after", ref: "СМС" },
+      },
+      { kind: "remove", ref: "СМС" },
+    ]);
+    expect(r.applied).toHaveLength(2);
   });
 });
