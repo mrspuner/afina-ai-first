@@ -60,4 +60,33 @@ test.describe("Block F — Launch flyout", () => {
     await page.getByRole("textbox", { name: "Поиск" }).fill("qwertyqwerty");
     await expect(page.getByText("Ничего не найдено.")).toBeVisible();
   });
+
+  test("dialog has no visible heading 'Запустить'", async ({ page }) => {
+    await page.goto("/");
+    await applyPreset(page, "mid");
+    await openFlyout(page);
+
+    await expect(
+      page.getByRole("dialog").getByRole("heading", { name: "Запустить" })
+    ).toHaveCount(0);
+  });
+
+  test("Escape closes the flyout", async ({ page }) => {
+    await page.goto("/");
+    await applyPreset(page, "mid");
+    await openFlyout(page);
+
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog", { name: "Запустить" })).toBeHidden();
+  });
+
+  test("subtitle under campaign heading is visible", async ({ page }) => {
+    await page.goto("/");
+    await applyPreset(page, "mid");
+    await openFlyout(page);
+
+    await expect(
+      page.getByText("Создать кампанию по готовому сигналу")
+    ).toBeVisible();
+  });
 });

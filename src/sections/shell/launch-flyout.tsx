@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useAppDispatch, useAppState } from "@/state/app-state-context";
@@ -24,6 +24,7 @@ export function LaunchFlyout({ open, onClose }: LaunchFlyoutProps) {
   const { signals } = useAppState();
   const dispatch = useAppDispatch();
   const [query, setQuery] = useState("");
+  const dialogRef = useRef<HTMLElement>(null);
 
   const normalized = query.trim().toLocaleLowerCase("ru-RU");
 
@@ -52,6 +53,40 @@ export function LaunchFlyout({ open, onClose }: LaunchFlyoutProps) {
     filteredTemplates.length === 0 &&
     filteredSignals.length === 0;
 
+  useEffect(() => {
+    if (!open) return;
+    const root = dialogRef.current;
+    if (!root) return;
+    const firstInput = root.querySelector<HTMLInputElement>("input");
+    firstInput?.focus();
+
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (e.key !== "Tab") return;
+      if (!root) return;
+      const focusables = Array.from(
+        root.querySelectorAll<HTMLElement>(
+          'a,button,input,textarea,select,[tabindex]:not([tabindex="-1"])'
+        )
+      ).filter((el) => !el.hasAttribute("disabled"));
+      if (focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
   if (!open) return null;
 
   function selectTemplate(id: string, name: string) {
@@ -72,12 +107,12 @@ export function LaunchFlyout({ open, onClose }: LaunchFlyoutProps) {
         aria-hidden="true"
       />
       <aside
+        ref={dialogRef}
         role="dialog"
         aria-label="Запустить"
         className="fixed inset-y-0 left-[120px] z-50 flex w-[360px] flex-col bg-card shadow-xl"
       >
-        <header className="flex items-center justify-between border-b border-border px-5 py-4">
-          <h2 className="text-sm font-semibold text-foreground">Запустить</h2>
+        <header className="flex items-center justify-end px-5 py-4">
           <button
             type="button"
             onClick={onClose}
@@ -88,15 +123,15 @@ export function LaunchFlyout({ open, onClose }: LaunchFlyoutProps) {
           </button>
         </header>
 
-        <div className="border-b border-border px-5 py-3">
+        <div className="px-5 py-3">
           <div className="relative">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Поиск"
               aria-label="Поиск"
-              className="pl-8"
+              className="pl-9"
             />
           </div>
         </div>
@@ -130,8 +165,11 @@ export function LaunchFlyout({ open, onClose }: LaunchFlyoutProps) {
               )}
 
               <section className="mt-6">
-                <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-foreground">
+                <p className="text-xs font-semibold uppercase tracking-widest text-foreground">
                   Новая коммуникационная кампания
+                </p>
+                <p className="mt-1 mb-3 text-xs text-muted-foreground">
+                  Создать кампанию по готовому сигналу
                 </p>
                 {signals.length === 0 ? (
                   <p className="text-xs text-muted-foreground">
