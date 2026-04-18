@@ -211,6 +211,7 @@ export function WorkflowSection() {
           nodeCommand={workflowNodeCommand}
           onNodeCommandHandled={handleNodeCommandHandled}
           signalType={currentSignal?.type}
+          signal={currentSignal ?? undefined}
           onGraphChange={handleGraphChange}
           onNodeClick={handleNodeClick}
           onPaneClick={handlePaneClick}

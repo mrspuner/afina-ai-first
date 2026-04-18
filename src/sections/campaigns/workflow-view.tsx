@@ -9,7 +9,7 @@ import {
   parseWorkflowCommand,
 } from "@/types/workflow";
 import type { WorkflowNode, WorkflowEdge } from "@/types/workflow";
-import type { SignalType } from "@/state/app-state";
+import type { Signal, SignalType } from "@/state/app-state";
 import { createTemplate } from "@/state/workflow-templates";
 
 interface GraphState {
@@ -24,13 +24,14 @@ interface WorkflowViewProps {
   nodeCommand?: { nodeId: string; text: string } | null;
   onNodeCommandHandled?: () => void;
   signalType?: SignalType;
+  signal?: Signal;
   onGraphChange?: (graph: GraphState) => void;
   onNodeClick?: (id: string, label: string) => void;
   onPaneClick?: () => void;
 }
 
-function initialGraph(signalType?: SignalType): GraphState {
-  if (signalType) return createTemplate(signalType);
+function initialGraph(signalType?: SignalType, signal?: Signal): GraphState {
+  if (signalType) return createTemplate(signalType, signal);
   return { nodes: createBaseNodes(), edges: createBaseEdges() };
 }
 
@@ -62,12 +63,13 @@ export function WorkflowView({
   nodeCommand,
   onNodeCommandHandled,
   signalType,
+  signal,
   onGraphChange,
   onNodeClick,
   onPaneClick,
 }: WorkflowViewProps) {
   const [graph, setGraph] = useState<GraphState>(() =>
-    initialGraph(signalType)
+    initialGraph(signalType, signal)
   );
 
   useEffect(() => {

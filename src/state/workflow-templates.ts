@@ -1,5 +1,7 @@
-import type { SignalType } from "./app-state";
+import type { Signal, SignalType } from "./app-state";
+import { patchNodeParams } from "@/types/workflow";
 import type {
+  NodeParams,
   WorkflowNode,
   WorkflowEdge,
   WorkflowNodeType,
@@ -20,18 +22,24 @@ function n(
   x: number,
   y: number,
   sublabel?: string,
-  extras?: NodeExtras
+  extras?: NodeExtras,
+  params?: NodeParams
 ): WorkflowNode {
   return {
     id,
     type: "workflowNode",
     position: { x, y },
-    data: { label, nodeType, sublabel, ...extras },
+    data: { label, nodeType, sublabel, ...extras, ...(params ? { params } : {}) },
   };
 }
 
+const EMPTY_SEGMENTS = { max: 0, high: 0, mid: 0, low: 0 };
+
 const EDGE_STYLE = { stroke: "#2a2a2a", strokeWidth: 1.5 };
-const LABEL_STYLE = { fill: "rgba(255,255,255,0.65)", fontSize: 10, fontWeight: 500 };
+const LABEL_STYLE = { fill: "rgba(255,255,255,0.9)", fontSize: 10, fontWeight: 500 };
+const LABEL_BG_STYLE = { fill: "#141414", fillOpacity: 0.92, stroke: "#2a2a2a", strokeWidth: 1 };
+const LABEL_BG_PADDING: [number, number] = [4, 2];
+const LABEL_BG_BORDER_RADIUS = 4;
 
 function e(source: string, target: string, label?: string): WorkflowEdge {
   return {
@@ -40,7 +48,15 @@ function e(source: string, target: string, label?: string): WorkflowEdge {
     target,
     type: "default",
     style: EDGE_STYLE,
-    ...(label ? { label, labelStyle: LABEL_STYLE } : {}),
+    ...(label
+      ? {
+          label,
+          labelStyle: LABEL_STYLE,
+          labelBgStyle: LABEL_BG_STYLE,
+          labelBgPadding: LABEL_BG_PADDING,
+          labelBgBorderRadius: LABEL_BG_BORDER_RADIUS,
+        }
+      : {}),
   };
 }
 
@@ -49,12 +65,18 @@ const STEP = 210;
 function registrationTemplate(): Template {
   return {
     nodes: [
-      n("signal", "Сигнал", "signal", 0, 0, "Регистрация"),
-      n("email", "Email", "email", STEP, 0, "Welcome"),
-      n("wait", "Wait 1d", "wait", STEP * 2, 0, "Задержка"),
-      n("push", "Push", "push", STEP * 3, 0, "Напоминание"),
-      n("success", "Успех", "success", STEP * 4, 0, "Активирован", { isSuccess: true }),
-      n("end", "Конец", "end", STEP * 4, 120, "Без конверсии"),
+      n("signal", "Сигнал", "signal", 0, 0, "Регистрация", undefined,
+        { kind: "signal", fileName: "сигнал_регистрация.json", count: 0, segments: EMPTY_SEGMENTS }),
+      n("email", "Email", "email", STEP, 0, "Welcome", undefined,
+        { kind: "email", subject: "Добро пожаловать", body: "Мы рады видеть вас в нашем сервисе.", sender: "noreply@brand.com", link: "https://brand.com/welcome" }),
+      n("wait", "Задержка", "wait", STEP * 2, 0, "1 день", undefined,
+        { kind: "wait", mode: "duration", durationHours: 24 }),
+      n("push", "Push", "push", STEP * 3, 0, "Напоминание", undefined,
+        { kind: "push", title: "Новости от бренда", body: "Есть что посмотреть", deeplink: "brand://home" }),
+      n("success", "Успех", "success", STEP * 4, 0, "Активирован", { isSuccess: true },
+        { kind: "success", goal: "Активация" }),
+      n("end", "Конец", "end", STEP * 4, 120, "Без конверсии", undefined,
+        { kind: "end", reason: "Без активации" }),
     ],
     edges: [
       e("signal", "email"),
@@ -68,13 +90,20 @@ function registrationTemplate(): Template {
 function firstDealTemplate(): Template {
   return {
     nodes: [
-      n("signal", "Сигнал", "signal", 0, 0, "Первая сделка"),
-      n("sms", "SMS", "sms", STEP, 0, "Промо"),
-      n("condition", "Открыл?", "condition", STEP * 2, 0, "Проверка события"),
-      n("landing", "Landing", "landing", STEP * 3, -80, "Покупка"),
-      n("push", "Push", "push", STEP * 3, 80, "Напомни"),
-      n("success", "Успех", "success", STEP * 4, -80, "Конверсия", { isSuccess: true }),
-      n("end", "Конец", "end", STEP * 4, 80),
+      n("signal", "Сигнал", "signal", 0, 0, "Первая сделка", undefined,
+        { kind: "signal", fileName: "сигнал_первая-сделка.json", count: 0, segments: EMPTY_SEGMENTS }),
+      n("sms", "СМС", "sms", STEP, 0, "Промо", undefined,
+        { kind: "sms", text: "Готовы к первой покупке? Подарок внутри.", alphaName: "BRAND", scheduledAt: "immediate", link: "https://brand.com/first" }),
+      n("condition", "Условие", "condition", STEP * 2, 0, "Открыл?", undefined,
+        { kind: "condition", trigger: "opened" }),
+      n("landing", "Лендинг", "landing", STEP * 3, -80, "Покупка", undefined,
+        { kind: "landing", cta: "Купить", offerTitle: "Первый оффер" }),
+      n("push", "Push", "push", STEP * 3, 80, "Напомни", undefined,
+        { kind: "push", title: "Первая сделка", body: "Не пропустите" }),
+      n("success", "Успех", "success", STEP * 4, -80, "Конверсия", { isSuccess: true },
+        { kind: "success", goal: "Первая покупка" }),
+      n("end", "Конец", "end", STEP * 4, 80, undefined, undefined,
+        { kind: "end", reason: "Не открыл" }),
     ],
     edges: [
       e("signal", "sms"),
@@ -90,15 +119,24 @@ function firstDealTemplate(): Template {
 function upsellTemplate(): Template {
   return {
     nodes: [
-      n("signal", "Сигнал", "signal", 0, 0, "Апсейл"),
-      n("split", "Split", "split", STEP, 0, "По сегменту"),
-      n("storefront", "Витрина", "storefront", STEP * 2, -120, "Max"),
-      n("email", "Email", "email", STEP * 2, -40, "High"),
-      n("sms", "SMS", "sms", STEP * 2, 40, "Mid"),
-      n("end", "Конец", "end", STEP * 2, 120, "Low"),
-      n("landing", "Landing", "landing", STEP * 3, -40, "Оффер"),
-      n("merge", "Merge", "merge", STEP * 4, -40),
-      n("success", "Успех", "success", STEP * 5, -40, "Купил", { isSuccess: true }),
+      n("signal", "Сигнал", "signal", 0, 0, "Апсейл", undefined,
+        { kind: "signal", fileName: "сигнал_апсейл.json", count: 0, segments: EMPTY_SEGMENTS }),
+      n("split", "Сплиттер", "split", STEP, 0, "По сегменту", undefined,
+        { kind: "split", by: "segment", branches: 3 }),
+      n("storefront", "Витрина", "storefront", STEP * 2, -120, "Max", undefined,
+        { kind: "storefront", offers: ["Оффер А", "Оффер Б"] }),
+      n("email", "Email", "email", STEP * 2, -40, "High", undefined,
+        { kind: "email", subject: "Персональное предложение", body: "Специально для вас.", sender: "promo@brand.com", link: "https://brand.com/upsell" }),
+      n("sms", "СМС", "sms", STEP * 2, 40, "Mid", undefined,
+        { kind: "sms", text: "Скидка 20% для вашего сегмента.", alphaName: "BRAND", scheduledAt: "immediate" }),
+      n("end", "Конец", "end", STEP * 2, 120, "Low", undefined,
+        { kind: "end", reason: "Без апсейла" }),
+      n("landing", "Лендинг", "landing", STEP * 3, -40, "Оффер", undefined,
+        { kind: "landing", cta: "Забрать скидку", offerTitle: "Апсейл" }),
+      n("merge", "Слияние", "merge", STEP * 4, -40, undefined, undefined,
+        { kind: "merge" }),
+      n("success", "Успех", "success", STEP * 5, -40, "Купил", { isSuccess: true },
+        { kind: "success", goal: "Апсейл" }),
     ],
     edges: [
       e("signal", "split"),
@@ -118,14 +156,22 @@ function upsellTemplate(): Template {
 function reactivationTemplate(): Template {
   return {
     nodes: [
-      n("signal", "Сигнал", "signal", 0, 0, "Реактивация"),
-      n("wait", "Wait 3d", "wait", STEP, 0, "Задержка"),
-      n("sms", "SMS", "sms", STEP * 2, 0, "Оффер"),
-      n("condition", "Кликнул?", "condition", STEP * 3, 0, "Проверка"),
-      n("landing", "Landing", "landing", STEP * 4, -80, "Оффер"),
-      n("ivr", "IVR", "ivr", STEP * 4, 80, "Звонок"),
-      n("success", "Успех", "success", STEP * 5, -80, "Вернулся", { isSuccess: true }),
-      n("end", "Конец", "end", STEP * 5, 80),
+      n("signal", "Сигнал", "signal", 0, 0, "Реактивация", undefined,
+        { kind: "signal", fileName: "сигнал_реактивация.json", count: 0, segments: EMPTY_SEGMENTS }),
+      n("wait", "Задержка", "wait", STEP, 0, "3 дня", undefined,
+        { kind: "wait", mode: "duration", durationHours: 72 }),
+      n("sms", "СМС", "sms", STEP * 2, 0, "Оффер", undefined,
+        { kind: "sms", text: "Мы скучаем, вот скидка 30% для вас.", alphaName: "BRAND", scheduledAt: "immediate" }),
+      n("condition", "Условие", "condition", STEP * 3, 0, "Кликнул?", undefined,
+        { kind: "condition", trigger: "clicked" }),
+      n("landing", "Лендинг", "landing", STEP * 4, -80, "Оффер", undefined,
+        { kind: "landing", cta: "Вернуться", offerTitle: "Реактивация" }),
+      n("ivr", "Звонок", "ivr", STEP * 4, 80, "Голосовой", undefined,
+        { kind: "ivr", scenario: "Возврат", voiceType: "female" }),
+      n("success", "Успех", "success", STEP * 5, -80, "Вернулся", { isSuccess: true },
+        { kind: "success", goal: "Реактивация" }),
+      n("end", "Конец", "end", STEP * 5, 80, undefined, undefined,
+        { kind: "end", reason: "Молчание" }),
     ],
     edges: [
       e("signal", "wait"),
@@ -142,14 +188,22 @@ function reactivationTemplate(): Template {
 function returnTemplate(): Template {
   return {
     nodes: [
-      n("signal", "Сигнал", "signal", 0, 0, "Возврат"),
-      n("email", "Email", "email", STEP, 0, "Напоминание"),
-      n("wait", "Wait 3d", "wait", STEP * 2, 0, "Задержка"),
-      n("push", "Push", "push", STEP * 3, 0, "Усилить"),
-      n("condition", "Открыл?", "condition", STEP * 4, 0, "Проверка"),
-      n("storefront", "Витрина", "storefront", STEP * 5, -80, "Офферы"),
-      n("end", "Конец", "end", STEP * 5, 80),
-      n("success", "Успех", "success", STEP * 6, -80, "Купил", { isSuccess: true }),
+      n("signal", "Сигнал", "signal", 0, 0, "Возврат", undefined,
+        { kind: "signal", fileName: "сигнал_возврат.json", count: 0, segments: EMPTY_SEGMENTS }),
+      n("email", "Email", "email", STEP, 0, "Напоминание", undefined,
+        { kind: "email", subject: "Мы ценим вас", body: "Вернитесь и получите подарок.", sender: "care@brand.com", link: "https://brand.com/return" }),
+      n("wait", "Задержка", "wait", STEP * 2, 0, "3 дня", undefined,
+        { kind: "wait", mode: "duration", durationHours: 72 }),
+      n("push", "Push", "push", STEP * 3, 0, "Усилить", undefined,
+        { kind: "push", title: "Подарок ждёт", body: "Загляните в приложение", deeplink: "brand://return" }),
+      n("condition", "Условие", "condition", STEP * 4, 0, "Открыл?", undefined,
+        { kind: "condition", trigger: "opened" }),
+      n("storefront", "Витрина", "storefront", STEP * 5, -80, "Офферы", undefined,
+        { kind: "storefront", offers: ["Возврат", "Бонус"] }),
+      n("end", "Конец", "end", STEP * 5, 80, undefined, undefined,
+        { kind: "end", reason: "Не открыл" }),
+      n("success", "Успех", "success", STEP * 6, -80, "Купил", { isSuccess: true },
+        { kind: "success", goal: "Возврат" }),
     ],
     edges: [
       e("signal", "email"),
@@ -166,14 +220,22 @@ function returnTemplate(): Template {
 function retentionTemplate(): Template {
   return {
     nodes: [
-      n("signal", "Сигнал", "signal", 0, 0, "Удержание"),
-      n("split", "Split", "split", STEP, 0, "По сегменту"),
-      n("ivr", "IVR", "ivr", STEP * 2, -100, "Персональный звонок"),
-      n("email", "Email", "email", STEP * 2, 0, "Дайджест"),
-      n("push", "Push", "push", STEP * 2, 100, "Напомни"),
-      n("merge", "Merge", "merge", STEP * 3, 0),
-      n("wait", "Wait 7d", "wait", STEP * 4, 0, "Задержка"),
-      n("success", "Успех", "success", STEP * 5, 0, "Активен", { isSuccess: true }),
+      n("signal", "Сигнал", "signal", 0, 0, "Удержание", undefined,
+        { kind: "signal", fileName: "сигнал_удержание.json", count: 0, segments: EMPTY_SEGMENTS }),
+      n("split", "Сплиттер", "split", STEP, 0, "По сегменту", undefined,
+        { kind: "split", by: "segment", branches: 3 }),
+      n("ivr", "Звонок", "ivr", STEP * 2, -100, "Персональный", undefined,
+        { kind: "ivr", scenario: "Удержание", voiceType: "neutral" }),
+      n("email", "Email", "email", STEP * 2, 0, "Дайджест", undefined,
+        { kind: "email", subject: "Ваш дайджест", body: "Самое важное за неделю.", sender: "digest@brand.com" }),
+      n("push", "Push", "push", STEP * 2, 100, "Напомни", undefined,
+        { kind: "push", title: "Не забудьте заглянуть", body: "Есть новое" }),
+      n("merge", "Слияние", "merge", STEP * 3, 0, undefined, undefined,
+        { kind: "merge" }),
+      n("wait", "Задержка", "wait", STEP * 4, 0, "7 дней", undefined,
+        { kind: "wait", mode: "duration", durationHours: 168 }),
+      n("success", "Успех", "success", STEP * 5, 0, "Активен", { isSuccess: true },
+        { kind: "success", goal: "Удержание" }),
     ],
     edges: [
       e("signal", "split"),
@@ -198,6 +260,16 @@ export const TEMPLATE_BY_TYPE: Record<SignalType, () => Template> = {
   "Удержание": retentionTemplate,
 };
 
-export function createTemplate(signalType: SignalType): Template {
-  return TEMPLATE_BY_TYPE[signalType]();
+export function createTemplate(signalType: SignalType, signal?: Signal): Template {
+  const template = TEMPLATE_BY_TYPE[signalType]();
+  if (!signal) return template;
+  const fileName = `сигнал_${signalType.toLowerCase()}.json`;
+  return {
+    nodes: patchNodeParams(template.nodes, "signal", {
+      fileName,
+      count: signal.count,
+      segments: signal.segments,
+    }),
+    edges: template.edges,
+  };
 }

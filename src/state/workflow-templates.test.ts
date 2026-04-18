@@ -44,4 +44,53 @@ describe("workflow templates", () => {
       expect(TEMPLATE_BY_TYPE[type]).toBeTypeOf("function");
     }
   });
+
+  // Block A5 — numeric-suffix rule: within a template, every label must be unique.
+  // If the rule is applied correctly: single occurrence → bare canonical label,
+  // multiple occurrences → "<label> 1", "<label> 2", … so all labels stay unique.
+  it.each(SIGNAL_TYPES)("all labels are unique within %s template", (type) => {
+    const t = createTemplate(type);
+    const labels = t.nodes.map((n) => n.data.label);
+    expect(new Set(labels).size).toBe(labels.length);
+  });
+});
+
+describe("all template nodes have matching params.kind", () => {
+  it.each(SIGNAL_TYPES)("template \"%s\" — каждая нода имеет params.kind === nodeType", (type) => {
+    const { nodes } = createTemplate(type);
+    for (const node of nodes) {
+      expect(
+        node.data.params,
+        `node ${node.id} (${node.data.nodeType}) has no params`
+      ).toBeDefined();
+      if (node.data.params) {
+        expect(node.data.params.kind).toBe(node.data.nodeType);
+      }
+    }
+  });
+});
+
+describe("createTemplate with signal", () => {
+  it("patches signal node with count/segments from provided signal", () => {
+    const signal = {
+      id: "sig1",
+      type: "Регистрация" as const,
+      count: 5000,
+      segments: { max: 1000, high: 1500, mid: 1500, low: 1000 },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    const { nodes } = createTemplate("Регистрация", signal);
+    const signalNode = nodes.find((n) => n.data.nodeType === "signal");
+    expect(signalNode).toBeDefined();
+    const params = signalNode?.data.params;
+    expect(params?.kind).toBe("signal");
+    if (params?.kind === "signal") {
+      expect(params.count).toBe(5000);
+      expect(params.segments.max).toBe(1000);
+      expect(params.segments.high).toBe(1500);
+      expect(params.segments.mid).toBe(1500);
+      expect(params.segments.low).toBe(1000);
+    }
+  });
 });
