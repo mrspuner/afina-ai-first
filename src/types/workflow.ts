@@ -1,8 +1,25 @@
 import type { Node, Edge } from "@xyflow/react";
 
 export type WorkflowNodeType =
-  | "default"
+  // Endpoints
+  | "signal"
+  | "success"
+  | "end"
+  // Logic / Flow
   | "split"
+  | "wait"
+  | "condition"
+  | "merge"
+  // Communication (active)
+  | "sms"
+  | "email"
+  | "push"
+  | "ivr"
+  // Web (passive)
+  | "storefront"
+  | "landing"
+  // Legacy (retained for base graph + parseWorkflowCommand)
+  | "default"
   | "channel"
   | "retarget"
   | "result"
@@ -14,6 +31,35 @@ export interface WorkflowNodeData extends Record<string, unknown> {
   nodeType: WorkflowNodeType;
   needsAttention?: boolean;
   isSuccess?: boolean;
+  processing?: boolean;
+  justUpdated?: boolean;
+}
+
+export type NodeCategory = "endpoint" | "logic" | "communication" | "web" | "legacy";
+
+export const NODE_CATEGORY: Record<WorkflowNodeType, NodeCategory> = {
+  signal: "endpoint",
+  success: "endpoint",
+  end: "endpoint",
+  split: "logic",
+  wait: "logic",
+  condition: "logic",
+  merge: "logic",
+  sms: "communication",
+  email: "communication",
+  push: "communication",
+  ivr: "communication",
+  storefront: "web",
+  landing: "web",
+  default: "legacy",
+  channel: "legacy",
+  retarget: "legacy",
+  result: "legacy",
+  new: "legacy",
+};
+
+export function isCommunicationNode(t: WorkflowNodeType): boolean {
+  return NODE_CATEGORY[t] === "communication";
 }
 
 export type WorkflowNode = Node<WorkflowNodeData, "workflowNode">;
