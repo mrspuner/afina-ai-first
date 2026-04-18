@@ -1,12 +1,43 @@
-export type SignalFact = {
-  scenarioId: string;
-  createdAt: string;
+export type SignalType =
+  | "Регистрация"
+  | "Первая сделка"
+  | "Апсейл"
+  | "Реактивация"
+  | "Возврат"
+  | "Удержание";
+
+export type Signal = {
+  id: string;
+  type: SignalType;
   count: number;
+  segments: {
+    max: number;
+    high: number;
+    mid: number;
+    low: number;
+  };
+  createdAt: string;
+  updatedAt: string;
 };
 
-export type CampaignFact = {
-  typeName: string;
-  launchedAt: string;
+export type CampaignStatus = "draft" | "scheduled" | "active" | "completed";
+
+export type Campaign = {
+  id: string;
+  name: string;
+  signalId: string;
+  status: CampaignStatus;
+  createdAt: string;
+  launchedAt?: string;
+  completedAt?: string;
+  scheduledFor?: string;
+};
+
+export type Preset = {
+  key: "empty" | "mid" | "full";
+  label: string;
+  signals: Signal[];
+  campaigns: Campaign[];
 };
 
 export type SectionName = "Статистика" | "Сигналы" | "Кампании";
@@ -21,8 +52,8 @@ export type View =
 
 export type AppState = {
   view: View;
-  signal: SignalFact | null;
-  launchedCampaign: CampaignFact | null;
+  signals: Signal[];
+  campaigns: Campaign[];
   workflowCommand: string | null;
   launchFlyoutOpen: boolean;
   activeSection: SectionName | null;
@@ -30,11 +61,13 @@ export type AppState = {
 
 export type Action =
   | { type: "start_signal_flow"; initialScenario?: { id: string; name: string } }
-  | { type: "signal_step8_reached"; scenarioId: string }
+  | { type: "signal_added"; signal: Signal }
   | { type: "signal_complete" }
   | { type: "step2_clicked" }
   | { type: "campaign_selected"; campaign: { id: string; name: string } }
-  | { type: "campaign_launched"; typeName: string; launchedAt: string }
+  | { type: "campaign_created"; campaign: Campaign }
+  | { type: "campaign_status_changed"; id: string; status: CampaignStatus; timestamp: string }
+  | { type: "preset_applied"; preset: Preset }
   | { type: "workflow_command_submit"; text: string }
   | { type: "workflow_command_handled" }
   | { type: "goto_stats" }
@@ -46,8 +79,8 @@ export type Action =
 
 export const initialState: AppState = {
   view: { kind: "welcome" },
-  signal: null,
-  launchedCampaign: null,
+  signals: [],
+  campaigns: [],
   workflowCommand: null,
   launchFlyoutOpen: false,
   activeSection: null,
@@ -63,14 +96,12 @@ export function appReducer(state: AppState, action: Action): AppState {
         activeSection: null,
       };
 
-    case "signal_step8_reached": {
-      const createdAt = new Date().toLocaleDateString("ru-RU");
+    case "signal_added":
       return {
         ...state,
-        signal: { scenarioId: action.scenarioId, createdAt, count: 4312 },
+        signals: [...state.signals, action.signal],
         view: { kind: "awaiting-campaign" },
       };
-    }
 
     case "signal_complete":
     case "step2_clicked":
@@ -83,15 +114,49 @@ export function appReducer(state: AppState, action: Action): AppState {
         activeSection: null,
       };
 
-    case "campaign_launched": {
-      const fact = { typeName: action.typeName, launchedAt: action.launchedAt };
+    case "campaign_created":
       return {
         ...state,
-        launchedCampaign: fact,
+        campaigns: [...state.campaigns, action.campaign],
         view:
-          state.view.kind === "workflow"
+          state.view.kind === "workflow" &&
+          state.view.campaign.id === action.campaign.id &&
+          action.campaign.status === "active"
             ? { ...state.view, launched: true }
             : state.view,
+      };
+
+    case "campaign_status_changed":
+      return {
+        ...state,
+        campaigns: state.campaigns.map((c) => {
+          if (c.id !== action.id) return c;
+          const next: Campaign = { ...c, status: action.status };
+          if (action.status === "active") next.launchedAt = action.timestamp;
+          if (action.status === "completed") next.completedAt = action.timestamp;
+          if (action.status === "scheduled") next.scheduledFor = action.timestamp;
+          return next;
+        }),
+        view:
+          state.view.kind === "workflow" && state.view.campaign.id === action.id && action.status === "active"
+            ? { ...state.view, launched: true }
+            : state.view,
+      };
+
+    case "preset_applied": {
+      const keepWorkflow =
+        state.view.kind === "workflow" &&
+        action.preset.campaigns.some((c) => c.id === (state.view as { campaign: { id: string; name: string }; launched: boolean; kind: "workflow" }).campaign.id);
+      return {
+        ...state,
+        signals: action.preset.signals,
+        campaigns: action.preset.campaigns,
+        view:
+          state.view.kind === "workflow" && !keepWorkflow
+            ? { kind: "section", name: "Кампании" }
+            : state.view,
+        activeSection:
+          state.view.kind === "workflow" && !keepWorkflow ? "Кампании" : state.activeSection,
       };
     }
 
@@ -134,23 +199,23 @@ export function appReducer(state: AppState, action: Action): AppState {
         activeSection: null,
       };
 
-    case "flyout_campaign_select":
+    case "flyout_campaign_select": {
+      const hasSignal = state.signals.length > 0;
       return {
         ...state,
         launchFlyoutOpen: false,
-        view: state.signal
-          ? { kind: "campaign-select" }
-          : { kind: "section", name: "Сигналы" },
-        activeSection: state.signal ? null : "Сигналы",
+        view: hasSignal ? { kind: "campaign-select" } : { kind: "section", name: "Сигналы" },
+        activeSection: hasSignal ? null : "Сигналы",
       };
+    }
   }
 }
 
-export const isSignalDone = (s: AppState) => s.signal !== null;
-export const isCampaignDone = (s: AppState) => s.launchedCampaign !== null;
+export const isSignalDone = (s: AppState) => s.signals.length > 0;
+export const isCampaignDone = (s: AppState) =>
+  s.campaigns.some((c) => c.status === "active" || c.status === "completed");
 export const isStep1Active = (s: AppState) => !isSignalDone(s);
-export const isStep2Active = (s: AppState) =>
-  isSignalDone(s) && !isCampaignDone(s);
+export const isStep2Active = (s: AppState) => isSignalDone(s) && !isCampaignDone(s);
 export const isStep3Active = (s: AppState) => isCampaignDone(s);
 export const isWorkflowView = (s: AppState) => s.view.kind === "workflow";
 export const isOnWelcome = (s: AppState) => s.view.kind === "welcome";

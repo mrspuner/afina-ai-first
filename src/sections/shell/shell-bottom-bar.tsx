@@ -27,6 +27,7 @@ import {
   isWorkflowView,
   type View,
 } from "@/state/app-state";
+import { TYPE_TO_SCENARIO } from "@/state/scenario-map";
 
 function AttachmentFileList() {
   const { files } = usePromptInputAttachments();
@@ -74,8 +75,9 @@ function AttachmentEffect({
 export function ShellBottomBar() {
   const state = useAppState();
   const dispatch = useAppDispatch();
-  const { view, signal } = state;
-  const signalScenarioId = signal?.scenarioId ?? "";
+  const { view, signals } = state;
+  const latestSignal = signals.length > 0 ? signals[signals.length - 1] : null;
+  const signalScenarioId = latestSignal ? TYPE_TO_SCENARIO[latestSignal.type] ?? "" : "";
 
   const [stepTwoNew, setStepTwoNew] = useState(false);
   const prevViewKind = useRef<View["kind"] | null>(null);
@@ -118,14 +120,23 @@ export function ShellBottomBar() {
             <div className="flex justify-end">
               <button
                 type="button"
-                onClick={() =>
+                disabled={!latestSignal}
+                onClick={() => {
+                  if (!latestSignal) return;
+                  const now = new Date().toISOString();
                   dispatch({
-                    type: "campaign_launched",
-                    typeName: view.campaign.name,
-                    launchedAt: new Date().toLocaleDateString("ru-RU"),
-                  })
-                }
-                className="rounded-lg bg-foreground px-5 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90"
+                    type: "campaign_created",
+                    campaign: {
+                      id: view.campaign.id,
+                      name: view.campaign.name,
+                      signalId: latestSignal.id,
+                      status: "active",
+                      createdAt: now,
+                      launchedAt: now,
+                    },
+                  });
+                }}
+                className="rounded-lg bg-foreground px-5 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Начать кампанию →
               </button>

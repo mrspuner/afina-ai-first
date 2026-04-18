@@ -4,7 +4,7 @@ import { useAppState, useAppDispatch } from "@/state/app-state-context";
 import { CampaignTypeView } from "./campaign-type-view";
 
 export function CampaignsSection({ mode }: { mode: "guided" | "standalone" }) {
-  const { signal, launchedCampaign } = useAppState();
+  const { signals, campaigns } = useAppState();
   const dispatch = useAppDispatch();
 
   if (mode === "guided") {
@@ -17,13 +17,25 @@ export function CampaignsSection({ mode }: { mode: "guided" | "standalone" }) {
     );
   }
 
+  const launched =
+    campaigns.find((c) => c.status === "active" || c.status === "completed") ?? null;
+
   return (
     <CampaignTypeView
       onSelect={(id, name) =>
         dispatch({ type: "campaign_selected", campaign: { id, name } })
       }
-      noSignal={signal === null}
-      campaign={launchedCampaign}
+      noSignal={signals.length === 0}
+      campaign={
+        launched
+          ? {
+              typeName: launched.name,
+              launchedAt: launched.launchedAt
+                ? new Date(launched.launchedAt).toLocaleDateString("ru-RU")
+                : new Date(launched.createdAt).toLocaleDateString("ru-RU"),
+            }
+          : null
+      }
     />
   );
 }
