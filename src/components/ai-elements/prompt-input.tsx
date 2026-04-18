@@ -193,7 +193,7 @@ export interface TextInputContext {
   clear: () => void;
   insertAtCursor: (
     text: string,
-    options?: { separator?: "smart" | "none" }
+    options?: { separator?: "smart" | "none"; preserveTags?: boolean }
   ) => void;
   __registerTextarea: (
     ref: React.RefObject<HTMLTextAreaElement | null>
@@ -287,11 +287,17 @@ export const PromptInputProvider = ({
   );
 
   const insertAtCursor = useCallback(
-    (text: string, options?: { separator?: "smart" | "none" }) => {
+    (
+      text: string,
+      options?: { separator?: "smart" | "none"; preserveTags?: boolean }
+    ) => {
       const separator = options?.separator ?? "smart";
+      const preserveTags = options?.preserveTags ?? false;
       setTextInput((prev) => {
-        // 1. Clean empty @-tags from current input.
-        const cleaned = stripEmptyTags(prev);
+        // 1. Clean empty @-tags from current input — skipped when the caller
+        //    (e.g. a chip button under a selected node) needs the pending tag
+        //    to stay even though no content has been typed yet.
+        const cleaned = preserveTags ? prev : stripEmptyTags(prev);
 
         const el = textareaRef.current;
         const hasFocus = !!el && typeof document !== "undefined" && document.activeElement === el;

@@ -6,7 +6,8 @@ import {
   usePromptInputController,
 } from "@/components/ai-elements/prompt-input";
 import type { NodeParams, WorkflowNodeData, WorkflowNodeType } from "@/types/workflow";
-import { NODE_CATEGORY, type NodeCategory } from "@/types/workflow";
+import { NODE_CATEGORY } from "@/types/workflow";
+import { NODE_ACTIONS } from "@/state/node-actions";
 
 interface NodeControlPanelProps {
   node: { id: string; data: WorkflowNodeData };
@@ -34,13 +35,8 @@ const TYPE_LABEL: Record<WorkflowNodeType, string> = {
   new: "Новая",
 };
 
-const CATEGORY_CHIPS: Record<NodeCategory, string[]> = {
-  communication: ["Изменить текст", "Задержка 2 часа", "Добавить ссылку"],
-  logic: ["Добавить ветку", "Убрать"],
-  web: ["Сменить оффер", "Добавить баннер"],
-  endpoint: ["Изменить цель"],
-  legacy: ["Переименовать", "Обновить"],
-};
+// Quick actions come from NODE_ACTIONS so chip labels and prompt templates
+// stay in sync with the deriveParamsPatch parser (single source of truth).
 
 type ParamRow = { label: string; value: string };
 
@@ -142,11 +138,18 @@ export function NodeControlPanel({ node, onClose }: NodeControlPanelProps) {
   const { id, data } = node;
   const typeLabel = TYPE_LABEL[data.nodeType] ?? data.nodeType;
   const category = NODE_CATEGORY[data.nodeType];
-  const chips = CATEGORY_CHIPS[category];
+  const actions = data.params
+    ? NODE_ACTIONS[data.params.kind] ?? []
+    : [];
   const { textInput } = usePromptInputController();
 
-  function insertChip(chipText: string) {
-    textInput.insertAtCursor(chipText, { separator: "smart" });
+  function insertPrompt(template: string) {
+    // preserveTags:true — иначе пустой @-тег, только что вставленный при
+    // селекте ноды, будет снесён stripEmptyTags и смысл теряется.
+    textInput.insertAtCursor(template, {
+      separator: "smart",
+      preserveTags: true,
+    });
   }
 
   return (
@@ -223,16 +226,17 @@ export function NodeControlPanel({ node, onClose }: NodeControlPanelProps) {
             </>
           );
         })()}
-        {chips.length > 0 && (
+        {actions.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
-            {chips.map((chip) => (
+            {actions.map((action) => (
               <button
-                key={chip}
+                key={action.chipLabel}
                 type="button"
-                onClick={() => insertChip(chip)}
+                onClick={() => insertPrompt(action.promptTemplate)}
+                title={`Вставить шаблон: «${action.promptTemplate.trim()} …»`}
                 className="rounded-full border border-border bg-muted/40 px-2.5 py-0.5 text-xs text-foreground transition-colors hover:bg-muted"
               >
-                {chip}
+                {action.chipLabel}
               </button>
             ))}
           </div>

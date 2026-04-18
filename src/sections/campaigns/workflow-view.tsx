@@ -12,6 +12,7 @@ import {
 import type { NodeParams, WorkflowNode, WorkflowEdge } from "@/types/workflow";
 import type { Signal, SignalType } from "@/state/app-state";
 import { createTemplate } from "@/state/workflow-templates";
+import { matchActions } from "@/state/node-actions";
 
 interface GraphState {
   nodes: WorkflowNode[];
@@ -37,95 +38,70 @@ function initialGraph(signalType?: SignalType, signal?: Signal): GraphState {
   return { nodes: createBaseNodes(), edges: createBaseEdges() };
 }
 
+function computeDynamicSublabel(
+  kind: NodeParams["kind"],
+  patch: Partial<NodeParams>
+): string | null {
+  // Wait → show "N ч / N дней / N мин" based on durationHours.
+  if (kind === "wait" && "durationHours" in patch && patch.durationHours !== undefined) {
+    const h = patch.durationHours as number;
+    if (h < 1) return `${Math.round(h * 60)} мин`;
+    if (h < 24) return `${h} ч`;
+    const days = Math.round(h / 24);
+    return `${days} ${days === 1 ? "день" : days < 5 ? "дня" : "дней"}`;
+  }
+  // Condition → triggerLabel.
+  if (kind === "condition" && "trigger" in patch && patch.trigger !== undefined) {
+    const t = patch.trigger as string;
+    const map: Record<string, string> = {
+      opened: "Открыл?",
+      not_opened: "Не открыл?",
+      clicked: "Кликнул?",
+      not_clicked: "Не кликнул?",
+      delivered: "Доставлено?",
+      not_delivered: "Не доставлено?",
+    };
+    return map[t] ?? null;
+  }
+  // Split → reflect mode.
+  if (kind === "split" && "by" in patch && patch.by !== undefined) {
+    return patch.by === "segment" ? "По сегменту" : "Случайно";
+  }
+  return null;
+}
+
 function deriveParamsPatch(
   text: string,
   currentParams: NodeParams | undefined
 ): { sublabel?: string; paramsPatch?: Partial<NodeParams> } {
-  // 1. Duration: "задержка 2 часа", "через 30 минут", "2 дня"
-  const durationMatch = text.match(/(\d+)\s*(ч|час|мин|день|дн|дня|дней)/i);
-  if (durationMatch) {
-    const amount = parseInt(durationMatch[1], 10);
-    const unit = durationMatch[2].toLowerCase();
-    let hours = amount;
-    let unitLabel = "ч";
-    if (unit.startsWith("мин")) {
-      hours = amount / 60;
-      unitLabel = "мин";
-    } else if (unit.startsWith("д")) {
-      hours = amount * 24;
-      unitLabel = unit;
-    } else {
-      unitLabel = "ч";
-    }
-    if (currentParams?.kind === "wait") {
-      return {
-        sublabel: `${amount} ${unitLabel}`,
-        paramsPatch: { mode: "duration", durationHours: hours } as Partial<NodeParams>,
-      };
-    }
-    // fallback for non-wait nodes: keep legacy "Задержка N ч" sublabel
-    return { sublabel: `Задержка ${amount} ${unitLabel}` };
+  // Unified: iterate every NODE_ACTIONS entry for this node kind and merge
+  // all matching patches. Single source of truth with NodeControlPanel chips.
+  if (!currentParams) {
+    return { sublabel: "Обновлено по запросу" };
   }
 
-  // 2. Condition trigger
-  const triggerMap: Record<string, { trigger: string; label: string }> = {
-    "открыл": { trigger: "opened", label: "Открыл?" },
-    "не открыл": { trigger: "not_opened", label: "Не открыл?" },
-    "кликнул": { trigger: "clicked", label: "Кликнул?" },
-    "не кликнул": { trigger: "not_clicked", label: "Не кликнул?" },
-    "доставил": { trigger: "delivered", label: "Доставлено?" },
-  };
-  for (const [key, val] of Object.entries(triggerMap)) {
-    if (new RegExp(`\\b${key}\\b`, "i").test(text) && currentParams?.kind === "condition") {
-      return {
-        sublabel: val.label,
-        paramsPatch: { trigger: val.trigger } as Partial<NodeParams>,
-      };
-    }
+  const matched = matchActions(text, currentParams);
+  if (matched) {
+    const dynamic = computeDynamicSublabel(currentParams.kind, matched.paramsPatch);
+    return {
+      paramsPatch: matched.paramsPatch,
+      sublabel:
+        dynamic ??
+        (matched.appliedSublabels.length > 0
+          ? matched.appliedSublabels.join(", ")
+          : undefined),
+    };
   }
 
-  // 3. Text change: "текст: ..." for sms / push / email
-  const textChange = text.match(/текст[:\s]+(.+)/i);
-  if (textChange && currentParams) {
-    const newText = textChange[1].trim();
-    if (currentParams.kind === "sms") {
-      return {
-        sublabel: "Текст обновлён",
-        paramsPatch: { text: newText } as Partial<NodeParams>,
-      };
-    }
-    if (currentParams.kind === "email") {
-      return {
-        sublabel: "Тело обновлено",
-        paramsPatch: { body: newText } as Partial<NodeParams>,
-      };
-    }
-    if (currentParams.kind === "push") {
-      return {
-        sublabel: "Текст обновлён",
-        paramsPatch: { body: newText } as Partial<NodeParams>,
-      };
-    }
+  // No field matched — generic fallbacks for visual feedback.
+  const durationFallback = text.match(/(\d+)\s*(ч|час|мин|минут|день|дн|дня|дней)/i);
+  if (durationFallback) {
+    return { sublabel: `Задержка ${durationFallback[1]} ${durationFallback[2]}` };
   }
-
-  // 4. Link add: "ссылка <url>"
-  const linkMatch = text.match(/ссылк[аеу]?\s+(\S+)/i);
-  if (linkMatch && currentParams) {
-    const link = linkMatch[1];
-    if (currentParams.kind === "sms" || currentParams.kind === "email") {
-      return {
-        sublabel: "Ссылка добавлена",
-        paramsPatch: { link } as Partial<NodeParams>,
-      };
-    }
-  }
-
-  // 5. Channel hint fallbacks
   if (/email/i.test(text)) return { sublabel: "Email: обновлено" };
   if (/sms|смс/i.test(text)) return { sublabel: "SMS: обновлено" };
   if (/push/i.test(text)) return { sublabel: "Push: обновлено" };
   if (/ivr|звон/i.test(text)) return { sublabel: "Звонок: обновлено" };
-  if (/текст|оффер|ссылк/i.test(text)) return { sublabel: "Контент обновлён" };
 
   return { sublabel: "Обновлено по запросу" };
 }
