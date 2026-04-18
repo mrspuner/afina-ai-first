@@ -51,10 +51,6 @@ export default function Home() {
         <LaunchFlyout
           open={launchFlyoutOpen}
           onClose={() => dispatch({ type: "flyout_close" })}
-          onSignalSelect={(id, name) =>
-            dispatch({ type: "flyout_signal_select", id, name })
-          }
-          onCampaignSelect={() => dispatch({ type: "flyout_campaign_select" })}
         />
         <div className="relative flex flex-1 flex-col overflow-hidden">
           {renderMain()}
