@@ -153,17 +153,16 @@ export function WorkflowNodeComponent({ data, selected }: NodeProps<WorkflowNode
 // Shared CSS for node visual states — mounted once per WorkflowGraph.
 export const WORKFLOW_NODE_STATE_CSS = `
   .wf-node-selected {
-    outline: 2px solid #3b82f6;
-    outline-offset: 2px;
+    outline: 2px solid #60a5fa;
+    outline-offset: 3px;
+    box-shadow: 0 0 0 6px rgba(96, 165, 250, 0.18);
   }
   .wf-node-needs-attention {
     border-color: #fb923c !important;
     animation: wf-needs-attention 1.4s ease-in-out infinite;
   }
   .wf-node-processing {
-    animation: wf-processing 1.2s linear infinite;
-    background-image: linear-gradient(90deg, transparent 0%, rgba(99,102,241,0.25) 50%, transparent 100%);
-    background-size: 200% 100%;
+    animation: wf-processing 0.7s ease-in-out infinite;
   }
   .wf-node-just-updated {
     animation: wf-just-updated 1.2s ease-out;
@@ -173,11 +172,11 @@ export const WORKFLOW_NODE_STATE_CSS = `
     50%     { box-shadow: 0 0 0 6px rgba(251,146,60,0);   }
   }
   @keyframes wf-processing {
-    from { background-position: 0% 50%; }
-    to   { background-position: 100% 50%; }
+    0%,100% { box-shadow: 0 0 0 0 rgba(234,179,8,0); }
+    50%     { box-shadow: 0 0 0 4px rgba(234,179,8,0.55); }
   }
   @keyframes wf-just-updated {
-    0%   { box-shadow: 0 0 0 2px rgba(74,222,128,0.9); }
-    100% { box-shadow: 0 0 0 2px rgba(74,222,128,0);   }
+    0%   { box-shadow: 0 0 0 3px rgba(74,222,128,0.9); }
+    100% { box-shadow: 0 0 0 3px rgba(74,222,128,0);   }
   }
 `;

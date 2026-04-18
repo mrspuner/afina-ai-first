@@ -210,13 +210,13 @@ export function WorkflowView({
         }
         return { ...prev, nodes };
       });
-    }, 1500);
+    }, 1000);
     const t2 = setTimeout(() => {
       setGraph((prev) => ({
         ...prev,
         nodes: patchNode(prev.nodes, nodeId, { justUpdated: false }),
       }));
-    }, 2700);
+    }, 2200);
     aiTimersRef.current.push(t1, t2);
     onNodeCommandHandled?.();
     // graph only needs to read current params at start; intentionally omitted from deps

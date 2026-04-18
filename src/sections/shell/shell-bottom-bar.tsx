@@ -1,7 +1,6 @@
 "use client";
 
-import type React from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { Mic, ChevronRight } from "lucide-react";
 import type { PromptInputMessage } from "@/components/ai-elements/prompt-input";
@@ -132,16 +131,33 @@ export function ShellBottomBar() {
   const isWorkflow = isWorkflowView(state);
   const floatBottom = isOnWelcome(state) ? "40%" : isWorkflow ? "0%" : "3%";
 
+  const barRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = barRef.current;
+    if (!el) return;
+    const apply = () => {
+      const h = el.getBoundingClientRect().height;
+      document.documentElement.style.setProperty("--promptbar-height", `${Math.round(h)}px`);
+    };
+    apply();
+    const ro = new ResizeObserver(apply);
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+      document.documentElement.style.removeProperty("--promptbar-height");
+    };
+  }, [view.kind]);
+
   return (
     <>
       <SelectedNodeEffect selected={selectedWorkflowNode} />
       <ClearOnLeaveWorkflowEffect viewKind={view.kind} />
       <motion.div
+        ref={barRef}
         className={cn(
           "fixed left-[120px] right-0 z-30 px-8 pb-4",
           isWorkflow ? "bg-background/80 backdrop-blur-sm" : "bg-background"
         )}
-        style={{ "--promptbar-height": "120px" } as React.CSSProperties}
         initial={false}
         animate={{ bottom: floatBottom }}
         transition={{ duration: 0.55, ease: [0.32, 0.72, 0, 1] }}

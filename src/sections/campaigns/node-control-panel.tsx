@@ -157,13 +157,14 @@ export function NodeControlPanel({ node, onClose }: NodeControlPanelProps) {
       exit={{ y: 20, opacity: 0 }}
       transition={{ duration: 0.25, ease: [0.32, 0.72, 0, 1] }}
       className="pointer-events-auto fixed left-[120px] right-0 z-30 px-8"
-      style={{ bottom: "var(--promptbar-height, 120px)" }}
+      style={{ bottom: "var(--promptbar-height, 140px)" }}
     >
       <div
         role="region"
         aria-label="Управление нодой"
         data-testid="node-control-panel"
-        className="mx-auto flex w-full max-w-2xl flex-col gap-2 rounded-t-lg border border-b-0 border-border bg-card/95 px-4 py-3 text-sm backdrop-blur-sm"
+        className="mx-auto flex w-full max-w-2xl flex-col gap-2 overflow-y-auto rounded-t-lg border border-b-0 border-border bg-card/95 px-4 pt-3 pb-4 text-sm backdrop-blur-sm"
+        style={{ maxHeight: "calc(100vh - var(--promptbar-height, 140px) - 96px)" }}
       >
         <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
