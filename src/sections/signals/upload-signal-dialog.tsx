@@ -48,6 +48,7 @@ export function UploadSignalDialog({ open, onOpenChange }: UploadSignalDialogPro
     if (!file) return;
     const signal = buildSignalFromFile(file);
     dispatch({ type: "signal_added", signal });
+    dispatch({ type: "sidebar_nav", section: "Сигналы" });
     setFile(null);
     setIsHashing(false);
     onOpenChange(false);
