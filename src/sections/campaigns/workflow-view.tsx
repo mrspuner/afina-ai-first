@@ -23,6 +23,7 @@ interface WorkflowViewProps {
   onCommandHandled: () => void;
   onGoToStats: () => void;
   signalName?: string;
+  onGraphChange?: (graph: GraphState) => void;
 }
 
 export function WorkflowView({
@@ -31,11 +32,16 @@ export function WorkflowView({
   onCommandHandled,
   onGoToStats,
   signalName,
+  onGraphChange,
 }: WorkflowViewProps) {
   const [graph, setGraph] = useState<GraphState>({
     nodes: createBaseNodes(signalName),
     edges: createBaseEdges(),
   });
+
+  useEffect(() => {
+    onGraphChange?.(graph);
+  }, [graph, onGraphChange]);
   const [unknownCmd, setUnknownCmd] = useState<string | null>(null);
   const unknownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const graphRef = useRef<HTMLDivElement>(null);
