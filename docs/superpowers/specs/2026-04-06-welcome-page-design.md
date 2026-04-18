@@ -41,7 +41,11 @@ Steps 2 and 3 unlock progressively as the user completes the previous step. For 
 
 ## Click Behavior (Step 1)
 
-Clicking «Шаг 1 · Получение сигнала» opens the `LaunchFlyout` (same as clicking «Запустить» in the sidebar). This reuses the existing flyout flow.
+Clicking «Шаг 1 · Получение сигнала» sets `activeNav = "Кампании"` and navigates into the campaign wizard at step 1 (`CampaignWorkspace`). This is the same screen as the existing campaign creation flow.
+
+Step 1 of the wizard displays:
+- **Title:** «Выберите тип сигнала»
+- **Subtitle:** «Выберите сценарий, мы зададим нужные вопросы»
 
 ## Component
 

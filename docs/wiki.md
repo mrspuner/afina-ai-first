@@ -49,6 +49,7 @@
 - Спеки сохраняются в `docs/superpowers/specs/YYYY-MM-DD-<тема>.md`
 - Планы реализации — в `docs/superpowers/plans/YYYY-MM-DD-<тема>.md`
 - Реализация ведётся через задачи по плану (executing-plans или subagent-driven)
+- История реализованных флоу — в `git log` и в файлах спек/планов (не дублируется здесь)
 
 ---
 
@@ -59,19 +60,3 @@
 - `Progress` экспортирует: `Progress`, `ProgressTrack`, `ProgressIndicator`, `ProgressLabel`, `ProgressValue`
 - Pre-existing TypeScript ошибки в `src/components/ai-elements/` — не наши, игнорировать
 - `motion` импортируется только из `"motion/react"`, не из `"framer-motion"`
-
----
-
-## Реализованные флоу
-
-### Campaign Flow (8 шагов) — готов
-Спека: `docs/superpowers/specs/2026-04-04-campaign-flow-design.md`
-План: `docs/superpowers/plans/2026-04-04-campaign-flow.md`
-
-Шаги: выбор сценария → интересы → сегменты → лимит → загрузка файла → сводка → прогресс → результат
-
-### Sidebar Redesign — готов
-Спека: `docs/superpowers/specs/2026-04-05-sidebar-redesign-design.md`
-План: `docs/superpowers/plans/2026-04-05-sidebar-redesign.md`
-
-Изменения: вертикальный nav (иконка + текст), flyout «Запустить», убран border-r, фон совпадает с рабочей зоной.
