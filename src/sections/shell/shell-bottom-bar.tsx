@@ -27,6 +27,7 @@ import {
   isWorkflowView,
   type View,
 } from "@/state/app-state";
+import { parseStructuralCommands } from "@/state/structural-commands";
 
 function AttachmentFileList() {
   const { files } = usePromptInputAttachments();
@@ -114,24 +115,42 @@ export function ShellBottomBar() {
 
   function handlePromptSubmit(message: PromptInputMessage) {
     const rawText = message.text ?? "";
-    if (view.kind === "workflow" && !view.launched) {
-      const segments = parseTagSegments(rawText);
-      if (segments.length > 0) {
-        dispatch({
-          type: "workflow_node_command_submit",
-          commands: segments.map((s) => ({ nodeLabel: s.label, text: s.text })),
-        });
-        const names = segments.map((s) => `@${s.label}`).join(", ");
-        dispatch({
-          type: "ai_reply_shown",
-          text:
-            segments.length === 1
-              ? `Готово, обновил ноду ${names}.`
-              : `Готово, обновил ноды ${names}.`,
-        });
-      } else {
-        dispatch({ type: "workflow_command_submit", text: rawText });
-      }
+    if (view.kind !== "workflow" || view.launched) return;
+
+    const structural = parseStructuralCommands(rawText);
+    const tagSegments = parseTagSegments(rawText);
+
+    if (structural.ops.length > 0) {
+      dispatch({
+        type: "workflow_structural_commands_submit",
+        ops: structural.ops,
+      });
+    }
+    if (tagSegments.length > 0) {
+      dispatch({
+        type: "workflow_node_command_submit",
+        commands: tagSegments.map((s) => ({ nodeLabel: s.label, text: s.text })),
+      });
+    }
+    if (
+      structural.ops.length === 0 &&
+      tagSegments.length === 0 &&
+      rawText.trim()
+    ) {
+      dispatch({ type: "workflow_command_submit", text: rawText });
+    }
+
+    // @-tag reply is emitted here; structural reply is emitted by WorkflowView
+    // after applyOps (so it can include applied/skipped summary).
+    if (tagSegments.length > 0) {
+      const names = tagSegments.map((s) => `@${s.label}`).join(", ");
+      dispatch({
+        type: "ai_reply_shown",
+        text:
+          tagSegments.length === 1
+            ? `Готово, обновил ноду ${names}.`
+            : `Готово, обновил ноды ${names}.`,
+      });
     }
   }
 

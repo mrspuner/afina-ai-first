@@ -13,6 +13,11 @@ import type { NodeParams, WorkflowNode, WorkflowEdge } from "@/types/workflow";
 import type { Signal, SignalType } from "@/state/app-state";
 import { createTemplate } from "@/state/workflow-templates";
 import { matchActions } from "@/state/node-actions";
+import {
+  applyOps,
+  type StructuralOp,
+} from "@/state/structural-commands";
+import { useAppDispatch } from "@/state/app-state-context";
 
 interface GraphState {
   nodes: WorkflowNode[];
@@ -25,6 +30,8 @@ interface WorkflowViewProps {
   onCommandHandled: () => void;
   nodeCommand?: Array<{ nodeId: string; text: string }> | null;
   onNodeCommandHandled?: () => void;
+  structuralOps?: StructuralOp[] | null;
+  onStructuralOpsHandled?: () => void;
   selectedNodeId?: string | null;
   signalType?: SignalType;
   signal?: Signal;
@@ -113,6 +120,8 @@ export function WorkflowView({
   onCommandHandled,
   nodeCommand,
   onNodeCommandHandled,
+  structuralOps,
+  onStructuralOpsHandled,
   selectedNodeId,
   signalType,
   signal,
@@ -120,6 +129,7 @@ export function WorkflowView({
   onNodeClick,
   onPaneClick,
 }: WorkflowViewProps) {
+  const appDispatch = useAppDispatch();
   const [graph, setGraph] = useState<GraphState>(() =>
     initialGraph(signalType, signal)
   );
@@ -211,6 +221,32 @@ export function WorkflowView({
     // graph only needs to read current params at start; intentionally omitted from deps
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodeCommand, onNodeCommandHandled]);
+
+  useEffect(() => {
+    if (!structuralOps || structuralOps.length === 0) return;
+    setGraph((prev) => {
+      const result = applyOps(prev, structuralOps);
+      const lines: string[] = [];
+      if (result.applied.length > 0) {
+        if (result.applied.length === 1) {
+          lines.push(result.applied[0].description);
+        } else {
+          lines.push("Готово:");
+          for (const a of result.applied) lines.push(`• ${a.description}`);
+        }
+      }
+      if (result.skipped.length > 0) {
+        lines.push("Не выполнено:");
+        for (const s of result.skipped) lines.push(`• ${s.reason}`);
+      }
+      if (lines.length > 0) {
+        appDispatch({ type: "ai_reply_shown", text: lines.join("\n") });
+      }
+      return result.graph;
+    });
+    onStructuralOpsHandled?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [structuralOps]);
 
   useEffect(() => {
     const timers = aiTimersRef;

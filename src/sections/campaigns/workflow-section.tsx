@@ -30,6 +30,7 @@ export function WorkflowSection() {
     view,
     workflowCommand,
     workflowNodeCommand,
+    workflowStructuralCommands,
     selectedWorkflowNode,
     aiReply,
     signals,
@@ -50,6 +51,11 @@ export function WorkflowSection() {
 
   const handleNodeCommandHandled = useCallback(
     () => dispatch({ type: "workflow_node_command_handled" }),
+    [dispatch]
+  );
+
+  const handleStructuralOpsHandled = useCallback(
+    () => dispatch({ type: "workflow_structural_commands_handled" }),
     [dispatch]
   );
 
@@ -227,6 +233,8 @@ export function WorkflowSection() {
           onCommandHandled={handleCommandHandled}
           nodeCommand={resolvedNodeCommands}
           onNodeCommandHandled={handleNodeCommandHandled}
+          structuralOps={workflowStructuralCommands?.ops ?? null}
+          onStructuralOpsHandled={handleStructuralOpsHandled}
           selectedNodeId={selectedWorkflowNode?.id ?? null}
           signalType={currentSignal?.type}
           signal={currentSignal ?? undefined}

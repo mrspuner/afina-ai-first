@@ -663,3 +663,32 @@ describe("isCampaignDone", () => {
     ).toBe(false);
   });
 });
+
+describe("appReducer — workflow_structural_commands", () => {
+  it("workflow_structural_commands_submit captures ops and deselects", () => {
+    const state: AppState = {
+      ...initialState,
+      selectedWorkflowNode: { id: "x", label: "X" },
+    };
+    const ops = [{ kind: "remove" as const, ref: "X" }];
+    const next = appReducer(state, {
+      type: "workflow_structural_commands_submit",
+      ops,
+    });
+    expect(next.workflowStructuralCommands).toEqual({ ops });
+    expect(next.selectedWorkflowNode).toBeNull();
+  });
+
+  it("workflow_structural_commands_handled clears pending", () => {
+    const state: AppState = {
+      ...initialState,
+      workflowStructuralCommands: {
+        ops: [{ kind: "remove" as const, ref: "X" }],
+      },
+    };
+    const next = appReducer(state, {
+      type: "workflow_structural_commands_handled",
+    });
+    expect(next.workflowStructuralCommands).toBeNull();
+  });
+});

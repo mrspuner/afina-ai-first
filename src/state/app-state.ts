@@ -1,4 +1,5 @@
 import { nanoid } from "nanoid";
+import type { StructuralOp } from "./structural-commands";
 
 export type SignalType =
   | "Регистрация"
@@ -64,6 +65,7 @@ export type AppState = {
   campaigns: Campaign[];
   workflowCommand: string | null;
   workflowNodeCommand: { commands: Array<{ nodeLabel: string; text: string }> } | null;
+  workflowStructuralCommands: { ops: StructuralOp[] } | null;
   selectedWorkflowNode: { id: string; label: string } | null;
   aiReply: string | null;
   launchFlyoutOpen: boolean;
@@ -91,6 +93,8 @@ export type Action =
   | { type: "workflow_node_deselected" }
   | { type: "workflow_node_command_submit"; commands: Array<{ nodeLabel: string; text: string }> }
   | { type: "workflow_node_command_handled" }
+  | { type: "workflow_structural_commands_submit"; ops: StructuralOp[] }
+  | { type: "workflow_structural_commands_handled" }
   | { type: "ai_reply_shown"; text: string }
   | { type: "ai_reply_dismissed" }
   | { type: "goto_stats"; campaignId?: string }
@@ -106,6 +110,7 @@ export const initialState: AppState = {
   campaigns: [],
   workflowCommand: null,
   workflowNodeCommand: null,
+  workflowStructuralCommands: null,
   selectedWorkflowNode: null,
   aiReply: null,
   launchFlyoutOpen: false,
@@ -343,6 +348,16 @@ export function appReducer(state: AppState, action: Action): AppState {
 
     case "workflow_node_command_handled":
       return { ...state, workflowNodeCommand: null };
+
+    case "workflow_structural_commands_submit":
+      return {
+        ...state,
+        workflowStructuralCommands: { ops: action.ops },
+        selectedWorkflowNode: null,
+      };
+
+    case "workflow_structural_commands_handled":
+      return { ...state, workflowStructuralCommands: null };
 
     case "ai_reply_shown":
       return { ...state, aiReply: action.text };
