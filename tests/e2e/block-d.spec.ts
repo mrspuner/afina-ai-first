@@ -48,4 +48,46 @@ test.describe("Block D — Workflow templates", () => {
     await expect(page.locator('[data-node-type="wait"]')).toBeVisible();
     await expect(page.locator('[data-node-type="push"]')).toBeVisible();
   });
+
+  test("Edge labels render with background plates", async ({ page }) => {
+    await page.goto("/");
+    await applyPreset(page, "full");
+    await createCampaignForSignal(page, "Первая сделка");
+
+    // YES/NO labels on the condition edges should render with bg rects
+    await expect(page.locator(".react-flow__edge-textbg").first()).toBeVisible();
+  });
+
+  test("Canvas pans on left mouse button drag of empty pane", async ({ page }) => {
+    await page.goto("/");
+    await applyPreset(page, "full");
+    await createCampaignForSignal(page, "Регистрация");
+
+    const viewport = page.locator(".react-flow__viewport");
+    await expect(viewport).toBeVisible();
+
+    const initialTransform = await viewport.evaluate(
+      (el) => (el as HTMLElement).style.transform,
+    );
+
+    const pane = page.locator(".react-flow__pane");
+    const box = await pane.boundingBox();
+    if (!box) throw new Error("react-flow pane has no bounding box");
+
+    // Drag from an empty area near the top-left corner of the pane
+    const startX = box.x + 40;
+    const startY = box.y + 40;
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    await page.mouse.move(startX + 200, startY + 80, { steps: 10 });
+    await page.mouse.up();
+
+    // Allow ReactFlow to commit the transform update
+    await page.waitForTimeout(100);
+
+    const nextTransform = await viewport.evaluate(
+      (el) => (el as HTMLElement).style.transform,
+    );
+    expect(nextTransform).not.toBe(initialTransform);
+  });
 });

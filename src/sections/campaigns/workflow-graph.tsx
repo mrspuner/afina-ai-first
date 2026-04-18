@@ -8,7 +8,6 @@ import {
   ReactFlowProvider,
   useReactFlow,
   type Viewport,
-  PanOnScrollMode,
 } from "@xyflow/react";
 import { Controls } from "@/components/ai-elements/controls";
 import {
@@ -80,9 +79,9 @@ function GraphInner({ nodes, edges, compact, onNodeClick, onPaneClick }: Workflo
         nodeTypes={nodeTypes}
         fitView
         fitViewOptions={{ padding: 0.3 }}
-        panOnDrag={false}
-        panOnScroll
-        panOnScrollMode={PanOnScrollMode.Horizontal}
+        panOnDrag={true}
+        panOnScroll={false}
+        selectionOnDrag={false}
         zoomOnScroll={false}
         nodesDraggable={false}
         nodesConnectable={false}
