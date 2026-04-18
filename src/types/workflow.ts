@@ -12,6 +12,8 @@ export interface WorkflowNodeData extends Record<string, unknown> {
   label: string;
   sublabel?: string;
   nodeType: WorkflowNodeType;
+  needsAttention?: boolean;
+  isSuccess?: boolean;
 }
 
 export type WorkflowNode = Node<WorkflowNodeData, "workflowNode">;
@@ -31,8 +33,14 @@ function makeNode(
   x: number,
   y: number,
   sublabel?: string,
+  extras?: Partial<Pick<WorkflowNodeData, "needsAttention" | "isSuccess">>,
 ): WorkflowNode {
-  return { id, type: "workflowNode", position: { x, y }, data: { label, nodeType, sublabel } };
+  return {
+    id,
+    type: "workflowNode",
+    position: { x, y },
+    data: { label, nodeType, sublabel, ...extras },
+  };
 }
 
 const LABEL_STYLE = { fill: "rgba(255,255,255,0.65)", fontSize: 10, fontWeight: 500 };
@@ -69,7 +77,7 @@ export function createBaseNodes(signalName?: string): WorkflowNode[] {
     makeNode("check",    "Проверка отклика",    "new",     660,   0,  "Реакция / нет"),
     makeNode("engaged",  "Engaged flow",        "result",  880,  -40, "Баннер + доп. push"),
     makeNode("retarget", "Retarget flow",       "retarget",880,   40, "Смена канала + оффер"),
-    makeNode("result",   "Результат",           "default",1080,   0,  "Reactivated / cold"),
+    makeNode("result",   "Результат",           "default",1080,   0,  "Reactivated / cold", { isSuccess: true }),
   ];
 }
 
