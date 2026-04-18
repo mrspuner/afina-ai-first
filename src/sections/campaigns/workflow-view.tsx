@@ -102,6 +102,8 @@ export function WorkflowView({
     onCommandHandled();
   }, [pendingCommand, onCommandHandled]);
 
+  const aiTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
   useEffect(() => {
     if (!nodeCommand) return;
     const { nodeId, text } = nodeCommand;
@@ -127,12 +129,17 @@ export function WorkflowView({
         nodes: patchNode(prev.nodes, nodeId, { justUpdated: false }),
       }));
     }, 2700);
+    aiTimersRef.current.push(t1, t2);
     onNodeCommandHandled?.();
-    return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-    };
   }, [nodeCommand, onNodeCommandHandled]);
+
+  useEffect(() => {
+    const timers = aiTimersRef;
+    return () => {
+      timers.current.forEach(clearTimeout);
+      timers.current = [];
+    };
+  }, []);
 
   useEffect(() => {
     return () => {
