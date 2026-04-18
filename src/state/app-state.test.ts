@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { appReducer, initialState, type AppState, type Signal, type Campaign } from "./app-state";
+import {
+  appReducer,
+  initialState,
+  isCampaignDone,
+  type AppState,
+  type Signal,
+  type Campaign,
+} from "./app-state";
 
 function makeSignal(overrides: Partial<Signal> = {}): Signal {
   return {
@@ -424,5 +431,216 @@ describe("appReducer — campaign_opened", () => {
     };
     const next = appReducer(state, { type: "campaign_opened", id: "cmp_A" });
     expect(next.activeSection).toBeNull();
+  });
+});
+
+describe("appReducer — paused transitions", () => {
+  it("active → paused sets pausedAt and preserves launchedAt", () => {
+    const state: AppState = {
+      ...initialState,
+      campaigns: [
+        makeCampaign({
+          id: "c1",
+          status: "active",
+          launchedAt: "2026-03-01T00:00:00.000Z",
+        }),
+      ],
+    };
+    const next = appReducer(state, {
+      type: "campaign_status_changed",
+      id: "c1",
+      status: "paused",
+      timestamp: "2026-04-18T12:00:00.000Z",
+    });
+    expect(next.campaigns[0].status).toBe("paused");
+    expect(next.campaigns[0].pausedAt).toBe("2026-04-18T12:00:00.000Z");
+    expect(next.campaigns[0].launchedAt).toBe("2026-03-01T00:00:00.000Z");
+  });
+
+  it("paused → active clears pausedAt but keeps launchedAt", () => {
+    const state: AppState = {
+      ...initialState,
+      campaigns: [
+        makeCampaign({
+          id: "c1",
+          status: "paused",
+          launchedAt: "2026-03-01T00:00:00.000Z",
+          pausedAt: "2026-04-10T00:00:00.000Z",
+        }),
+      ],
+    };
+    const next = appReducer(state, {
+      type: "campaign_status_changed",
+      id: "c1",
+      status: "active",
+      timestamp: "2026-04-18T12:00:00.000Z",
+    });
+    expect(next.campaigns[0].status).toBe("active");
+    expect(next.campaigns[0].pausedAt).toBeUndefined();
+    expect(next.campaigns[0].launchedAt).toBe("2026-03-01T00:00:00.000Z");
+  });
+
+  it("keeps view.launched true when workflow view transitions into paused", () => {
+    const state: AppState = {
+      ...initialState,
+      campaigns: [
+        makeCampaign({
+          id: "c1",
+          status: "active",
+          launchedAt: "2026-03-01T00:00:00.000Z",
+        }),
+      ],
+      view: { kind: "workflow", campaign: { id: "c1", name: "C1" }, launched: true },
+    };
+    const next = appReducer(state, {
+      type: "campaign_status_changed",
+      id: "c1",
+      status: "paused",
+      timestamp: "2026-04-18T12:00:00.000Z",
+    });
+    if (next.view.kind !== "workflow") throw new Error("unreachable");
+    expect(next.view.launched).toBe(true);
+  });
+});
+
+describe("appReducer — campaign_duplicated", () => {
+  it("creates a draft copy named with 'Копия —' prefix", () => {
+    const original = makeCampaign({
+      id: "cmp_orig",
+      name: "Летний апсейл",
+      status: "active",
+    });
+    const state: AppState = { ...initialState, campaigns: [original] };
+    const next = appReducer(state, { type: "campaign_duplicated", id: "cmp_orig" });
+    expect(next.campaigns).toHaveLength(2);
+    const dup = next.campaigns[1];
+    expect(dup.name).toBe("Копия — Летний апсейл");
+    expect(dup.status).toBe("draft");
+    expect(dup.signalId).toBe(original.signalId);
+    expect(dup.id).not.toBe(original.id);
+    expect(dup.id).toMatch(/^cmp_/);
+  });
+
+  it("switches view to workflow pointing to the new copy (launched=false)", () => {
+    const original = makeCampaign({ id: "cmp_orig", name: "Orig" });
+    const state: AppState = { ...initialState, campaigns: [original] };
+    const next = appReducer(state, { type: "campaign_duplicated", id: "cmp_orig" });
+    if (next.view.kind !== "workflow") throw new Error("unreachable");
+    expect(next.view.launched).toBe(false);
+    expect(next.view.campaign.name).toBe("Копия — Orig");
+    expect(next.view.campaign.id).toBe(next.campaigns[1].id);
+  });
+
+  it("is a no-op when the id is unknown", () => {
+    const state: AppState = {
+      ...initialState,
+      campaigns: [makeCampaign({ id: "cmp_A" })],
+    };
+    const next = appReducer(state, { type: "campaign_duplicated", id: "cmp_missing" });
+    expect(next).toBe(state);
+  });
+});
+
+describe("appReducer — campaign_schedule_cancelled", () => {
+  it("returns scheduled campaign to draft and clears scheduledFor", () => {
+    const state: AppState = {
+      ...initialState,
+      campaigns: [
+        makeCampaign({
+          id: "c1",
+          status: "scheduled",
+          scheduledFor: "2026-05-01T00:00:00.000Z",
+        }),
+      ],
+    };
+    const next = appReducer(state, {
+      type: "campaign_schedule_cancelled",
+      id: "c1",
+    });
+    expect(next.campaigns[0].status).toBe("draft");
+    expect(next.campaigns[0].scheduledFor).toBeUndefined();
+  });
+
+  it("is a no-op when campaign is not in scheduled status", () => {
+    const state: AppState = {
+      ...initialState,
+      campaigns: [makeCampaign({ id: "c1", status: "active" })],
+    };
+    const next = appReducer(state, {
+      type: "campaign_schedule_cancelled",
+      id: "c1",
+    });
+    expect(next.campaigns[0].status).toBe("active");
+  });
+
+  it("is a no-op when id is unknown", () => {
+    const state: AppState = {
+      ...initialState,
+      campaigns: [makeCampaign({ id: "c1", status: "scheduled" })],
+    };
+    const next = appReducer(state, {
+      type: "campaign_schedule_cancelled",
+      id: "missing",
+    });
+    expect(next.campaigns[0].status).toBe("scheduled");
+  });
+});
+
+describe("appReducer — goto_stats with campaignId", () => {
+  it("stores campaignId on the section view", () => {
+    const next = appReducer(initialState, {
+      type: "goto_stats",
+      campaignId: "cmp_X",
+    });
+    expect(next.view).toEqual({
+      kind: "section",
+      name: "Статистика",
+      campaignId: "cmp_X",
+    });
+    expect(next.activeSection).toBe("Статистика");
+  });
+
+  it("leaves campaignId undefined when not passed", () => {
+    const next = appReducer(initialState, { type: "goto_stats" });
+    if (next.view.kind !== "section") throw new Error("unreachable");
+    expect(next.view.campaignId).toBeUndefined();
+    expect(next.view.name).toBe("Статистика");
+  });
+});
+
+describe("isCampaignDone", () => {
+  it("returns true when any campaign is paused", () => {
+    const state: AppState = {
+      ...initialState,
+      campaigns: [makeCampaign({ id: "c1", status: "paused" })],
+    };
+    expect(isCampaignDone(state)).toBe(true);
+  });
+
+  it("returns true for active/completed as before", () => {
+    expect(
+      isCampaignDone({
+        ...initialState,
+        campaigns: [makeCampaign({ status: "active" })],
+      })
+    ).toBe(true);
+    expect(
+      isCampaignDone({
+        ...initialState,
+        campaigns: [makeCampaign({ status: "completed" })],
+      })
+    ).toBe(true);
+  });
+
+  it("returns false for draft/scheduled only", () => {
+    expect(
+      isCampaignDone({
+        ...initialState,
+        campaigns: [
+          makeCampaign({ id: "c1", status: "draft" }),
+          makeCampaign({ id: "c2", status: "scheduled" }),
+        ],
+      })
+    ).toBe(false);
   });
 });

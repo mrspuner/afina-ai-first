@@ -22,7 +22,12 @@ export type Signal = {
   updatedAt: string;
 };
 
-export type CampaignStatus = "draft" | "scheduled" | "active" | "completed";
+export type CampaignStatus =
+  | "draft"
+  | "scheduled"
+  | "active"
+  | "paused"
+  | "completed";
 
 export type Campaign = {
   id: string;
@@ -31,6 +36,7 @@ export type Campaign = {
   status: CampaignStatus;
   createdAt: string;
   launchedAt?: string;
+  pausedAt?: string;
   completedAt?: string;
   scheduledFor?: string;
 };
@@ -50,7 +56,7 @@ export type View =
   | { kind: "awaiting-campaign" }
   | { kind: "campaign-select" }
   | { kind: "workflow"; campaign: { id: string; name: string }; launched: boolean }
-  | { kind: "section"; name: SectionName };
+  | { kind: "section"; name: SectionName; campaignId?: string };
 
 export type AppState = {
   view: View;
@@ -76,6 +82,8 @@ export type Action =
   | { type: "campaign_saved_draft"; id: string }
   | { type: "campaign_created"; campaign: Campaign }
   | { type: "campaign_status_changed"; id: string; status: CampaignStatus; timestamp: string }
+  | { type: "campaign_duplicated"; id: string }
+  | { type: "campaign_schedule_cancelled"; id: string }
   | { type: "preset_applied"; preset: Preset }
   | { type: "workflow_command_submit"; text: string }
   | { type: "workflow_command_handled" }
@@ -85,7 +93,7 @@ export type Action =
   | { type: "workflow_node_command_handled" }
   | { type: "ai_reply_shown"; text: string }
   | { type: "ai_reply_dismissed" }
-  | { type: "goto_stats" }
+  | { type: "goto_stats"; campaignId?: string }
   | { type: "sidebar_nav"; section: SectionName }
   | { type: "flyout_open" }
   | { type: "flyout_close" }
@@ -134,7 +142,9 @@ export function appReducer(state: AppState, action: Action): AppState {
             kind: "workflow",
             campaign: action.campaign,
             launched:
-              existing.status === "active" || existing.status === "completed",
+              existing.status === "active" ||
+              existing.status === "paused" ||
+              existing.status === "completed",
           },
           activeSection: null,
         };
@@ -191,7 +201,10 @@ export function appReducer(state: AppState, action: Action): AppState {
         view: {
           kind: "workflow",
           campaign: { id: c.id, name: c.name },
-          launched: c.status === "active" || c.status === "completed",
+          launched:
+            c.status === "active" ||
+            c.status === "paused" ||
+            c.status === "completed",
         },
         activeSection: null,
       };
@@ -234,7 +247,15 @@ export function appReducer(state: AppState, action: Action): AppState {
         campaigns: state.campaigns.map((c) => {
           if (c.id !== action.id) return c;
           const next: Campaign = { ...c, status: action.status };
-          if (action.status === "active") next.launchedAt = action.timestamp;
+          if (action.status === "active") {
+            // transition from paused → active clears pausedAt but must NOT
+            // overwrite launchedAt. Fresh launch (from draft) sets launchedAt.
+            next.pausedAt = undefined;
+            if (!c.launchedAt) next.launchedAt = action.timestamp;
+          }
+          if (action.status === "paused") {
+            next.pausedAt = action.timestamp ?? new Date().toISOString();
+          }
           if (action.status === "completed") next.completedAt = action.timestamp;
           if (action.status === "scheduled") next.scheduledFor = action.timestamp;
           return next;
@@ -243,6 +264,40 @@ export function appReducer(state: AppState, action: Action): AppState {
           state.view.kind === "workflow" && state.view.campaign.id === action.id && action.status === "active"
             ? { ...state.view, launched: true }
             : state.view,
+      };
+
+    case "campaign_duplicated": {
+      const original = state.campaigns.find((c) => c.id === action.id);
+      if (!original) return state;
+      const dup: Campaign = {
+        id: `cmp_${nanoid(6)}`,
+        name: `Копия — ${original.name}`,
+        signalId: original.signalId,
+        status: "draft",
+        createdAt: new Date().toISOString(),
+      };
+      return {
+        ...state,
+        campaigns: [...state.campaigns, dup],
+        view: {
+          kind: "workflow",
+          campaign: { id: dup.id, name: dup.name },
+          launched: false,
+        },
+        activeSection: null,
+      };
+    }
+
+    case "campaign_schedule_cancelled":
+      return {
+        ...state,
+        campaigns: state.campaigns.map((c) => {
+          if (c.id !== action.id) return c;
+          if (c.status !== "scheduled") return c;
+          const next: Campaign = { ...c, status: "draft" };
+          delete next.scheduledFor;
+          return next;
+        }),
       };
 
     case "preset_applied": {
@@ -297,7 +352,7 @@ export function appReducer(state: AppState, action: Action): AppState {
     case "goto_stats":
       return {
         ...state,
-        view: { kind: "section", name: "Статистика" },
+        view: { kind: "section", name: "Статистика", campaignId: action.campaignId },
         workflowCommand: null,
         activeSection: "Статистика",
       };
@@ -341,7 +396,12 @@ export function appReducer(state: AppState, action: Action): AppState {
 
 export const isSignalDone = (s: AppState) => s.signals.length > 0;
 export const isCampaignDone = (s: AppState) =>
-  s.campaigns.some((c) => c.status === "active" || c.status === "completed");
+  s.campaigns.some(
+    (c) =>
+      c.status === "active" ||
+      c.status === "paused" ||
+      c.status === "completed"
+  );
 export const isStep1Active = (s: AppState) => !isSignalDone(s);
 export const isStep2Active = (s: AppState) => isSignalDone(s) && !isCampaignDone(s);
 export const isStep3Active = (s: AppState) => isCampaignDone(s);

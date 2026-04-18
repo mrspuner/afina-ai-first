@@ -4,6 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import { Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import type { Campaign, Signal } from "@/state/app-state";
 
 export interface CanvasHeaderToast {
@@ -11,12 +19,19 @@ export interface CanvasHeaderToast {
   text: string;
 }
 
+type ConfirmKind = "pause" | "duplicate" | "cancel-schedule";
+
 interface CanvasHeaderProps {
   campaign: Campaign;
   signal: Signal | null;
   onRename: (name: string) => void;
   onSaveDraft: () => void;
   onLaunch: () => void;
+  onPause: () => void;
+  onResume: () => void;
+  onDuplicate: () => void;
+  onGoToStats: () => void;
+  onCancelSchedule: () => void;
   toast?: CanvasHeaderToast | null;
   onDismissToast?: () => void;
 }
@@ -38,11 +53,17 @@ export function CanvasHeader({
   onRename,
   onSaveDraft,
   onLaunch,
+  onPause,
+  onResume,
+  onDuplicate,
+  onGoToStats,
+  onCancelSchedule,
   toast,
   onDismissToast,
 }: CanvasHeaderProps) {
   const [editing, setEditing] = useState(false);
   const [draftName, setDraftName] = useState(campaign.name);
+  const [confirm, setConfirm] = useState<ConfirmKind | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Resync draft name when the campaign is renamed externally (e.g.,
@@ -123,10 +144,60 @@ export function CanvasHeader({
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
-          <Button variant="outline" onClick={onSaveDraft}>
-            Сохранить черновик
-          </Button>
-          <Button onClick={onLaunch}>Запустить</Button>
+          {campaign.status === "draft" && (
+            <>
+              <Button variant="outline" onClick={onSaveDraft}>
+                Сохранить черновик
+              </Button>
+              <Button onClick={onLaunch}>Запустить</Button>
+            </>
+          )}
+          {campaign.status === "active" && (
+            <>
+              <Button variant="outline" onClick={onGoToStats}>
+                Посмотреть статистику
+              </Button>
+              <Button
+                variant="outline"
+                className="text-amber-600 border-amber-500/40 hover:bg-amber-500/10"
+                onClick={() => setConfirm("pause")}
+              >
+                Приостановить
+              </Button>
+              <Button onClick={() => setConfirm("duplicate")}>Дублировать</Button>
+            </>
+          )}
+          {campaign.status === "paused" && (
+            <>
+              <Button variant="outline" onClick={onGoToStats}>
+                Посмотреть статистику
+              </Button>
+              <Button variant="outline" onClick={() => setConfirm("duplicate")}>
+                Дублировать
+              </Button>
+              <Button onClick={onResume}>Возобновить</Button>
+            </>
+          )}
+          {campaign.status === "completed" && (
+            <>
+              <Button variant="outline" onClick={onGoToStats}>
+                Посмотреть статистику
+              </Button>
+              <Button onClick={() => setConfirm("duplicate")}>Дублировать</Button>
+            </>
+          )}
+          {campaign.status === "scheduled" && (
+            <>
+              <Button
+                variant="outline"
+                className="text-destructive border-destructive/40 hover:bg-destructive/10"
+                onClick={() => setConfirm("cancel-schedule")}
+              >
+                Отменить расписание
+              </Button>
+              <Button onClick={() => setConfirm("duplicate")}>Дублировать</Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -152,6 +223,88 @@ export function CanvasHeader({
           )}
         </div>
       )}
+
+      <Dialog
+        open={confirm !== null}
+        onOpenChange={(open) => {
+          if (!open) setConfirm(null);
+        }}
+      >
+        <DialogContent>
+          {confirm === "pause" && (
+            <>
+              <DialogHeader>
+                <DialogTitle>Приостановить кампанию?</DialogTitle>
+                <DialogDescription>
+                  Кампания перестанет выполнять шаги сценария. Возобновить
+                  можно в любой момент.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setConfirm(null)}>
+                  Отмена
+                </Button>
+                <Button
+                  onClick={() => {
+                    setConfirm(null);
+                    onPause();
+                  }}
+                >
+                  Приостановить
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+          {confirm === "duplicate" && (
+            <>
+              <DialogHeader>
+                <DialogTitle>Дублировать кампанию?</DialogTitle>
+                <DialogDescription>
+                  Будет создана черновая копия «Копия — {campaign.name}» и
+                  открыта в Canvas.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setConfirm(null)}>
+                  Отмена
+                </Button>
+                <Button
+                  onClick={() => {
+                    setConfirm(null);
+                    onDuplicate();
+                  }}
+                >
+                  Дублировать
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+          {confirm === "cancel-schedule" && (
+            <>
+              <DialogHeader>
+                <DialogTitle>Отменить расписание?</DialogTitle>
+                <DialogDescription>
+                  Кампания вернётся в состояние черновика. Вам потребуется
+                  заново её запланировать.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setConfirm(null)}>
+                  Отмена
+                </Button>
+                <Button
+                  onClick={() => {
+                    setConfirm(null);
+                    onCancelSchedule();
+                  }}
+                >
+                  Отменить расписание
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

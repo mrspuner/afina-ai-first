@@ -94,11 +94,12 @@ function DataCells({ data }: { data: RowData }) {
   );
 }
 
-export function StatisticsView() {
+export function StatisticsView({ campaignId }: { campaignId?: string } = {}) {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
     new Set(["14.05.2024", "13.05.2024"])
   );
   const [searchQuery, setSearchQuery] = useState("");
+  const filterByCampaign = Boolean(campaignId);
 
   const toggleGroup = (date: string) => {
     setExpandedGroups((prev) => {
@@ -112,7 +113,14 @@ export function StatisticsView() {
     });
   };
 
-  const filteredData = TABLE_DATA.filter(
+  // When a campaignId is provided, filter down to days that have nested
+  // campaign rows. The mocks don't carry real IDs, so this is a minimal
+  // MVP reduction: just keep groups that actually expand into children.
+  const campaignScoped = filterByCampaign
+    ? TABLE_DATA.filter((g) => g.campaigns.length > 0)
+    : TABLE_DATA;
+
+  const filteredData = campaignScoped.filter(
     (group) =>
       searchQuery === "" ||
       group.date.includes(searchQuery) ||
@@ -128,7 +136,7 @@ export function StatisticsView() {
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
             <h1 className="text-[38px] font-semibold leading-[46px] tracking-tight">
-              Сводный за период
+              {filterByCampaign ? "Статистика кампании" : "Сводный за период"}
             </h1>
             <ChevronDown className="h-5 w-5 text-muted-foreground mt-1 shrink-0" />
           </div>

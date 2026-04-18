@@ -5,6 +5,7 @@ const LABELS: Record<CampaignStatus, string> = {
   active: "Активно",
   scheduled: "Запланированно",
   draft: "Не запущено",
+  paused: "Приостановлена",
   completed: "Завершено",
 };
 
@@ -12,6 +13,7 @@ const DOT: Record<CampaignStatus, string> = {
   active: "bg-green-500",
   scheduled: "bg-blue-500",
   draft: "bg-muted-foreground",
+  paused: "bg-amber-500",
   completed: "bg-muted-foreground/50",
 };
 

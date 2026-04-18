@@ -137,6 +137,15 @@ export function generateCampaigns(opts: GenerateCampaignsOpts): Campaign[] {
     if (status === "active") {
       campaign.launchedAt = rndPastDate(rng, 30, opts.now);
     }
+    if (status === "paused") {
+      // Launched some time ago (5-30 days), paused more recently (1-15 days).
+      campaign.launchedAt = new Date(
+        opts.now - (5 + Math.floor(rng() * 26)) * DAY_MS
+      ).toISOString();
+      campaign.pausedAt = new Date(
+        opts.now - (1 + Math.floor(rng() * 15)) * DAY_MS
+      ).toISOString();
+    }
     if (status === "completed") {
       campaign.launchedAt = rndPastDate(rng, opts.dateSpanDays, opts.now);
       campaign.completedAt = rndPastDate(rng, 30, opts.now);
@@ -162,7 +171,7 @@ function buildPresets(): Record<PresetKey, Preset> {
   const midCampaigns = generateCampaigns({
     seed: 0xcafe,
     signals: midSignals,
-    distribution: { active: 3, completed: 3, scheduled: 2, draft: 2 },
+    distribution: { active: 2, paused: 1, completed: 3, scheduled: 2, draft: 2 },
     dateSpanDays: 30,
     now,
   });
@@ -177,7 +186,7 @@ function buildPresets(): Record<PresetKey, Preset> {
   const fullCampaigns = generateCampaigns({
     seed: 0xf00d,
     signals: fullSignals,
-    distribution: { active: 10, completed: 10, scheduled: 6, draft: 6 },
+    distribution: { active: 8, paused: 2, completed: 10, scheduled: 6, draft: 6 },
     dateSpanDays: 90,
     now,
   });
