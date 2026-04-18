@@ -45,6 +45,17 @@ export function CanvasHeader({
   const [draftName, setDraftName] = useState(campaign.name);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Resync draft name when the campaign is renamed externally (e.g.,
+  // reducer-driven rename from another surface). eslint-disable is used
+  // so the rule react-hooks/set-state-in-effect doesn't flag the intentional
+  // external→internal state sync.
+  useEffect(() => {
+    if (!editing) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setDraftName(campaign.name);
+    }
+  }, [campaign.name, editing]);
+
   useEffect(() => {
     if (editing && inputRef.current) {
       inputRef.current.focus();

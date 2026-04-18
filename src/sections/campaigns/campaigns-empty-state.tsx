@@ -9,7 +9,7 @@ interface CampaignsEmptyStateProps {
 
 export function CampaignsEmptyState({ onGoToSignals }: CampaignsEmptyStateProps) {
   return (
-    <div className="fixed inset-0 left-[120px] flex flex-col items-center justify-center">
+    <div className="flex flex-1 flex-col items-center justify-center py-16">
       <p className="mb-4 max-w-sm text-center text-sm text-muted-foreground">
         Кампании создаются из Сигналов
       </p>
