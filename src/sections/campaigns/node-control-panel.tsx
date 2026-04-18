@@ -1,6 +1,6 @@
 "use client";
 
-import { X } from "lucide-react";
+import { AlertTriangle, X } from "lucide-react";
 import { motion } from "motion/react";
 import {
   usePromptInputController,
@@ -169,6 +169,15 @@ export function NodeControlPanel({ node, onClose }: NodeControlPanelProps) {
         className="mx-auto flex w-full max-w-2xl flex-col gap-2 overflow-y-auto rounded-t-lg border border-b-0 border-border bg-card/95 px-4 pt-3 pb-4 text-sm backdrop-blur-sm"
         style={{ maxHeight: "calc(100vh - var(--promptbar-height, 140px) - 96px)" }}
       >
+        {data.attentionReason && (
+          <div
+            role="alert"
+            className="mb-2 flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200"
+          >
+            <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+            <span>{data.attentionReason}</span>
+          </div>
+        )}
         <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
             <div className="mb-1 flex flex-wrap items-center gap-2">

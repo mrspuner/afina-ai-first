@@ -118,6 +118,7 @@ export interface WorkflowNodeData extends Record<string, unknown> {
   sublabel?: string;
   nodeType: WorkflowNodeType;
   needsAttention?: boolean;
+  attentionReason?: string;
   isSuccess?: boolean;
   processing?: boolean;
   justUpdated?: boolean;
