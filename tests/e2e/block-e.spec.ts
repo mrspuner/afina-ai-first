@@ -32,13 +32,12 @@ test.describe("Block E — Node control + AI cycle", () => {
     await expect(textarea).toHaveValue(/^@/);
   });
 
-  test("submit prompt updates node sublabel and shows AI reply", async ({ page }) => {
+  test("submit prompt fires AI cycle and shows AI reply", async ({ page }) => {
     await page.goto("/");
     await applyPreset(page, "mid");
     await openAnyDraftCampaign(page);
 
-    // выбираем первый email-канал (регистрация-шаблон содержит email) или
-    // любую коммуникационную ноду из текущего шаблона
+    // выбираем первый коммуникационный канал из текущего шаблона
     const comms = page.locator(
       '[data-node-type="email"], [data-node-type="sms"], [data-node-type="push"], [data-node-type="ivr"]'
     );
@@ -49,12 +48,10 @@ test.describe("Block E — Node control + AI cycle", () => {
     // Wait for auto-inserted @tag then append instruction (preserve the real label).
     await expect(textarea).toHaveValue(/^@/);
     const tagValue = await textarea.inputValue();
-    await textarea.fill(`${tagValue}Задержка 2 часа`);
+    await textarea.fill(`${tagValue}обнови контент`);
     await textarea.press("Enter");
 
     await expect(page.getByText(/Готово, обновил ноду/)).toBeVisible({ timeout: 2_000 });
-    // Дождаться applied sublabel — для задержки шаблон выдаёт "Задержка 2 ч"
-    await expect(page.locator('text="Задержка 2 ч"').first()).toBeVisible({ timeout: 4_000 });
   });
 
   test("pane click closes the control panel", async ({ page }) => {

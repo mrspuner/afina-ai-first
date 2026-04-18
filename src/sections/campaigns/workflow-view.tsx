@@ -75,9 +75,14 @@ function deriveParamsPatch(
   currentParams: NodeParams | undefined
 ): { sublabel?: string; paramsPatch?: Partial<NodeParams> } {
   // Unified: iterate every NODE_ACTIONS entry for this node kind and merge
-  // all matching patches. Single source of truth with NodeControlPanel chips.
+  // all matching patches. The sublabel we mutate is intentionally narrow:
+  // it stays in sync with a *visible* parameter (wait duration, condition
+  // trigger, split mode). For every other field (sms text, email subject,
+  // push title, ...) we do NOT overwrite sublabel — the user already sees
+  // the real value in the node's params section, and the generic "Текст
+  // обновлён" стрингует ноду без пользы.
   if (!currentParams) {
-    return { sublabel: "Обновлено по запросу" };
+    return {};
   }
 
   const matched = matchActions(text, currentParams);
@@ -85,25 +90,11 @@ function deriveParamsPatch(
     const dynamic = computeDynamicSublabel(currentParams.kind, matched.paramsPatch);
     return {
       paramsPatch: matched.paramsPatch,
-      sublabel:
-        dynamic ??
-        (matched.appliedSublabels.length > 0
-          ? matched.appliedSublabels.join(", ")
-          : undefined),
+      ...(dynamic ? { sublabel: dynamic } : {}),
     };
   }
 
-  // No field matched — generic fallbacks for visual feedback.
-  const durationFallback = text.match(/(\d+)\s*(ч|час|мин|минут|день|дн|дня|дней)/i);
-  if (durationFallback) {
-    return { sublabel: `Задержка ${durationFallback[1]} ${durationFallback[2]}` };
-  }
-  if (/email/i.test(text)) return { sublabel: "Email: обновлено" };
-  if (/sms|смс/i.test(text)) return { sublabel: "SMS: обновлено" };
-  if (/push/i.test(text)) return { sublabel: "Push: обновлено" };
-  if (/ivr|звон/i.test(text)) return { sublabel: "Звонок: обновлено" };
-
-  return { sublabel: "Обновлено по запросу" };
+  return {};
 }
 
 function patchNode(
