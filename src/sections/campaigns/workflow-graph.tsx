@@ -21,9 +21,11 @@ interface WorkflowGraphProps {
   nodes: WorkflowNode[];
   edges: WorkflowEdge[];
   compact?: boolean;
+  onNodeClick?: (id: string, label: string) => void;
+  onPaneClick?: () => void;
 }
 
-function GraphInner({ nodes, edges, compact }: WorkflowGraphProps) {
+function GraphInner({ nodes, edges, compact, onNodeClick, onPaneClick }: WorkflowGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { getNodes, fitView } = useReactFlow();
 
@@ -80,7 +82,12 @@ function GraphInner({ nodes, edges, compact }: WorkflowGraphProps) {
         zoomOnScroll={false}
         nodesDraggable={false}
         nodesConnectable={false}
-        elementsSelectable={false}
+        elementsSelectable={true}
+        onNodeClick={(_, node) => {
+          const label = (node.data as { label?: string } | undefined)?.label ?? node.id;
+          onNodeClick?.(node.id, label);
+        }}
+        onPaneClick={onPaneClick}
         onViewportChange={updateFades}
         style={{ background: "#0a0a0a" }}
         proOptions={{ hideAttribution: true }}
@@ -91,10 +98,22 @@ function GraphInner({ nodes, edges, compact }: WorkflowGraphProps) {
   );
 }
 
-export function WorkflowGraph({ nodes, edges, compact }: WorkflowGraphProps) {
+export function WorkflowGraph({
+  nodes,
+  edges,
+  compact,
+  onNodeClick,
+  onPaneClick,
+}: WorkflowGraphProps) {
   return (
     <ReactFlowProvider>
-      <GraphInner nodes={nodes} edges={edges} compact={compact} />
+      <GraphInner
+        nodes={nodes}
+        edges={edges}
+        compact={compact}
+        onNodeClick={onNodeClick}
+        onPaneClick={onPaneClick}
+      />
     </ReactFlowProvider>
   );
 }

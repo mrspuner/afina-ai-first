@@ -23,10 +23,14 @@ interface WorkflowViewProps {
   launched: boolean;
   pendingCommand: string | null;
   onCommandHandled: () => void;
+  nodeCommand?: { nodeId: string; text: string } | null;
+  onNodeCommandHandled?: () => void;
   onGoToStats: () => void;
   signalName?: string;
   signalType?: SignalType;
   onGraphChange?: (graph: GraphState) => void;
+  onNodeClick?: (id: string, label: string) => void;
+  onPaneClick?: () => void;
 }
 
 function initialGraph(signalType?: SignalType, signalName?: string): GraphState {
@@ -34,14 +38,39 @@ function initialGraph(signalType?: SignalType, signalName?: string): GraphState 
   return { nodes: createBaseNodes(signalName), edges: createBaseEdges() };
 }
 
+function deriveSublabel(text: string): string {
+  const delay = text.match(/(\d+)\s*(ч|час)/i);
+  if (delay) return `Задержка ${delay[1]} ч`;
+  if (/email/i.test(text)) return "Email: обновлено";
+  if (/sms/i.test(text)) return "SMS: обновлено";
+  if (/push/i.test(text)) return "Push: обновлено";
+  if (/ivr|звон/i.test(text)) return "Звонок: обновлено";
+  if (/текст|оффер|ссылк/i.test(text)) return "Контент обновлён";
+  return "Обновлено по запросу";
+}
+
+function patchNode(
+  nodes: WorkflowNode[],
+  id: string,
+  patch: Partial<WorkflowNode["data"]>
+): WorkflowNode[] {
+  return nodes.map((n) =>
+    n.id === id ? { ...n, data: { ...n.data, ...patch } } : n
+  );
+}
+
 export function WorkflowView({
   launched,
   pendingCommand,
   onCommandHandled,
+  nodeCommand,
+  onNodeCommandHandled,
   onGoToStats,
   signalName,
   signalType,
   onGraphChange,
+  onNodeClick,
+  onPaneClick,
 }: WorkflowViewProps) {
   const [graph, setGraph] = useState<GraphState>(() =>
     initialGraph(signalType, signalName)
@@ -74,6 +103,38 @@ export function WorkflowView({
   }, [pendingCommand, onCommandHandled]);
 
   useEffect(() => {
+    if (!nodeCommand) return;
+    const { nodeId, text } = nodeCommand;
+    const sublabel = deriveSublabel(text);
+    setGraph((prev) => ({
+      ...prev,
+      nodes: patchNode(prev.nodes, nodeId, { processing: true }),
+    }));
+    const t1 = setTimeout(() => {
+      setGraph((prev) => ({
+        ...prev,
+        nodes: patchNode(prev.nodes, nodeId, {
+          processing: false,
+          justUpdated: true,
+          needsAttention: false,
+          sublabel,
+        }),
+      }));
+    }, 1500);
+    const t2 = setTimeout(() => {
+      setGraph((prev) => ({
+        ...prev,
+        nodes: patchNode(prev.nodes, nodeId, { justUpdated: false }),
+      }));
+    }, 2700);
+    onNodeCommandHandled?.();
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, [nodeCommand, onNodeCommandHandled]);
+
+  useEffect(() => {
     return () => {
       if (unknownTimerRef.current) clearTimeout(unknownTimerRef.current);
     };
@@ -92,7 +153,13 @@ export function WorkflowView({
           flexShrink: 0,
         }}
       >
-        <WorkflowGraph nodes={graph.nodes} edges={graph.edges} compact={launched} />
+        <WorkflowGraph
+          nodes={graph.nodes}
+          edges={graph.edges}
+          compact={launched}
+          onNodeClick={onNodeClick}
+          onPaneClick={onPaneClick}
+        />
       </div>
 
       {/* Status — fills the remaining 45% */}

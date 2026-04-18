@@ -72,10 +72,27 @@ function AttachmentEffect({
   return null;
 }
 
+function SelectedNodeEffect({
+  selected,
+}: {
+  selected: { id: string; label: string } | null;
+}) {
+  const { textInput } = usePromptInputController();
+  useEffect(() => {
+    if (selected) {
+      textInput.setInput(`@${selected.label} `);
+    } else if (textInput.value.startsWith("@")) {
+      textInput.clear();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected?.id]);
+  return null;
+}
+
 export function ShellBottomBar() {
   const state = useAppState();
   const dispatch = useAppDispatch();
-  const { view, signals } = state;
+  const { view, signals, selectedWorkflowNode } = state;
   const latestSignal = signals.length > 0 ? signals[signals.length - 1] : null;
   const signalScenarioId = latestSignal ? TYPE_TO_SCENARIO[latestSignal.type] ?? "" : "";
 
@@ -92,8 +109,24 @@ export function ShellBottomBar() {
   }, [view.kind]);
 
   function handlePromptSubmit(message: PromptInputMessage) {
+    const rawText = message.text ?? "";
     if (view.kind === "workflow" && !view.launched) {
-      dispatch({ type: "workflow_command_submit", text: message.text ?? "" });
+      if (selectedWorkflowNode) {
+        const stripped = rawText.startsWith(`@${selectedWorkflowNode.label}`)
+          ? rawText.slice(`@${selectedWorkflowNode.label}`.length).trimStart()
+          : rawText;
+        dispatch({
+          type: "workflow_node_command_submit",
+          nodeId: selectedWorkflowNode.id,
+          text: stripped,
+        });
+        dispatch({
+          type: "ai_reply_shown",
+          text: `Готово, обновил ноду @${selectedWorkflowNode.label}`,
+        });
+      } else {
+        dispatch({ type: "workflow_command_submit", text: rawText });
+      }
     }
   }
 
@@ -108,6 +141,7 @@ export function ShellBottomBar() {
   return (
     <>
       <AttachmentEffect view={view} signalScenarioId={signalScenarioId} />
+      <SelectedNodeEffect selected={selectedWorkflowNode} />
       <motion.div
         className="fixed left-[120px] right-0 z-30 bg-background px-8 pb-4"
         initial={false}
