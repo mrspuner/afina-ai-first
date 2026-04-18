@@ -9,6 +9,7 @@ import { WelcomeSection } from "@/sections/welcome/welcome-section";
 import { GuidedSignalSection } from "@/sections/signals/guided-signal-section";
 import { SignalsSection } from "@/sections/signals/signals-section";
 import { CampaignsSection } from "@/sections/campaigns/campaigns-section";
+import { CampaignTypeView } from "@/sections/campaigns/campaign-type-view";
 import { WorkflowSection } from "@/sections/campaigns/workflow-section";
 import { StatisticsSection } from "@/sections/statistics/statistics-section";
 import { DevPanel } from "@/components/dev/dev-panel";
@@ -21,12 +22,19 @@ export default function Home() {
     if (view.kind === "welcome") return <WelcomeSection />;
     if (view.kind === "guided-signal" || view.kind === "awaiting-campaign")
       return <GuidedSignalSection />;
-    if (view.kind === "campaign-select") return <CampaignsSection mode="guided" />;
+    if (view.kind === "campaign-select")
+      return (
+        <CampaignTypeView
+          onSelect={(id, name) =>
+            dispatch({ type: "campaign_selected", campaign: { id, name } })
+          }
+        />
+      );
     if (view.kind === "workflow") return <WorkflowSection />;
     if (view.kind === "section") {
       if (view.name === "Статистика") return <StatisticsSection />;
       if (view.name === "Сигналы") return <SignalsSection />;
-      if (view.name === "Кампании") return <CampaignsSection mode="standalone" />;
+      if (view.name === "Кампании") return <CampaignsSection />;
     }
     return null;
   }

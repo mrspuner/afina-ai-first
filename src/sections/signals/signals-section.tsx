@@ -1,30 +1,63 @@
 "use client";
 
-// Adapter (Block A.5): renders the most recently added signal via the
-// single-item SignalTypeView. Replaced in Block B with a real list of
-// signal cards.
-
-import { useAppState, useAppDispatch } from "@/state/app-state-context";
-import { TYPE_TO_SCENARIO } from "@/state/scenario-map";
-import { SignalTypeView } from "./signal-type-view";
+import { useMemo, useState } from "react";
+import { useAppDispatch, useAppState } from "@/state/app-state-context";
+import { NewSignalMenu } from "./new-signal-menu";
+import { SignalCard } from "./signal-card";
+import { SignalsEmptyState } from "./signals-empty-state";
+import { UploadSignalDialog } from "./upload-signal-dialog";
 
 export function SignalsSection() {
   const { signals } = useAppState();
   const dispatch = useAppDispatch();
-  const latest = signals.length > 0 ? signals[signals.length - 1] : null;
+  const [uploadOpen, setUploadOpen] = useState(false);
+
+  const sorted = useMemo(
+    () => [...signals].sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1)),
+    [signals]
+  );
+
+  function handleCreate() {
+    dispatch({ type: "start_signal_flow" });
+  }
+
+  function handleCreateCampaign(signalId: string) {
+    dispatch({ type: "campaign_from_signal", signalId });
+  }
+
+  function handleDownload(signalId: string) {
+    console.log("download signal", signalId);
+  }
+
   return (
-    <SignalTypeView
-      onCreateSignal={() => dispatch({ type: "start_signal_flow" })}
-      signal={
-        latest
-          ? {
-              scenarioId: TYPE_TO_SCENARIO[latest.type] ?? "registration",
-              count: latest.count,
-              createdAt: new Date(latest.createdAt).toLocaleDateString("ru-RU"),
-            }
-          : null
-      }
-      onLaunchCampaign={() => dispatch({ type: "step2_clicked" })}
-    />
+    <div className="flex flex-1 flex-col overflow-y-auto px-8 pb-40 pt-[140px]">
+      <div className="mx-auto flex w-full max-w-2xl flex-col">
+        <div className="mb-6 flex items-baseline justify-between">
+          <h1 className="text-[38px] font-semibold leading-[46px] tracking-tight">
+            Сигналы
+          </h1>
+          {signals.length > 0 && (
+            <NewSignalMenu onCreate={handleCreate} onUpload={() => setUploadOpen(true)} />
+          )}
+        </div>
+
+        {signals.length === 0 ? (
+          <SignalsEmptyState onCreate={handleCreate} onUpload={() => setUploadOpen(true)} />
+        ) : (
+          <div className="flex flex-col gap-3">
+            {sorted.map((s) => (
+              <SignalCard
+                key={s.id}
+                signal={s}
+                onCreateCampaign={handleCreateCampaign}
+                onDownload={handleDownload}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      <UploadSignalDialog open={uploadOpen} onOpenChange={setUploadOpen} />
+    </div>
   );
 }

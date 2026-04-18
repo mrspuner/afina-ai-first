@@ -1,45 +1,64 @@
 "use client";
 
-// Adapter (Block A.5): in standalone mode, shows the first active/completed
-// campaign via the legacy CampaignTypeView. Replaced in Block B with a real
-// list of campaign cards (active / completed / scheduled / draft).
+import { useMemo } from "react";
+import { useAppDispatch, useAppState } from "@/state/app-state-context";
+import { CampaignCard } from "./campaign-card";
+import { CampaignsEmptyState } from "./campaigns-empty-state";
+import type { Campaign } from "@/state/app-state";
 
-import { useAppState, useAppDispatch } from "@/state/app-state-context";
-import { CampaignTypeView } from "./campaign-type-view";
+function relevantTimestamp(c: Campaign): string {
+  return c.launchedAt ?? c.scheduledFor ?? c.completedAt ?? c.createdAt;
+}
 
-export function CampaignsSection({ mode }: { mode: "guided" | "standalone" }) {
+export function CampaignsSection() {
   const { signals, campaigns } = useAppState();
   const dispatch = useAppDispatch();
 
-  if (mode === "guided") {
+  const sorted = useMemo(
+    () =>
+      [...campaigns].sort((a, b) =>
+        relevantTimestamp(a) < relevantTimestamp(b) ? 1 : -1
+      ),
+    [campaigns]
+  );
+
+  const signalById = useMemo(
+    () => new Map(signals.map((s) => [s.id, s])),
+    [signals]
+  );
+
+  if (campaigns.length === 0) {
     return (
-      <CampaignTypeView
-        onSelect={(id, name) =>
-          dispatch({ type: "campaign_selected", campaign: { id, name } })
-        }
-      />
+      <div className="flex flex-1 flex-col overflow-y-auto px-8 pb-40 pt-[140px]">
+        <div className="mx-auto flex w-full max-w-2xl flex-col">
+          <h1 className="mb-6 text-[38px] font-semibold leading-[46px] tracking-tight">
+            Кампании
+          </h1>
+          <CampaignsEmptyState
+            onGoToSignals={() => dispatch({ type: "sidebar_nav", section: "Сигналы" })}
+          />
+        </div>
+      </div>
     );
   }
 
-  const launched =
-    campaigns.find((c) => c.status === "active" || c.status === "completed") ?? null;
-
   return (
-    <CampaignTypeView
-      onSelect={(id, name) =>
-        dispatch({ type: "campaign_selected", campaign: { id, name } })
-      }
-      noSignal={signals.length === 0}
-      campaign={
-        launched
-          ? {
-              typeName: launched.name,
-              launchedAt: launched.launchedAt
-                ? new Date(launched.launchedAt).toLocaleDateString("ru-RU")
-                : new Date(launched.createdAt).toLocaleDateString("ru-RU"),
-            }
-          : null
-      }
-    />
+    <div className="flex flex-1 flex-col overflow-y-auto px-8 pb-40 pt-[140px]">
+      <div className="mx-auto flex w-full max-w-2xl flex-col">
+        <h1 className="mb-6 text-[38px] font-semibold leading-[46px] tracking-tight">
+          Кампании
+        </h1>
+        <div className="flex flex-col gap-3">
+          {sorted.map((c) => (
+            <CampaignCard
+              key={c.id}
+              campaign={c}
+              signal={signalById.get(c.signalId)}
+              onOpen={(id) => dispatch({ type: "campaign_opened", id })}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
