@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { motion } from "motion/react";
 import { WorkflowGraph } from "@/sections/campaigns/workflow-graph";
 import {
   createBaseNodes,
@@ -222,10 +223,21 @@ export function WorkflowView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodeCommand, onNodeCommandHandled]);
 
+  const [structuralCycleActive, setStructuralCycleActive] = useState(false);
+  const cycleDurationMsRef = useRef(3000);
+  const cycleTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
   useEffect(() => {
     if (!structuralOps || structuralOps.length === 0) return;
-    setGraph((prev) => {
-      const result = applyOps(prev, structuralOps);
+
+    // Compute the result up-front so we know how big the change is and can
+    // pick an animation duration. The actual setGraph happens immediately
+    // (so the user sees the new graph through the opacity dip) — the cycle
+    // animation runs over the new state.
+    const result = applyOps(graph, structuralOps);
+    const opCount = result.applied.length;
+
+    function buildReply(): string {
       const lines: string[] = [];
       if (result.applied.length > 0) {
         if (result.applied.length === 1) {
@@ -239,14 +251,89 @@ export function WorkflowView({
         lines.push("Не выполнено:");
         for (const s of result.skipped) lines.push(`• ${s.reason}`);
       }
-      if (lines.length > 0) {
-        appDispatch({ type: "ai_reply_shown", text: lines.join("\n") });
+      return lines.join("\n");
+    }
+
+    if (opCount === 0) {
+      // Everything skipped — no animation, just the explanation.
+      const reply = buildReply();
+      if (reply) appDispatch({ type: "ai_reply_shown", text: reply });
+      onStructuralOpsHandled?.();
+      return;
+    }
+
+    // Pick a duration that scales with the size of the change.
+    // 1 op → 3s, 2-3 → 4s, 4+ → 5s. Stays in the user's 3-6s window.
+    const duration = opCount === 1 ? 3000 : opCount <= 3 ? 4000 : 5000;
+    cycleDurationMsRef.current = duration;
+
+    // Diff old vs new graph to know which nodes to flash green.
+    const oldIds = new Set(graph.nodes.map((n) => n.id));
+    const oldKindById = new Map(
+      graph.nodes.map(
+        (n) => [n.id, (n.data as { nodeType: WorkflowNodeType }).nodeType] as const
+      )
+    );
+    const changedIds = new Set<string>();
+    for (const n of result.graph.nodes) {
+      if (!oldIds.has(n.id)) {
+        changedIds.add(n.id); // freshly added
+      } else if (
+        oldKindById.get(n.id) !==
+        (n.data as { nodeType: WorkflowNodeType }).nodeType
+      ) {
+        changedIds.add(n.id); // replaced
       }
-      return result.graph;
-    });
+    }
+
+    // Apply graph immediately. The opacity oscillation runs over the new
+    // layout — the dip masks the position re-flow.
+    setGraph(result.graph);
+    setStructuralCycleActive(true);
+    appDispatch({ type: "ai_reply_shown", text: "Думаю..." });
+
+    // Clear any in-flight cycle timers.
+    cycleTimersRef.current.forEach(clearTimeout);
+    cycleTimersRef.current = [];
+
+    const t1 = setTimeout(() => {
+      setStructuralCycleActive(false);
+      // Mark changed nodes with justUpdated for the green flash.
+      setGraph((prev) => ({
+        ...prev,
+        nodes: prev.nodes.map((n) =>
+          changedIds.has(n.id)
+            ? { ...n, data: { ...n.data, justUpdated: true } }
+            : n
+        ),
+      }));
+      const reply = buildReply();
+      if (reply) appDispatch({ type: "ai_reply_shown", text: reply });
+    }, duration);
+
+    const t2 = setTimeout(() => {
+      setGraph((prev) => ({
+        ...prev,
+        nodes: prev.nodes.map((n) =>
+          changedIds.has(n.id)
+            ? { ...n, data: { ...n.data, justUpdated: false } }
+            : n
+        ),
+      }));
+    }, duration + 1500);
+
+    cycleTimersRef.current.push(t1, t2);
     onStructuralOpsHandled?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [structuralOps]);
+
+  useEffect(() => {
+    const timers = cycleTimersRef;
+    return () => {
+      timers.current.forEach(clearTimeout);
+      timers.current = [];
+    };
+  }, []);
 
   useEffect(() => {
     const timers = aiTimersRef;
@@ -264,14 +351,27 @@ export function WorkflowView({
 
   return (
     <div className="relative flex flex-1 flex-col overflow-hidden">
-      {/* Graph — occupies the full workflow area */}
-      <div
+      {/* Graph — occupies the full workflow area. Wrapped in motion.div so
+          the whole canvas can softly oscillate opacity during a structural
+          cycle (mid-cycle the new positions land hidden under the dip). */}
+      <motion.div
         ref={graphRef}
         style={{
           height: "100%",
           display: "flex",
           flexDirection: "column",
           flex: 1,
+        }}
+        animate={
+          structuralCycleActive
+            ? { opacity: [1, 0.4, 0.7, 0.4, 0.7, 1] }
+            : { opacity: 1 }
+        }
+        transition={{
+          duration: structuralCycleActive
+            ? cycleDurationMsRef.current / 1000
+            : 0.3,
+          ease: "easeInOut",
         }}
       >
         <WorkflowGraph
@@ -283,7 +383,7 @@ export function WorkflowView({
           onNodeClick={onNodeClick}
           onPaneClick={onPaneClick}
         />
-      </div>
+      </motion.div>
 
       {/* Unknown command feedback */}
       {unknownCmd && (

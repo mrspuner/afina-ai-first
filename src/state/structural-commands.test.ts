@@ -265,6 +265,25 @@ describe("applyOps", () => {
     expect(r.skipped[0].reason).toContain("точка входа");
   });
 
+  it("REMOVE Успех → skipped", () => {
+    const r = applyOps(makeGraph(), [{ kind: "remove", ref: "Успех" }]);
+    expect(r.applied).toHaveLength(0);
+    expect(r.skipped[0].reason).toContain("финальная нода");
+  });
+
+  it("relayouts the graph after a successful op (BFS depth columns)", () => {
+    const r = applyOps(makeGraph(), [
+      { kind: "add", nodeType: "email", placement: { mode: "after", ref: "СМС" } },
+    ]);
+    expect(r.applied).toHaveLength(1);
+    const byLabel = (lbl: string) =>
+      r.graph.nodes.find((n) => (n.data as { label: string }).label === lbl)!;
+    expect(byLabel("Сигнал").position.x).toBe(0);
+    expect(byLabel("СМС").position.x).toBe(200);
+    expect(byLabel("Email").position.x).toBe(400);
+    expect(byLabel("Успех").position.x).toBe(600);
+  });
+
   it("REMOVE unknown ref → skipped", () => {
     const r = applyOps(makeGraph(), [{ kind: "remove", ref: "Виноват" }]);
     expect(r.applied).toHaveLength(0);

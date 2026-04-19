@@ -509,6 +509,9 @@ function applyRemove(
   if (nodeType === "signal") {
     return { error: `Сигнал — точка входа, удалять нельзя` };
   }
+  if (nodeType === "success" || nodeType === "end") {
+    return { error: `${TYPE_LABEL[nodeType]} — финальная нода, удалять нельзя` };
+  }
   const incoming = graph.edges.filter((e) => e.target === node.id);
   const outgoing = graph.edges.filter((e) => e.source === node.id);
   const N = incoming.length;
@@ -609,6 +612,71 @@ function applyReplace(
   };
 }
 
+/**
+ * BFS-layout: расставить ноды столбцами по глубине от Сигнала.
+ * Узлы той же глубины — вертикально по центру.
+ * Сироты (не достижимые из Сигнала) — за последним столбцом.
+ */
+export function relayoutGraph(graph: GraphState): GraphState {
+  const signal = graph.nodes.find(
+    (n) => (n.data as { nodeType: WorkflowNodeType }).nodeType === "signal"
+  );
+  if (!signal) return graph;
+
+  const COL_WIDTH = 200;
+  const ROW_HEIGHT = 100;
+
+  const depth = new Map<string, number>();
+  depth.set(signal.id, 0);
+  const queue: string[] = [signal.id];
+  while (queue.length > 0) {
+    const id = queue.shift()!;
+    const d = depth.get(id)!;
+    for (const e of graph.edges) {
+      if (e.source === id && !depth.has(e.target)) {
+        depth.set(e.target, d + 1);
+        queue.push(e.target);
+      }
+    }
+  }
+
+  const byDepth = new Map<number, string[]>();
+  for (const [id, d] of depth) {
+    if (!byDepth.has(d)) byDepth.set(d, []);
+    byDepth.get(d)!.push(id);
+  }
+
+  const positions = new Map<string, { x: number; y: number }>();
+  for (const [d, ids] of byDepth) {
+    const x = d * COL_WIDTH;
+    const yOffset = -((ids.length - 1) * ROW_HEIGHT) / 2;
+    ids.forEach((id, i) => {
+      positions.set(id, { x, y: yOffset + i * ROW_HEIGHT });
+    });
+  }
+
+  const maxDepth =
+    byDepth.size > 0 ? Math.max(...Array.from(byDepth.keys())) : 0;
+  let orphanIdx = 0;
+  for (const n of graph.nodes) {
+    if (!positions.has(n.id)) {
+      positions.set(n.id, {
+        x: (maxDepth + 1) * COL_WIDTH,
+        y: orphanIdx * ROW_HEIGHT,
+      });
+      orphanIdx++;
+    }
+  }
+
+  return {
+    ...graph,
+    nodes: graph.nodes.map((n) => ({
+      ...n,
+      position: positions.get(n.id) ?? n.position,
+    })),
+  };
+}
+
 export function applyOps(
   graph: GraphState,
   ops: StructuralOp[]
@@ -640,5 +708,9 @@ export function applyOps(
     }
   }
 
-  return { graph: g, applied, skipped };
+  return {
+    graph: applied.length > 0 ? relayoutGraph(g) : g,
+    applied,
+    skipped,
+  };
 }
