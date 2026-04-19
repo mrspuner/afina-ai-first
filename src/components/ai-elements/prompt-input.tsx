@@ -203,18 +203,22 @@ export interface TextInputContext {
 /**
  * Remove "empty" @-tags from an input string.
  *
- * An empty tag is `@word` followed (possibly with whitespace) by either
- * another `@` or the end of the string — i.e. no meaningful text follows.
+ * An empty tag is `@word` (or `@[multi word]`) followed (possibly with
+ * whitespace) by either another `@` or the end of the string — i.e. no
+ * meaningful text follows.
  *
  * Examples:
- * - `@A `            -> ``
- * - `@A hello`       -> `@A hello` (has content after tag)
- * - `@A @B `         -> ``
- * - `@A hello @B `   -> `@A hello ` (trailing @B is empty)
- * - `привет @A `     -> `привет ` ("привет" preserved)
+ * - `@A `             -> ``
+ * - `@[Email 2] `     -> ``
+ * - `@A hello`        -> `@A hello` (has content after tag)
+ * - `@A @B `          -> ``
+ * - `@A hello @B `    -> `@A hello ` (trailing @B is empty)
+ * - `привет @A `      -> `привет ` ("привет" preserved)
  */
 export function stripEmptyTags(input: string): string {
-  return input.replace(/@\S+\s*(?=@|$)/g, "").replace(/\s{2,}/g, " ");
+  return input
+    .replace(/@(?:\[[^\]]+\]|\S+)\s*(?=@|$)/g, "")
+    .replace(/\s{2,}/g, " ");
 }
 
 export interface PromptInputControllerProps {

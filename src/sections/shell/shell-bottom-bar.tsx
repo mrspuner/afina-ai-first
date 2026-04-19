@@ -46,6 +46,15 @@ function AttachmentFileList() {
   );
 }
 
+/**
+ * Multi-word labels (e.g. "Email 2") need bracket-quoting so the parser can
+ * recover the full label from a prompt like "@[Email 2] ...". Single-word
+ * labels stay as bare "@Email" for readability.
+ */
+function formatTag(label: string): string {
+  return label.includes(" ") ? `@[${label}] ` : `@${label} `;
+}
+
 function SelectedNodeEffect({
   selected,
 }: {
@@ -54,7 +63,7 @@ function SelectedNodeEffect({
   const { textInput } = usePromptInputController();
   useEffect(() => {
     if (selected) {
-      textInput.insertAtCursor(`@${selected.label} `, { separator: "smart" });
+      textInput.insertAtCursor(formatTag(selected.label), { separator: "smart" });
     }
     // NB: on deselect we intentionally do NOT clear the input — any stale
     // empty tag will be stripped on the next insertAtCursor call.
@@ -77,20 +86,26 @@ function ClearOnLeaveWorkflowEffect({ viewKind }: { viewKind: View["kind"] }) {
 
 /**
  * Разбирает текст промпта на сегменты по @-тегам.
- * "@A foo @B bar"  → [{ label: "A", text: "foo" }, { label: "B", text: "bar" }]
- * "hello @A foo"   → [{ label: "A", text: "foo" }]  (прологовый текст игнорируется)
- * "hello"          → []
+ * Поддерживает:
+ *   "@A foo"            → label "A"
+ *   "@[Multi word] foo" → label "Multi word"  (для нод с пробелом в label)
+ *
+ * Примеры:
+ *   "@A foo @B bar"      → [{ label: "A", text: "foo" }, { label: "B", text: "bar" }]
+ *   "@[Email 2] текст"   → [{ label: "Email 2", text: "текст" }]
+ *   "hello @A foo"       → [{ label: "A", text: "foo" }]  (прологовый текст игнорируется)
+ *   "hello"              → []
  */
 function parseTagSegments(
   input: string
 ): Array<{ label: string; text: string }> {
   const out: Array<{ label: string; text: string }> = [];
-  const re = /@(\S+)\s*([^@]*)/g;
+  const re = /@(?:\[([^\]]+)\]|(\S+))\s*([^@]*)/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(input)) !== null) {
-    const label = m[1];
-    const text = (m[2] ?? "").trim();
-    out.push({ label, text });
+    const label = (m[1] ?? m[2] ?? "").trim();
+    const text = (m[3] ?? "").trim();
+    if (label) out.push({ label, text });
   }
   return out;
 }
