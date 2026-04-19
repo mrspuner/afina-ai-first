@@ -51,7 +51,7 @@ test.describe("Block E — Node control + AI cycle", () => {
     await textarea.fill(`${tagValue}обнови контент`);
     await textarea.press("Enter");
 
-    await expect(page.getByText(/Готово, обновил ноду/)).toBeVisible({ timeout: 2_000 });
+    await expect(page.getByText(/Готово, обновил ноду/)).toBeVisible({ timeout: 5_000 });
   });
 
   test("pane click closes the control panel", async ({ page }) => {
@@ -137,10 +137,10 @@ test.describe("Block E — Node control + AI cycle", () => {
     await textarea.press("Enter");
 
     // Submit clears selection → panel closes. Wait for AI-cycle and re-open.
-    await expect(panel).toBeHidden({ timeout: 4_000 });
-    await page.waitForTimeout(1300);
+    await expect(panel).toBeHidden({ timeout: 7_000 });
+    await page.waitForTimeout(4500);
     await smsNode.click();
-    await expect(panel).toContainText("новое сообщение", { timeout: 4_000 });
+    await expect(panel).toContainText("новое сообщение", { timeout: 7_000 });
   });
 
   test("G.4 — node-command: задержка 2 часа обновляет Wait-ноду", async ({ page }) => {
@@ -180,9 +180,9 @@ test.describe("Block E — Node control + AI cycle", () => {
     await textarea.press("Enter");
 
     // Submit clears selection → panel closes. Wait and re-open.
-    await expect(panel).toBeHidden({ timeout: 4_000 });
-    await page.waitForTimeout(1300);
+    await expect(panel).toBeHidden({ timeout: 7_000 });
+    await page.waitForTimeout(4500);
     await waitNode.click();
-    await expect(panel).toContainText("2 ч", { timeout: 4_000 });
+    await expect(panel).toContainText("2 ч", { timeout: 7_000 });
   });
 });

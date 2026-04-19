@@ -10,7 +10,12 @@ import {
   parseWorkflowCommand,
   patchNodeParams,
 } from "@/types/workflow";
-import type { NodeParams, WorkflowNode, WorkflowEdge } from "@/types/workflow";
+import type {
+  NodeParams,
+  WorkflowNode,
+  WorkflowEdge,
+  WorkflowNodeType,
+} from "@/types/workflow";
 import type { Signal, SignalType } from "@/state/app-state";
 import { createTemplate } from "@/state/workflow-templates";
 import { matchActions } from "@/state/node-actions";
@@ -161,14 +166,69 @@ export function WorkflowView({
     onCommandHandled();
   }, [pendingCommand, onCommandHandled]);
 
-  const aiTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  type CyclePhase = "idle" | "thinking" | "reveal";
+  const [cyclePhase, setCyclePhase] = useState<CyclePhase>("idle");
+  const thinkDurationMsRef = useRef(3000);
+  const cycleTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const REVEAL_MS = 600;
+  const FLASH_MS = 1500;
+
+  // Helper: kicks off a unified cycle that (1) shows "Думаю..." while opacity
+  // oscillates, (2) applies a graph mutation at the start of the reveal phase
+  // and flashes changed nodes green, (3) returns to idle.
+  function runCycle(opts: {
+    durationMs: number;
+    apply: (prev: GraphState) => { graph: GraphState; changedIds: Set<string> };
+    finalReply: string | null;
+  }) {
+    const { durationMs, apply, finalReply } = opts;
+    thinkDurationMsRef.current = durationMs;
+    cycleTimersRef.current.forEach(clearTimeout);
+    cycleTimersRef.current = [];
+
+    setCyclePhase("thinking");
+    appDispatch({ type: "ai_reply_shown", text: "Думаю..." });
+
+    let changedIdsAfter: Set<string> = new Set();
+    const t1 = setTimeout(() => {
+      setGraph((prev) => {
+        const result = apply(prev);
+        changedIdsAfter = result.changedIds;
+        // Mark changed nodes with justUpdated for the green flash.
+        const flashed = result.graph.nodes.map((n) =>
+          changedIdsAfter.has(n.id)
+            ? { ...n, data: { ...n.data, justUpdated: true } }
+            : n
+        );
+        return { ...result.graph, nodes: flashed };
+      });
+      setCyclePhase("reveal");
+      if (finalReply) appDispatch({ type: "ai_reply_shown", text: finalReply });
+    }, durationMs);
+
+    const t2 = setTimeout(() => {
+      setCyclePhase("idle");
+    }, durationMs + REVEAL_MS);
+
+    const t3 = setTimeout(() => {
+      setGraph((prev) => ({
+        ...prev,
+        nodes: prev.nodes.map((n) =>
+          changedIdsAfter.has(n.id)
+            ? { ...n, data: { ...n.data, justUpdated: false } }
+            : n
+        ),
+      }));
+    }, durationMs + REVEAL_MS + FLASH_MS);
+
+    cycleTimersRef.current.push(t1, t2, t3);
+  }
 
   useEffect(() => {
     if (!nodeCommand || nodeCommand.length === 0) return;
-    aiTimersRef.current.forEach(clearTimeout);
-    aiTimersRef.current = [];
 
-    // Pre-compute patches for each command against current graph snapshot.
+    // Pre-compute patches against the current graph snapshot so the apply
+    // phase has a stable plan.
     const plans = nodeCommand.map(({ nodeId, text }) => {
       const currentNode = graph.nodes.find((x) => x.id === nodeId);
       const { sublabel, paramsPatch } = deriveParamsPatch(
@@ -178,62 +238,45 @@ export function WorkflowView({
       return { nodeId, sublabel, paramsPatch };
     });
 
-    // Phase 0 — mark every targeted node as processing.
-    setGraph((prev) => {
-      let nodes = prev.nodes;
-      for (const p of plans) {
-        nodes = patchNode(nodes, p.nodeId, { processing: true });
-      }
-      return { ...prev, nodes };
-    });
+    const opCount = plans.length;
+    // 1 node = 3s, 2-3 = 4s, 4+ = 5s.
+    const duration = opCount === 1 ? 3000 : opCount <= 3 ? 4000 : 5000;
 
-    // Phase 1 (t=1000ms) — flip to justUpdated + apply sublabel/params.
-    const t1 = setTimeout(() => {
-      setGraph((prev) => {
+    const ids = plans.map((p) => p.nodeId).join(", ");
+    const finalReply =
+      opCount === 1
+        ? `Готово, обновил ноду`
+        : `Готово, обновил ${opCount} нод`;
+
+    runCycle({
+      durationMs: duration,
+      apply: (prev) => {
         let nodes = prev.nodes;
+        const changedIds = new Set<string>();
         for (const p of plans) {
           nodes = patchNode(nodes, p.nodeId, {
-            processing: false,
-            justUpdated: true,
             needsAttention: false,
+            attentionReason: undefined,
             ...(p.sublabel ? { sublabel: p.sublabel } : {}),
           });
           if (p.paramsPatch) {
             nodes = patchNodeParams(nodes, p.nodeId, p.paramsPatch);
           }
+          changedIds.add(p.nodeId);
         }
-        return { ...prev, nodes };
-      });
-    }, 1000);
+        return { graph: { ...prev, nodes }, changedIds };
+      },
+      finalReply: `${finalReply}: ${ids}.`,
+    });
 
-    // Phase 2 (t=2200ms) — clear justUpdated flash.
-    const t2 = setTimeout(() => {
-      setGraph((prev) => {
-        let nodes = prev.nodes;
-        for (const p of plans) {
-          nodes = patchNode(nodes, p.nodeId, { justUpdated: false });
-        }
-        return { ...prev, nodes };
-      });
-    }, 2200);
-
-    aiTimersRef.current.push(t1, t2);
     onNodeCommandHandled?.();
-    // graph only needs to read current params at start; intentionally omitted from deps
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodeCommand, onNodeCommandHandled]);
-
-  const [structuralCycleActive, setStructuralCycleActive] = useState(false);
-  const cycleDurationMsRef = useRef(3000);
-  const cycleTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   useEffect(() => {
     if (!structuralOps || structuralOps.length === 0) return;
 
-    // Compute the result up-front so we know how big the change is and can
-    // pick an animation duration. The actual setGraph happens immediately
-    // (so the user sees the new graph through the opacity dip) — the cycle
-    // animation runs over the new state.
+    // Pre-compute the resulting graph + diff to know what to flash green.
     const result = applyOps(graph, structuralOps);
     const opCount = result.applied.length;
 
@@ -255,19 +298,16 @@ export function WorkflowView({
     }
 
     if (opCount === 0) {
-      // Everything skipped — no animation, just the explanation.
+      // All skipped — no cycle, just the explanation.
       const reply = buildReply();
       if (reply) appDispatch({ type: "ai_reply_shown", text: reply });
       onStructuralOpsHandled?.();
       return;
     }
 
-    // Pick a duration that scales with the size of the change.
-    // 1 op → 3s, 2-3 → 4s, 4+ → 5s. Stays in the user's 3-6s window.
     const duration = opCount === 1 ? 3000 : opCount <= 3 ? 4000 : 5000;
-    cycleDurationMsRef.current = duration;
 
-    // Diff old vs new graph to know which nodes to flash green.
+    // Diff old → new graph for green flash targets.
     const oldIds = new Set(graph.nodes.map((n) => n.id));
     const oldKindById = new Map(
       graph.nodes.map(
@@ -277,66 +317,27 @@ export function WorkflowView({
     const changedIds = new Set<string>();
     for (const n of result.graph.nodes) {
       if (!oldIds.has(n.id)) {
-        changedIds.add(n.id); // freshly added
+        changedIds.add(n.id);
       } else if (
         oldKindById.get(n.id) !==
         (n.data as { nodeType: WorkflowNodeType }).nodeType
       ) {
-        changedIds.add(n.id); // replaced
+        changedIds.add(n.id);
       }
     }
 
-    // Apply graph immediately. The opacity oscillation runs over the new
-    // layout — the dip masks the position re-flow.
-    setGraph(result.graph);
-    setStructuralCycleActive(true);
-    appDispatch({ type: "ai_reply_shown", text: "Думаю..." });
+    runCycle({
+      durationMs: duration,
+      apply: () => ({ graph: result.graph, changedIds }),
+      finalReply: buildReply() || null,
+    });
 
-    // Clear any in-flight cycle timers.
-    cycleTimersRef.current.forEach(clearTimeout);
-    cycleTimersRef.current = [];
-
-    const t1 = setTimeout(() => {
-      setStructuralCycleActive(false);
-      // Mark changed nodes with justUpdated for the green flash.
-      setGraph((prev) => ({
-        ...prev,
-        nodes: prev.nodes.map((n) =>
-          changedIds.has(n.id)
-            ? { ...n, data: { ...n.data, justUpdated: true } }
-            : n
-        ),
-      }));
-      const reply = buildReply();
-      if (reply) appDispatch({ type: "ai_reply_shown", text: reply });
-    }, duration);
-
-    const t2 = setTimeout(() => {
-      setGraph((prev) => ({
-        ...prev,
-        nodes: prev.nodes.map((n) =>
-          changedIds.has(n.id)
-            ? { ...n, data: { ...n.data, justUpdated: false } }
-            : n
-        ),
-      }));
-    }, duration + 1500);
-
-    cycleTimersRef.current.push(t1, t2);
     onStructuralOpsHandled?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [structuralOps]);
 
   useEffect(() => {
     const timers = cycleTimersRef;
-    return () => {
-      timers.current.forEach(clearTimeout);
-      timers.current = [];
-    };
-  }, []);
-
-  useEffect(() => {
-    const timers = aiTimersRef;
     return () => {
       timers.current.forEach(clearTimeout);
       timers.current = [];
@@ -363,16 +364,19 @@ export function WorkflowView({
           flex: 1,
         }}
         animate={
-          structuralCycleActive
-            ? { opacity: [1, 0.4, 0.7, 0.4, 0.7, 1] }
-            : { opacity: 1 }
+          cyclePhase === "thinking"
+            ? { opacity: [1, 0.6, 0.3, 0.5, 0.2, 0.4, 0.2], scale: [1, 1, 1, 1, 1, 1, 0.95] }
+            : cyclePhase === "reveal"
+              ? { opacity: 1, scale: 1 }
+              : { opacity: 1, scale: 1 }
         }
-        transition={{
-          duration: structuralCycleActive
-            ? cycleDurationMsRef.current / 1000
-            : 0.3,
-          ease: "easeInOut",
-        }}
+        transition={
+          cyclePhase === "thinking"
+            ? { duration: thinkDurationMsRef.current / 1000, ease: "easeInOut" }
+            : cyclePhase === "reveal"
+              ? { duration: REVEAL_MS / 1000, ease: [0.16, 1, 0.3, 1] }
+              : { duration: 0.3, ease: "easeOut" }
+        }
       >
         <WorkflowGraph
           nodes={graph.nodes.map((n) =>

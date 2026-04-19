@@ -52,7 +52,7 @@ test.describe("Block H — structural node operations", () => {
     await textarea.press("Enter");
 
     await expect(page.getByText(/Добавил Email/)).toBeVisible({
-      timeout: 6_000,
+      timeout: 8_000,
     });
 
     const afterCount = await page.locator("[data-node-type]").count();
@@ -67,7 +67,7 @@ test.describe("Block H — structural node operations", () => {
     const textarea = page.getByRole("textbox").first();
     await textarea.fill("убери Сигнал");
     await textarea.press("Enter");
-    await expect(page.getByText(/точка входа/)).toBeVisible({ timeout: 6_000 });
+    await expect(page.getByText(/точка входа/)).toBeVisible({ timeout: 8_000 });
   });
 
   test("replace node keeps graph coherent", async ({ page }) => {
@@ -81,7 +81,7 @@ test.describe("Block H — structural node operations", () => {
     const textarea = page.getByRole("textbox").first();
     await textarea.fill(`замени ${target} на Email`);
     await textarea.press("Enter");
-    await expect(page.getByText(/Заменил/)).toBeVisible({ timeout: 6_000 });
+    await expect(page.getByText(/Заменил/)).toBeVisible({ timeout: 8_000 });
   });
 
   test("attention block shows up on add without inline params", async ({
@@ -100,7 +100,7 @@ test.describe("Block H — structural node operations", () => {
 
     // wait for apply
     await expect(page.getByText(/Добавил Email/)).toBeVisible({
-      timeout: 6_000,
+      timeout: 8_000,
     });
 
     // Click the new Email node (last one) and verify attention block shows.

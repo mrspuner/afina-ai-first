@@ -145,6 +145,21 @@ export function WorkflowNodeComponent({ data, selected }: NodeProps<WorkflowNode
           }}
         />
       )}
+      {data.needsAttention && (
+        <span
+          aria-hidden
+          style={{
+            position: "absolute",
+            top: 4,
+            right: 4,
+            width: 6,
+            height: 6,
+            borderRadius: "50%",
+            background: "#facc15",
+            opacity: 0.95,
+          }}
+        />
+      )}
       <Handle type="source" position={Position.Right} style={HANDLE_STYLE} />
     </motion.div>
   );

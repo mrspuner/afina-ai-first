@@ -140,18 +140,9 @@ export function ShellBottomBar() {
       dispatch({ type: "workflow_command_submit", text: rawText });
     }
 
-    // @-tag reply is emitted here; structural reply is emitted by WorkflowView
-    // after applyOps (so it can include applied/skipped summary).
-    if (tagSegments.length > 0) {
-      const names = tagSegments.map((s) => `@${s.label}`).join(", ");
-      dispatch({
-        type: "ai_reply_shown",
-        text:
-          tagSegments.length === 1
-            ? `Готово, обновил ноду ${names}.`
-            : `Готово, обновил ноды ${names}.`,
-      });
-    }
+    // AI reply (both for tag-segments and structural ops) is emitted by
+    // WorkflowView at the end of the unified "Думаю..." cycle so the user
+    // sees the thinking animation before the result.
   }
 
   const chatPlaceholder =
@@ -162,7 +153,12 @@ export function ShellBottomBar() {
     "Выберите шаг или задайте вопрос…";
 
   const isWorkflow = isWorkflowView(state);
-  const floatBottom = isOnWelcome(state) ? "40%" : isWorkflow ? "0%" : "3%";
+  // Pin to bottom on section views (Сигналы / Кампании / Статистика) and on
+  // workflow. Welcome stays centered for the AI-chat hero. Transient
+  // wizard steps (guided-signal, awaiting-campaign, campaign-select) keep
+  // the 3% offset so they don't cover the step's primary CTA.
+  const pinnedToBottom = isWorkflow || view.kind === "section";
+  const floatBottom = isOnWelcome(state) ? "40%" : pinnedToBottom ? "0%" : "3%";
 
   const barRef = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
