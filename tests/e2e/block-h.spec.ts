@@ -1,10 +1,10 @@
 import { test, expect, type Page } from "@playwright/test";
 
 async function applyPreset(page: Page, key: "empty" | "mid" | "full") {
-  await page.keyboard.press("Shift+KeyT");
+  await page.keyboard.press("Control+Shift+KeyE");
   const label = key.charAt(0).toUpperCase() + key.slice(1);
   await page.getByRole("button", { name: new RegExp(`^${label}\\b`) }).click();
-  await page.keyboard.press("Shift+KeyT");
+  await page.keyboard.press("Control+Shift+KeyE");
 }
 
 async function openAnyDraftCampaign(page: Page) {
