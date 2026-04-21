@@ -55,7 +55,7 @@ export default function Home() {
         <div className="relative flex flex-1 flex-col overflow-hidden">
           {renderMain()}
           <ShellBottomBar />
-          {process.env.NODE_ENV === "development" && <DevPanel />}
+          <DevPanel />
         </div>
       </div>
     </PromptInputProvider>
