@@ -169,11 +169,11 @@ export function ShellBottomBar() {
 
   const isWorkflow = isWorkflowView(state);
   // Pin to bottom on section views (Сигналы / Кампании / Статистика) and on
-  // workflow. Welcome stays centered for the AI-chat hero. Transient
-  // wizard steps (guided-signal, awaiting-campaign, campaign-select) keep
-  // the 3% offset so they don't cover the step's primary CTA.
+  // workflow. Transient wizard steps (guided-signal, awaiting-campaign,
+  // campaign-select) keep the 3% offset so they don't cover the step's
+  // primary CTA. Welcome renders its own inline PromptBar inside WelcomeView.
   const pinnedToBottom = isWorkflow || view.kind === "section";
-  const floatBottom = isOnWelcome(state) ? "40%" : pinnedToBottom ? "0%" : "3%";
+  const floatBottom = pinnedToBottom ? "0%" : "3%";
 
   const barRef = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
@@ -191,6 +191,8 @@ export function ShellBottomBar() {
       document.documentElement.style.removeProperty("--promptbar-height");
     };
   }, [view.kind]);
+
+  if (isOnWelcome(state)) return null;
 
   return (
     <>
