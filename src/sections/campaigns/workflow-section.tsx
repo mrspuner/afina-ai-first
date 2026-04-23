@@ -7,6 +7,7 @@ import { useAppState, useAppDispatch } from "@/state/app-state-context";
 import { CanvasHeader, type CanvasHeaderToast } from "./canvas-header";
 import { WorkflowView } from "./workflow-view";
 import { validateWorkflow } from "@/state/workflow-validation";
+import { normalizeNodeRef } from "@/state/structural-commands";
 import type {
   WorkflowEdge,
   WorkflowNode,
@@ -104,8 +105,10 @@ export function WorkflowSection() {
     if (!g) return null;
     const resolved: Array<{ nodeId: string; text: string }> = [];
     for (const cmd of workflowNodeCommand.commands) {
+      const target = normalizeNodeRef(cmd.nodeLabel);
       const node = g.nodes.find(
-        (n) => (n.data as WorkflowNodeData).label === cmd.nodeLabel
+        (n) =>
+          normalizeNodeRef((n.data as WorkflowNodeData).label) === target
       );
       if (node) resolved.push({ nodeId: node.id, text: cmd.text });
     }

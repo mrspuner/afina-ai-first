@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { parseStructuralCommands, applyOps } from "./structural-commands";
+import {
+  parseStructuralCommands,
+  applyOps,
+  normalizeNodeRef,
+} from "./structural-commands";
 import type { WorkflowNode, WorkflowEdge } from "@/types/workflow";
 
 describe("parseStructuralCommands", () => {
@@ -328,5 +332,79 @@ describe("applyOps", () => {
       { kind: "remove", ref: "СМС" },
     ]);
     expect(r.applied).toHaveLength(2);
+  });
+});
+
+describe("normalizeNodeRef", () => {
+  it("lowercases", () => {
+    expect(normalizeNodeRef("Email")).toBe("email");
+    expect(normalizeNodeRef("СМС")).toBe("смс");
+  });
+
+  it("maps English variants to Russian canonical", () => {
+    expect(normalizeNodeRef("sms")).toBe("смс");
+    expect(normalizeNodeRef("wait")).toBe("задержка");
+    expect(normalizeNodeRef("landing")).toBe("лендинг");
+    expect(normalizeNodeRef("success")).toBe("успех");
+  });
+
+  it("maps Russian variants to English canonical", () => {
+    expect(normalizeNodeRef("почта")).toBe("email");
+    expect(normalizeNodeRef("пуш")).toBe("push");
+  });
+
+  it("preserves suffix numbers", () => {
+    expect(normalizeNodeRef("Email 2")).toBe("email 2");
+    expect(normalizeNodeRef("почта 2")).toBe("email 2");
+  });
+
+  it("returns empty string for empty input", () => {
+    expect(normalizeNodeRef("")).toBe("");
+    expect(normalizeNodeRef("   ")).toBe("");
+  });
+});
+
+describe("applyOps — ref normalization", () => {
+  it("REMOVE matches node ignoring case", () => {
+    const r = applyOps(makeGraph(), [{ kind: "remove", ref: "смс" }]);
+    expect(r.applied).toHaveLength(1);
+    expect(r.graph.nodes.find((n) => n.id === "sms1")).toBeUndefined();
+  });
+
+  it("REMOVE matches node via English synonym", () => {
+    const r = applyOps(makeGraph(), [{ kind: "remove", ref: "sms" }]);
+    expect(r.applied).toHaveLength(1);
+    expect(r.graph.nodes.find((n) => n.id === "sms1")).toBeUndefined();
+  });
+
+  it("ADD after accepts lowercase ref", () => {
+    const r = applyOps(makeGraph(), [
+      {
+        kind: "add",
+        nodeType: "email",
+        placement: { mode: "after", ref: "смс" },
+      },
+    ]);
+    expect(r.applied).toHaveLength(1);
+  });
+
+  it("ADD between accepts English synonyms for both refs", () => {
+    const r = applyOps(makeGraph(), [
+      {
+        kind: "add",
+        nodeType: "wait",
+        placement: { mode: "between", refA: "signal", refB: "sms" },
+      },
+    ]);
+    expect(r.applied).toHaveLength(1);
+  });
+
+  it("REPLACE accepts case-insensitive ref", () => {
+    const r = applyOps(makeGraph(), [
+      { kind: "replace", ref: "смс", newType: "email" },
+    ]);
+    expect(r.applied).toHaveLength(1);
+    const replaced = r.graph.nodes.find((n) => n.id === "sms1")!;
+    expect(replaced.data.nodeType).toBe("email");
   });
 });

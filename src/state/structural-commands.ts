@@ -47,6 +47,61 @@ const TYPE_LOOKUP: Record<string, WorkflowNodeType> = {
   "конец": "end",
 };
 
+/**
+ * Per-word synonym map used when matching a user-written node reference
+ * against actual node labels. Values are the canonical form each variant
+ * collapses to. Keep all keys lowercase.
+ */
+const REF_SYNONYMS: Record<string, string> = {
+  sms: "смс",
+  смс: "смс",
+  email: "email",
+  почта: "email",
+  mail: "email",
+  "e-mail": "email",
+  push: "push",
+  пуш: "push",
+  звонок: "звонок",
+  ivr: "звонок",
+  call: "звонок",
+  задержка: "задержка",
+  ожидание: "задержка",
+  пауза: "задержка",
+  wait: "задержка",
+  delay: "задержка",
+  витрина: "витрина",
+  storefront: "витрина",
+  лендинг: "лендинг",
+  landing: "лендинг",
+  успех: "успех",
+  success: "успех",
+  конец: "конец",
+  end: "конец",
+  условие: "условие",
+  condition: "условие",
+  сплиттер: "сплиттер",
+  split: "сплиттер",
+  слияние: "слияние",
+  merge: "слияние",
+  сигнал: "сигнал",
+  signal: "сигнал",
+};
+
+/**
+ * Normalize a node reference / label for case-insensitive comparison:
+ * lowercase, collapse whitespace, and map known synonyms per token.
+ * Example: "SMS 2" → "смс 2", "Почта" → "email", "Задержка" → "задержка".
+ */
+export function normalizeNodeRef(raw: string): string {
+  return raw
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((tok) => REF_SYNONYMS[tok] ?? tok)
+    .join(" ");
+}
+
 const ADD_VERBS = /^(добавь|добавить|вставь|вставить)$/i;
 const REMOVE_VERBS = /^(убери|убрать|удали|удалить)$/i;
 const REPLACE_VERBS = /^(замени|заменить)$/i;
@@ -226,9 +281,12 @@ function findNodeByLabel(
   nodes: WorkflowNode[],
   ref: string
 ): WorkflowNode | null {
-  const trimmed = ref.trim();
+  const target = normalizeNodeRef(ref);
+  if (!target) return null;
   return (
-    nodes.find((n) => (n.data as { label: string }).label === trimmed) ?? null
+    nodes.find(
+      (n) => normalizeNodeRef((n.data as { label: string }).label) === target
+    ) ?? null
   );
 }
 
