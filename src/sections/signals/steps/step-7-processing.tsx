@@ -30,7 +30,7 @@ export function Step7Processing({ data, onNext }: StepProps) {
 
   return (
     <StepContent
-      title="Ваша кампания обрабатывается"
+      title="Ваши сигналы обрабатываются"
       subtitle="Это займёт некоторое время. Скоро вы получите сигналы"
       maxWidth="max-w-md"
     >
