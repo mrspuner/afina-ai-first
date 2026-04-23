@@ -16,14 +16,13 @@ import {
 export type OnboardingChatState = {
   history: Msg[];
   chips: Chip[];
-  thinking: boolean;
   submitChip: (chip: Chip) => void;
   submitFreeText: (text: string) => void;
 };
 
-// Simulated LLM generation delay before the bot reply materializes. Tuned to
-// feel like real text generation — long enough that the user notices the
-// "thinking" indicator, short enough that the flow doesn't stall.
+// Simulated LLM generation delay before the bot reply materializes. Long
+// enough that the thinking dots read as "thinking", short enough that the
+// conversation doesn't stall.
 const THINK_DELAY_MS = 900;
 
 export function useOnboardingChat(): OnboardingChatState {
@@ -39,7 +38,6 @@ export function useOnboardingChat(): OnboardingChatState {
   const [chips, setChips] = useState<Chip[]>(
     done ? POST_ONBOARDING_CHIPS : WAVE_0_CHIPS
   );
-  const [thinking, setThinking] = useState(false);
 
   const replyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clearReplyTimer = () => {
@@ -49,7 +47,6 @@ export function useOnboardingChat(): OnboardingChatState {
     }
   };
 
-  // Unmount cleanup — cancel any pending simulated reply.
   useEffect(() => {
     return () => clearReplyTimer();
   }, []);
@@ -63,7 +60,6 @@ export function useOnboardingChat(): OnboardingChatState {
     const doneChanged = prevDone.current !== done;
     if (enteredWelcome || doneChanged) {
       clearReplyTimer();
-      setThinking(false);
       setHistory([]);
       setChips(done ? POST_ONBOARDING_CHIPS : WAVE_0_CHIPS);
     }
@@ -71,15 +67,27 @@ export function useOnboardingChat(): OnboardingChatState {
     prevDone.current = done;
   }, [onWelcome, done]);
 
+  // Push a pending bot bubble immediately (user sees dots enter right after
+  // the user message), then swap its content to the real reply after the
+  // think delay. The bubble container itself never re-mounts — so the UI
+  // does one slide-in, then a content crossfade, instead of two independent
+  // animations.
   const queueBotReply = useCallback(
     (botText: string, chipsAfter: Chip[]) => {
       clearReplyTimer();
-      setThinking(true);
+      const pendingId = nextId();
+      setHistory((h) => [
+        ...h,
+        { id: pendingId, role: "bot", text: "", pending: true },
+      ]);
       setChips([]);
       replyTimerRef.current = setTimeout(() => {
-        setHistory((h) => [...h, { id: nextId(), role: "bot", text: botText }]);
+        setHistory((h) =>
+          h.map((m) =>
+            m.id === pendingId ? { ...m, text: botText, pending: false } : m
+          )
+        );
         setChips(chipsAfter);
-        setThinking(false);
         replyTimerRef.current = null;
       }, THINK_DELAY_MS);
     },
@@ -91,11 +99,8 @@ export function useOnboardingChat(): OnboardingChatState {
       const userMsg: Msg = { id: nextId(), role: "user", text: chip.label };
 
       if (!done) {
-        // Terminal onboarding chip — user goes straight into the signal
-        // creation wizard (6-scenario picker is step 1).
         if (chip.next === "create-signal") {
           clearReplyTimer();
-          setThinking(false);
           setHistory((h) => [...h, userMsg]);
           setChips([]);
           dispatch({ type: "start_signal_flow" });
@@ -104,8 +109,6 @@ export function useOnboardingChat(): OnboardingChatState {
         const node = WAVES[chip.next];
         if (!node) return;
         setHistory((h) => [...h, userMsg]);
-        // Wave-3 "extra question" is single-use — after it's asked, leave
-        // only "Создать первый сигнал →" in the chip row.
         const nextChips =
           chip.next === "wave-3-repeat"
             ? node.chips.filter((c) => c.next === "create-signal")
@@ -116,7 +119,6 @@ export function useOnboardingChat(): OnboardingChatState {
 
       if (chip.next === "post-create-signal") {
         clearReplyTimer();
-        setThinking(false);
         setHistory((h) => [...h, userMsg]);
         setChips([]);
         dispatch({ type: "start_signal_flow" });
@@ -143,5 +145,5 @@ export function useOnboardingChat(): OnboardingChatState {
     [queueBotReply, done, chips]
   );
 
-  return { history, chips, thinking, submitChip, submitFreeText };
+  return { history, chips, submitChip, submitFreeText };
 }

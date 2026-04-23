@@ -1,4 +1,10 @@
-export type Msg = { id: number; role: "user" | "bot"; text: string };
+export type Msg = {
+  id: number;
+  role: "user" | "bot";
+  text: string;
+  /** true while the bot bubble is "thinking" — bubble renders dots instead of text */
+  pending?: boolean;
+};
 
 export type Chip = {
   id: string;

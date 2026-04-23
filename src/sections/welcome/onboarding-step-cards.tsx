@@ -69,10 +69,11 @@ export function OnboardingStepCards() {
             disabled={!active}
             onClick={onClick}
             className={cn(
-              "flex flex-col items-start rounded-lg border p-4 text-left transition-all",
+              "flex flex-col items-start rounded-lg border p-4 text-left",
+              "transition-[opacity,border-color,background-color,transform] duration-200 ease-out",
               active
                 ? onClick
-                  ? "cursor-pointer border-border bg-card hover:border-border hover:bg-accent"
+                  ? "cursor-pointer border-border bg-card hover:border-border hover:bg-accent active:scale-[0.98]"
                   : "cursor-default border-border bg-card"
                 : "cursor-not-allowed border-border/40 bg-card/40 opacity-35"
             )}
