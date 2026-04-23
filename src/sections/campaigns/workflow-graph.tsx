@@ -27,7 +27,13 @@ interface WorkflowGraphProps {
   onPaneClick?: () => void;
 }
 
-function GraphInner({ nodes, edges, compact, onNodeClick, onPaneClick }: WorkflowGraphProps) {
+function GraphInner({
+  nodes,
+  edges,
+  compact,
+  onNodeClick,
+  onPaneClick,
+}: WorkflowGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { getNodes, fitView } = useReactFlow();
 
@@ -56,6 +62,14 @@ function GraphInner({ nodes, edges, compact, onNodeClick, onPaneClick }: Workflo
   return (
     <div ref={containerRef} className="relative h-full w-full">
       <style>{WORKFLOW_NODE_STATE_CSS}</style>
+      <style>{`
+        .react-flow__node {
+          transition: transform 320ms cubic-bezier(0.32, 0.72, 0, 1);
+        }
+        .react-flow__node.dragging {
+          transition: none;
+        }
+      `}</style>
       {/* Left fade */}
       <div
         className="pointer-events-none absolute inset-y-0 left-0 z-10 w-20 transition-opacity duration-300"

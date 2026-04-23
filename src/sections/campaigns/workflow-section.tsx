@@ -5,7 +5,6 @@ import { AnimatePresence, motion } from "motion/react";
 import { Sparkles, X } from "lucide-react";
 import { useAppState, useAppDispatch } from "@/state/app-state-context";
 import { CanvasHeader, type CanvasHeaderToast } from "./canvas-header";
-import { NodeControlPanel } from "./node-control-panel";
 import { WorkflowView } from "./workflow-view";
 import { validateWorkflow } from "@/state/workflow-validation";
 import type {
@@ -96,17 +95,6 @@ export function WorkflowSection() {
       if (aiReplyTimerRef.current) clearTimeout(aiReplyTimerRef.current);
     };
   }, [aiReply, dispatch]);
-
-  const selectedNode = useMemo(() => {
-    if (!selectedWorkflowNode) return null;
-    const g = graphRef.current;
-    if (!g) return null;
-    const node = g.nodes.find((n) => n.id === selectedWorkflowNode.id);
-    if (!node) return null;
-    return { id: node.id, data: node.data as WorkflowNodeData };
-    // graphTick ensures re-evaluation after AI cycle mutates node data
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedWorkflowNode, graphTick]);
 
   // Resolve node-command labels → ids via the current graph snapshot.
   // Tags pointing to unknown labels are silently skipped.
@@ -254,15 +242,6 @@ export function WorkflowSection() {
           onPaneClick={handlePaneClick}
         />
       </div>
-
-      <AnimatePresence>
-        {selectedNode && (
-          <NodeControlPanel
-            node={selectedNode}
-            onClose={() => dispatch({ type: "workflow_node_deselected" })}
-          />
-        )}
-      </AnimatePresence>
 
       <AnimatePresence>
         {aiReply && (

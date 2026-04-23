@@ -20,10 +20,15 @@ export type OnboardingChatState = {
   submitFreeText: (text: string) => void;
 };
 
-// Simulated LLM generation delay before the bot reply materializes. Long
-// enough that the thinking dots read as "thinking", short enough that the
-// conversation doesn't stall.
-const THINK_DELAY_MS = 900;
+// Small pause between the user message appearing and the bot "thinking"
+// bubble starting its entrance. Without it, both bubbles enter nearly
+// simultaneously — which reads as "scripted UI" instead of a conversation.
+const PRE_THINK_DELAY_MS = 260;
+
+// How long the bot "thinks" (shows dots) before the reply materializes,
+// measured from the moment the pending bubble appears. Long enough that
+// the dots complete ~1.5 pulses and read as deliberate.
+const THINK_DELAY_MS = 1000;
 
 export function useOnboardingChat(): OnboardingChatState {
   const state = useAppState();
@@ -39,8 +44,13 @@ export function useOnboardingChat(): OnboardingChatState {
     done ? POST_ONBOARDING_CHIPS : WAVE_0_CHIPS
   );
 
+  const preThinkTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const replyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clearReplyTimer = () => {
+    if (preThinkTimerRef.current) {
+      clearTimeout(preThinkTimerRef.current);
+      preThinkTimerRef.current = null;
+    }
     if (replyTimerRef.current) {
       clearTimeout(replyTimerRef.current);
       replyTimerRef.current = null;
@@ -67,29 +77,36 @@ export function useOnboardingChat(): OnboardingChatState {
     prevDone.current = done;
   }, [onWelcome, done]);
 
-  // Push a pending bot bubble immediately (user sees dots enter right after
-  // the user message), then swap its content to the real reply after the
-  // think delay. The bubble container itself never re-mounts — so the UI
-  // does one slide-in, then a content crossfade, instead of two independent
-  // animations.
+  // Two-step reveal:
+  //   1) After PRE_THINK_DELAY_MS, push a pending bot bubble (dots). This
+  //      gap gives the preceding user message room to finish its slide-in,
+  //      so the two bubbles don't enter on top of each other.
+  //   2) After THINK_DELAY_MS more, update that same bubble in place with
+  //      the real text. The bubble container never re-mounts — Motion
+  //      animates its layout resize + the dots→text blur crossfade inside.
   const queueBotReply = useCallback(
     (botText: string, chipsAfter: Chip[]) => {
       clearReplyTimer();
       const pendingId = nextId();
-      setHistory((h) => [
-        ...h,
-        { id: pendingId, role: "bot", text: "", pending: true },
-      ]);
       setChips([]);
-      replyTimerRef.current = setTimeout(() => {
-        setHistory((h) =>
-          h.map((m) =>
-            m.id === pendingId ? { ...m, text: botText, pending: false } : m
-          )
-        );
-        setChips(chipsAfter);
-        replyTimerRef.current = null;
-      }, THINK_DELAY_MS);
+      preThinkTimerRef.current = setTimeout(() => {
+        setHistory((h) => [
+          ...h,
+          { id: pendingId, role: "bot", text: "", pending: true },
+        ]);
+        preThinkTimerRef.current = null;
+        replyTimerRef.current = setTimeout(() => {
+          setHistory((h) =>
+            h.map((m) =>
+              m.id === pendingId
+                ? { ...m, text: botText, pending: false }
+                : m
+            )
+          );
+          setChips(chipsAfter);
+          replyTimerRef.current = null;
+        }, THINK_DELAY_MS);
+      }, PRE_THINK_DELAY_MS);
     },
     []
   );

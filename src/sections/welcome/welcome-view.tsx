@@ -13,10 +13,8 @@ export function WelcomeView({ chat }: { chat: OnboardingChatState }) {
   const state = useAppState();
   const done = isCampaignDone(state);
 
-  // Once the conversation starts (first user message, or a pending bot
-  // bubble, is in history), we fade the hero (heading + subtitle + step
-  // cards) out so the chat takes over. Post-onboarding keeps the minimal
-  // "Добро пожаловать" header for continuity.
+  // The conversation counts as started the moment any message (including
+  // the pending bot bubble) is in history — that drives the hero exit.
   const conversationStarted = chat.history.length > 0;
 
   return (
@@ -26,7 +24,7 @@ export function WelcomeView({ chat }: { chat: OnboardingChatState }) {
     >
       <motion.div
         layout
-        transition={{ duration: 0.4, ease: HERO_EASE }}
+        transition={{ duration: 0.52, ease: HERO_EASE }}
         className="flex w-full max-w-2xl flex-col items-center gap-8"
       >
         {done ? (
@@ -39,14 +37,17 @@ export function WelcomeView({ chat }: { chat: OnboardingChatState }) {
             </p>
           </div>
         ) : (
-          <AnimatePresence initial={false} mode="wait">
+          // mode="popLayout" positions the exiting hero absolutely during
+          // its exit animation — so the chat bubbles below can reflow
+          // into the freed space *while* the hero is still fading, not
+          // after it finishes.
+          <AnimatePresence initial={false} mode="popLayout">
             {!conversationStarted && (
               <motion.div
                 key="hero"
-                layout
                 initial={false}
-                exit={{ opacity: 0, y: -12, filter: "blur(6px)" }}
-                transition={{ duration: 0.32, ease: HERO_EASE }}
+                exit={{ opacity: 0, y: -20, filter: "blur(10px)" }}
+                transition={{ duration: 0.52, ease: HERO_EASE }}
                 className="flex w-full flex-col items-center gap-8"
               >
                 <div className="flex w-full flex-col items-center gap-2 text-center">
@@ -64,7 +65,16 @@ export function WelcomeView({ chat }: { chat: OnboardingChatState }) {
           </AnimatePresence>
         )}
 
-        <OnboardingChatHistory history={chat.history} />
+        {/* `layout` here is what makes the chat smoothly rise up as the
+            hero pops out — without it, chat would stay put until exit
+            finished, then snap to its new position. */}
+        <motion.div
+          layout
+          transition={{ duration: 0.52, ease: HERO_EASE }}
+          className="w-full"
+        >
+          <OnboardingChatHistory history={chat.history} />
+        </motion.div>
       </motion.div>
     </div>
   );

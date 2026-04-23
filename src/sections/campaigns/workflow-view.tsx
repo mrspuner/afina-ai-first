@@ -120,6 +120,59 @@ function patchNode(
   );
 }
 
+// xyflow stores position as the node's top-left corner. The collapsed card
+// is ~130x45, the expanded card is ~320x230. If we only push neighbors, the
+// expanded node grows only to the right/down from its anchor — so the right
+// neighbor still gets overlapped while the left gap grows too wide. Fix:
+// also pull the SELECTED node up-and-left by half the extra size, so its
+// visual centre stays put and neighbor shifts land symmetrically around it.
+const EXPAND_DX = 100;
+const EXPAND_DY = 100;
+const SELECTED_RECENTER_X = -95; // ≈ (320 − 130) / 2
+const SELECTED_RECENTER_Y = -90; // ≈ (230 − 45) / 2
+const AXIS_THRESHOLD = 5;
+
+function shiftNeighborsAround(
+  nodes: WorkflowNode[],
+  selectedId: string | null | undefined
+): WorkflowNode[] {
+  if (!selectedId) return nodes.map((n) => ({ ...n, selected: false }));
+  const sel = nodes.find((n) => n.id === selectedId);
+  if (!sel) return nodes.map((n) => ({ ...n, selected: false }));
+  const sx = sel.position.x;
+  const sy = sel.position.y;
+  return nodes.map((n) => {
+    if (n.id === selectedId) {
+      return {
+        ...n,
+        position: {
+          x: n.position.x + SELECTED_RECENTER_X,
+          y: n.position.y + SELECTED_RECENTER_Y,
+        },
+        selected: true,
+      };
+    }
+    const dx =
+      n.position.x > sx + AXIS_THRESHOLD
+        ? EXPAND_DX
+        : n.position.x < sx - AXIS_THRESHOLD
+          ? -EXPAND_DX
+          : 0;
+    const dy =
+      n.position.y > sy + AXIS_THRESHOLD
+        ? EXPAND_DY
+        : n.position.y < sy - AXIS_THRESHOLD
+          ? -EXPAND_DY
+          : 0;
+    if (dx === 0 && dy === 0) return { ...n, selected: false };
+    return {
+      ...n,
+      position: { x: n.position.x + dx, y: n.position.y + dy },
+      selected: false,
+    };
+  });
+}
+
 export function WorkflowView({
   launched,
   pendingCommand,
@@ -379,9 +432,7 @@ export function WorkflowView({
         }
       >
         <WorkflowGraph
-          nodes={graph.nodes.map((n) =>
-            n.id === selectedNodeId ? { ...n, selected: true } : { ...n, selected: false }
-          )}
+          nodes={shiftNeighborsAround(graph.nodes, selectedNodeId)}
           edges={graph.edges}
           compact={launched}
           onNodeClick={onNodeClick}

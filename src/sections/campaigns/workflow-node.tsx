@@ -17,9 +17,12 @@ import {
   LayoutTemplate,
   CheckCircle2,
   CircleStop,
+  X,
   type LucideIcon,
 } from "lucide-react";
+import { useAppDispatch } from "@/state/app-state-context";
 import type { WorkflowNode, WorkflowNodeType } from "@/types/workflow";
+import { NodeCardBody } from "./node-card-content";
 
 interface NodeStyle {
   border: string;
@@ -76,60 +79,114 @@ const HANDLE_STYLE = {
   height: 8,
 };
 
-export function WorkflowNodeComponent({ data, selected }: NodeProps<WorkflowNode>) {
+export function WorkflowNodeComponent({ id, data, selected }: NodeProps<WorkflowNode>) {
   const s = STYLES[data.nodeType] ?? STYLES.default;
   const Icon = ICON[data.nodeType];
+  const dispatch = useAppDispatch();
+
   const showReadyDot =
-    !data.needsAttention && !data.processing && !data.justUpdated;
+    !data.needsAttention && !data.processing && !data.justUpdated && !selected;
 
   const stateClass = [
     data.needsAttention ? "wf-node-needs-attention" : null,
     data.processing ? "wf-node-processing" : null,
     data.justUpdated ? "wf-node-just-updated" : null,
-    selected ? "wf-node-selected" : null,
+    selected ? "wf-node-selected wf-node-expanded" : null,
   ]
     .filter(Boolean)
     .join(" ");
 
   return (
     <motion.div
+      layout
       className={stateClass}
       data-node-type={data.nodeType}
-      initial={{ opacity: 0, scale: 0.88 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.25, ease: "easeOut" }}
+      data-testid={selected ? "node-control-panel" : undefined}
+      initial={false}
+      animate={{
+        opacity: 1,
+        scale: 1,
+      }}
+      transition={{ layout: { duration: 0.28, ease: [0.32, 0.72, 0, 1] } }}
       style={{
         position: "relative",
         border: `1px solid ${s.border}`,
         background: s.bg,
-        borderRadius: 8,
-        padding: "10px 14px",
-        minWidth: 110,
+        borderRadius: selected ? 12 : 8,
+        padding: selected ? "12px 14px 14px" : "10px 14px",
+        width: selected ? 320 : "auto",
+        minWidth: selected ? 320 : 110,
+        zIndex: selected ? 50 : 1,
+        boxShadow: selected
+          ? "0 12px 40px -12px rgba(0,0,0,0.65), 0 0 0 1px rgba(255,255,255,0.04)"
+          : "none",
         transition: "border-color 0.3s ease, background 0.3s ease",
       }}
     >
       <Handle type="target" position={Position.Left} style={HANDLE_STYLE} />
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-          fontSize: 11,
-          fontWeight: 500,
-          color: s.color,
-          whiteSpace: "nowrap",
-          lineHeight: "1.4",
-          transition: "color 0.3s ease",
-        }}
-      >
-        {Icon ? <Icon size={12} strokeWidth={2} /> : null}
-        <span>{data.label}</span>
-      </div>
-      {data.sublabel && (
-        <div style={{ fontSize: 10, color: "rgba(255,255,255,0.55)", marginTop: 2 }}>
-          {data.sublabel}
+
+      <div className="flex items-start gap-2">
+        <div
+          className="min-w-0 flex-1"
+          style={{
+            fontSize: selected ? 13 : 11,
+            fontWeight: 500,
+            color: s.color,
+            lineHeight: "1.4",
+            transition: "color 0.3s ease, font-size 0.3s ease",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              whiteSpace: selected ? "normal" : "nowrap",
+            }}
+          >
+            {Icon ? <Icon size={selected ? 14 : 12} strokeWidth={2} /> : null}
+            <span>{data.label}</span>
+          </div>
+          {data.sublabel && (
+            <div
+              style={{
+                fontSize: selected ? 11 : 10,
+                color: "rgba(255,255,255,0.55)",
+                marginTop: 2,
+                whiteSpace: selected ? "normal" : "nowrap",
+              }}
+            >
+              {data.sublabel}
+            </div>
+          )}
         </div>
+
+        {selected && (
+          <button
+            type="button"
+            aria-label="Закрыть карточку ноды"
+            onClick={(e) => {
+              e.stopPropagation();
+              dispatch({ type: "workflow_node_deselected" });
+            }}
+            className="nodrag -mr-1 -mt-1 rounded-md p-1 text-muted-foreground opacity-70 hover:bg-accent hover:text-foreground hover:opacity-100"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+
+      {selected && (
+        <motion.div
+          initial={{ opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.22, ease: "easeOut", delay: 0.05 }}
+          className="mt-2.5 border-t border-border/60 pt-2.5"
+        >
+          <NodeCardBody id={id} data={data} />
+        </motion.div>
       )}
+
       {showReadyDot && (
         <span
           aria-hidden
@@ -145,7 +202,7 @@ export function WorkflowNodeComponent({ data, selected }: NodeProps<WorkflowNode
           }}
         />
       )}
-      {data.needsAttention && (
+      {data.needsAttention && !selected && (
         <span
           aria-hidden
           style={{
@@ -171,6 +228,9 @@ export const WORKFLOW_NODE_STATE_CSS = `
     outline: 2px solid #60a5fa;
     outline-offset: 3px;
     box-shadow: 0 0 0 6px rgba(96, 165, 250, 0.18);
+  }
+  .wf-node-expanded {
+    outline-offset: 2px;
   }
   .wf-node-needs-attention {
     border-color: #fb923c !important;

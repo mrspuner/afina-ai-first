@@ -49,8 +49,3 @@ next-env.d.ts
 
 # superpowers transient brainstorm artifacts
 /.superpowers
-
-# claude code plugin/session state (skills, agents, lock)
-/.claude/skills
-/.claude/agents
-/skills-lock.json
