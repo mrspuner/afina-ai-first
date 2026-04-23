@@ -49,19 +49,22 @@ function WorkspaceInner({
   const handleNext = useCallback(
     (partial: Partial<StepData>) => {
       setStepData((prev) => ({ ...prev, ...partial }));
-      const next = currentStep + 1;
-      if (next > maxStep) {
-        setMaxStep(next);
-        setAnimatingStep(next);
-        setCurrentStep(next);
-        if (next === 8) onStep8Reached?.(stepData.scenario ?? "");
-      } else {
+      // Revisited earlier step: keep filled progress, jump back to the
+      // furthest reached step instead of advancing linearly.
+      if (currentStep < maxStep) {
         setAnimatingStep(null);
-        setCurrentStep(next);
+        setCurrentStep(maxStep);
+        pendingScroll.current = { step: maxStep, behavior: "smooth" };
+        return;
       }
+      const next = currentStep + 1;
+      setMaxStep(next);
+      setAnimatingStep(next);
+      setCurrentStep(next);
+      if (next === 8) onStep8Reached?.(stepData.scenario ?? "");
       pendingScroll.current = { step: next, behavior: "smooth" };
     },
-    [currentStep, maxStep, onStep8Reached]
+    [currentStep, maxStep, onStep8Reached, stepData.scenario]
   );
 
   const handleStepperClick = useCallback((step: number) => {
@@ -107,6 +110,7 @@ function WorkspaceInner({
         <div className="absolute right-6 top-6 z-10">
           <CampaignStepper
             currentStep={currentStep}
+            maxStep={maxStep}
             onStepClick={handleStepperClick}
             disabled={currentStep === 7}
           />

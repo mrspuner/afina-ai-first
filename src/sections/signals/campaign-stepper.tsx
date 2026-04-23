@@ -15,22 +15,25 @@ const STEPPER_ITEMS = [
 
 interface CampaignStepperProps {
   currentStep: number;
+  maxStep: number;
   onStepClick: (step: number) => void;
   disabled?: boolean;
 }
 
 export function CampaignStepper({
   currentStep,
+  maxStep,
   onStepClick,
   disabled = false,
 }: CampaignStepperProps) {
   return (
     <div className="flex flex-col gap-1">
       {STEPPER_ITEMS.map(({ label, step }, idx) => {
-        const isCompleted = step < currentStep;
         const isActive = step === currentStep;
-        const isPending = step > currentStep;
-        const isClickable = isCompleted && !disabled;
+        const isVisited = step <= maxStep;
+        const isCompleted = isVisited && !isActive;
+        const isPending = step > maxStep;
+        const isClickable = isVisited && !isActive && !disabled;
 
         return (
           <div key={step} className="flex items-center gap-2.5">
@@ -39,7 +42,7 @@ export function CampaignStepper({
               <div
                 className={cn(
                   "w-px flex-1",
-                  idx === 0 ? "invisible" : isCompleted || isActive ? "bg-primary" : "bg-border"
+                  idx === 0 ? "invisible" : isVisited ? "bg-primary" : "bg-border"
                 )}
               />
               {/* Circle */}
@@ -64,7 +67,7 @@ export function CampaignStepper({
                   "w-px flex-1",
                   idx === STEPPER_ITEMS.length - 1
                     ? "invisible"
-                    : isCompleted
+                    : isVisited
                     ? "bg-primary"
                     : "bg-border"
                 )}
@@ -78,7 +81,7 @@ export function CampaignStepper({
               className={cn(
                 "py-1 text-xs transition-colors",
                 isActive && "font-medium text-foreground",
-                isCompleted && !disabled
+                isClickable
                   ? "cursor-pointer text-foreground hover:text-primary"
                   : "cursor-default",
                 isPending && "text-muted-foreground"

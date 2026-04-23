@@ -12,10 +12,16 @@ export function Step5Upload({ data, onNext }: StepProps) {
   const [isHashing, setIsHashing] = useState(false);
 
   function handleNext() {
+    // Already-hashed file on revisit — skip re-hashing, just proceed.
+    if (file && file === data.file) {
+      onNext({ file });
+      return;
+    }
     setIsHashing(true);
   }
 
   function handleHashingComplete() {
+    setIsHashing(false);
     onNext({ file });
   }
 
