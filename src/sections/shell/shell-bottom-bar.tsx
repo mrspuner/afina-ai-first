@@ -24,9 +24,10 @@ import {
   type View,
 } from "@/state/app-state";
 import { parseStructuralCommands } from "@/state/structural-commands";
-import { parseCampaignFilter } from "@/state/parse-campaign-filter";
+import { parseCampaignQuery } from "@/state/parse-campaign-filter";
 import { useWelcomeChat } from "@/sections/welcome/welcome-chat-context";
 import { OnboardingChatChips } from "@/sections/welcome/onboarding-chat-view";
+import { CampaignsPromptChips } from "@/sections/campaigns/campaigns-prompt-chips";
 
 function AttachmentFileList() {
   const { files } = usePromptInputAttachments();
@@ -124,9 +125,9 @@ export function ShellBottomBar() {
     }
 
     if (view.kind === "section" && view.name === "Кампании") {
-      const statuses = parseCampaignFilter(rawText);
-      if (statuses.length > 0) {
-        dispatch({ type: "campaigns_filter_set", statuses });
+      const { statuses, sort } = parseCampaignQuery(rawText);
+      if (statuses.length > 0 || sort !== "default") {
+        dispatch({ type: "campaigns_query_set", statuses, sort });
       }
       return;
     }
@@ -212,7 +213,7 @@ export function ShellBottomBar() {
             // Outer frosted card (Figma node 18750:213937): dark translucent
             // panel with a subtle 2px backdrop blur — no outer shadow, the
             // "solidity" comes from the inner InputGroup's 17px/9px halo.
-            "bg-[rgba(10,10,10,0.55)] backdrop-blur-[2px]"
+            "bg-[rgba(10,10,10,0.75)] backdrop-blur-[2px]"
           )}
         >
           <PromptInput
@@ -253,6 +254,16 @@ export function ShellBottomBar() {
             <OnboardingChatChips
               chips={welcomeChat.chips}
               onChipClick={welcomeChat.submitChip}
+            />
+          )}
+          {view.kind === "section" && view.name === "Кампании" && (
+            <CampaignsPromptChips
+              onChipClick={(text) => {
+                const { statuses, sort } = parseCampaignQuery(text);
+                if (statuses.length > 0 || sort !== "default") {
+                  dispatch({ type: "campaigns_query_set", statuses, sort });
+                }
+              }}
             />
           )}
         </div>

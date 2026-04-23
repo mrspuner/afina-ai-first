@@ -1,5 +1,6 @@
 import { nanoid } from "nanoid";
 import type { StructuralOp } from "./structural-commands";
+import type { CampaignSort } from "./parse-campaign-filter";
 
 export type SignalType =
   | "Регистрация"
@@ -93,6 +94,7 @@ export type AppState = {
   launchFlyoutOpen: boolean;
   activeSection: SectionName | null;
   campaignFilter: CampaignStatus[];
+  campaignSort: CampaignSort;
 };
 
 export type Action =
@@ -109,7 +111,7 @@ export type Action =
   | { type: "campaign_status_changed"; id: string; status: CampaignStatus; timestamp: string }
   | { type: "campaign_duplicated"; id: string }
   | { type: "campaign_schedule_cancelled"; id: string }
-  | { type: "campaigns_filter_set"; statuses: CampaignStatus[] }
+  | { type: "campaigns_query_set"; statuses: CampaignStatus[]; sort: CampaignSort }
   | { type: "campaigns_filter_remove"; status: CampaignStatus }
   | { type: "campaigns_filter_clear" }
   | { type: "preset_applied"; preset: Preset }
@@ -144,6 +146,7 @@ export const initialState: AppState = {
   launchFlyoutOpen: false,
   activeSection: null,
   campaignFilter: [],
+  campaignSort: "default",
 };
 
 export function appReducer(state: AppState, action: Action): AppState {
@@ -182,6 +185,7 @@ export function appReducer(state: AppState, action: Action): AppState {
           },
           activeSection: null,
           campaignFilter: [],
+          campaignSort: "default",
         };
       }
       const latestSignal = state.signals[state.signals.length - 1];
@@ -202,6 +206,7 @@ export function appReducer(state: AppState, action: Action): AppState {
         view: { kind: "workflow", campaign: action.campaign, launched: false },
         activeSection: null,
         campaignFilter: [],
+        campaignSort: "default",
       };
     }
 
@@ -227,6 +232,7 @@ export function appReducer(state: AppState, action: Action): AppState {
         },
         activeSection: null,
         campaignFilter: [],
+        campaignSort: "default",
       };
     }
 
@@ -245,6 +251,7 @@ export function appReducer(state: AppState, action: Action): AppState {
         },
         activeSection: null,
         campaignFilter: [],
+        campaignSort: "default",
       };
     }
 
@@ -324,6 +331,7 @@ export function appReducer(state: AppState, action: Action): AppState {
         },
         activeSection: null,
         campaignFilter: [],
+        campaignSort: "default",
       };
     }
 
@@ -339,7 +347,7 @@ export function appReducer(state: AppState, action: Action): AppState {
         }),
       };
 
-    case "campaigns_filter_set": {
+    case "campaigns_query_set": {
       const seen = new Set<CampaignStatus>();
       const dedup: CampaignStatus[] = [];
       for (const s of action.statuses) {
@@ -348,7 +356,7 @@ export function appReducer(state: AppState, action: Action): AppState {
           dedup.push(s);
         }
       }
-      return { ...state, campaignFilter: dedup };
+      return { ...state, campaignFilter: dedup, campaignSort: action.sort };
     }
 
     case "campaigns_filter_remove":
@@ -358,7 +366,7 @@ export function appReducer(state: AppState, action: Action): AppState {
       };
 
     case "campaigns_filter_clear":
-      return { ...state, campaignFilter: [] };
+      return { ...state, campaignFilter: [], campaignSort: "default" };
 
     case "preset_applied": {
       const workflowCampaignId =
@@ -427,6 +435,7 @@ export function appReducer(state: AppState, action: Action): AppState {
         workflowCommand: null,
         activeSection: "Статистика",
         campaignFilter: [],
+        campaignSort: "default",
       };
 
     case "sidebar_nav":
@@ -436,6 +445,7 @@ export function appReducer(state: AppState, action: Action): AppState {
         workflowCommand: null,
         activeSection: action.section,
         campaignFilter: [],
+        campaignSort: "default",
       };
 
     case "flyout_open":
@@ -477,6 +487,7 @@ export function appReducer(state: AppState, action: Action): AppState {
         workflowStructuralCommands: null,
         aiReply: null,
         campaignFilter: [],
+        campaignSort: "default",
       };
 
     case "restore_address": {
@@ -493,6 +504,7 @@ export function appReducer(state: AppState, action: Action): AppState {
         workflowStructuralCommands: null,
         aiReply: null,
         campaignFilter: [],
+        campaignSort: "default",
       };
     }
   }

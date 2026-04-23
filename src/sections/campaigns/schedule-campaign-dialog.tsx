@@ -16,6 +16,12 @@ interface ScheduleCampaignDialogProps {
   onOpenChange: (open: boolean) => void;
   onConfirm: (iso: string) => void;
   campaignName: string;
+  /**
+   * Pre-fill the picker with this ISO timestamp (used when rescheduling an
+   * already-scheduled campaign). Falls back to a fresh default if absent or
+   * already in the past.
+   */
+  initialIso?: string;
 }
 
 function pad(n: number): string {
@@ -41,24 +47,32 @@ function minDate(): Date {
   return new Date(Date.now() + 5 * 60_000);
 }
 
+function seedValue(initialIso: string | undefined): string {
+  if (initialIso) {
+    const d = new Date(initialIso);
+    if (!Number.isNaN(d.getTime()) && d > minDate()) {
+      return toLocalInputValue(d);
+    }
+  }
+  return toLocalInputValue(defaultDate());
+}
+
 export function ScheduleCampaignDialog({
   open,
   onOpenChange,
   onConfirm,
   campaignName,
+  initialIso,
 }: ScheduleCampaignDialogProps) {
-  const [value, setValue] = useState<string>(() =>
-    toLocalInputValue(defaultDate()),
-  );
+  const [value, setValue] = useState<string>(() => seedValue(initialIso));
 
-  // Reset to a fresh default each time the dialog reopens — intentional
-  // external (open prop) → internal (input value) sync.
+  // Re-seed each time the dialog opens — intentional external→internal sync.
   useEffect(() => {
     if (open) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setValue(toLocalInputValue(defaultDate()));
+      setValue(seedValue(initialIso));
     }
-  }, [open]);
+  }, [open, initialIso]);
 
   const min = useMemo(() => toLocalInputValue(minDate()), [open]); // eslint-disable-line react-hooks/exhaustive-deps
 

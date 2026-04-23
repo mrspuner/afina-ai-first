@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/dialog";
 import type { Campaign, Signal } from "@/state/app-state";
 import { ScheduleCampaignDialog } from "./schedule-campaign-dialog";
+import { StatusBadge } from "./status-badge";
 
 export interface CanvasHeaderToast {
   kind: "error" | "info";
@@ -50,6 +51,40 @@ function formatDate(iso: string): string {
     day: "2-digit",
     month: "2-digit",
   });
+}
+
+function formatLongDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
+function formatDateTime(iso: string): string {
+  const d = new Date(iso);
+  const date = d.toLocaleDateString("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+  const time = d.toLocaleTimeString("ru-RU", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  return `${date} в ${time}`;
+}
+
+function statusDescription(c: Campaign): string {
+  if (c.status === "scheduled" && c.scheduledFor)
+    return `Запуск запланирован на ${formatDateTime(c.scheduledFor)}`;
+  if (c.status === "active" && c.launchedAt)
+    return `Запущена ${formatDateTime(c.launchedAt)}`;
+  if (c.status === "paused" && c.pausedAt)
+    return `Приостановлена ${formatDateTime(c.pausedAt)}`;
+  if (c.status === "completed" && c.completedAt)
+    return `Завершена ${formatLongDate(c.completedAt)}`;
+  return `Создана ${formatLongDate(c.createdAt)}`;
 }
 
 function formatNumber(n: number): string {
@@ -152,6 +187,12 @@ export function CanvasHeader({
           >
             {signalLine}
           </p>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <StatusBadge status={campaign.status} />
+            <span className="text-xs text-muted-foreground">
+              {statusDescription(campaign)}
+            </span>
+          </div>
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
@@ -224,6 +265,9 @@ export function CanvasHeader({
                 onClick={() => setConfirm("cancel-schedule")}
               >
                 Отменить расписание
+              </Button>
+              <Button variant="outline" onClick={() => setSchedulerOpen(true)}>
+                Изменить расписание
               </Button>
               <Button onClick={() => setConfirm("duplicate")}>Дублировать</Button>
             </>
@@ -341,6 +385,7 @@ export function CanvasHeader({
         onOpenChange={setSchedulerOpen}
         onConfirm={onSchedule}
         campaignName={campaign.name}
+        initialIso={campaign.scheduledFor}
       />
     </div>
   );

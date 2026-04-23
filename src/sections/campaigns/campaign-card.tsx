@@ -3,6 +3,11 @@
 import { Card } from "@/components/ui/card";
 import type { Campaign, Signal } from "@/state/app-state";
 import { StatusBadge } from "./status-badge";
+import {
+  formatCompactRub,
+  formatCount,
+  getCampaignStats,
+} from "./mock-stats";
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("ru-RU");
@@ -30,6 +35,10 @@ export function CampaignCard({ campaign, signal, onOpen }: CampaignCardProps) {
     ? `Сигнал: ${signal.type} · ${formatNumber(signal.count)}`
     : "Сигнал: —";
 
+  const showStats =
+    campaign.status === "active" || campaign.status === "completed";
+  const stats = showStats ? getCampaignStats(campaign, signal) : null;
+
   return (
     <Card
       className="cursor-pointer gap-2 px-5 py-4 transition-colors hover:bg-accent"
@@ -51,6 +60,43 @@ export function CampaignCard({ campaign, signal, onOpen }: CampaignCardProps) {
         <p className="text-xs text-muted-foreground">{signalLine}</p>
         <p className="text-xs text-muted-foreground">{timestampLine(campaign)}</p>
       </div>
+      {stats && (
+        <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border/60 pt-2 text-xs">
+          <StatItem label="Охват" value={formatCount(stats.reach)} />
+          <StatItem
+            label="Конверсия"
+            value={`${stats.conversionPct.toFixed(1)}%`}
+          />
+          <StatItem
+            label="Прибыль"
+            value={formatCompactRub(stats.profit)}
+            tone={stats.profit >= 0 ? "positive" : "negative"}
+          />
+        </div>
+      )}
     </Card>
+  );
+}
+
+function StatItem({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone?: "positive" | "negative";
+}) {
+  const valueClass =
+    tone === "positive"
+      ? "text-emerald-600 dark:text-emerald-400"
+      : tone === "negative"
+        ? "text-destructive"
+        : "text-foreground";
+  return (
+    <span className="flex items-baseline gap-1">
+      <span className="text-muted-foreground">{label}</span>
+      <span className={`font-medium ${valueClass}`}>{value}</span>
+    </span>
   );
 }

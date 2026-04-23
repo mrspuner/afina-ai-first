@@ -3,15 +3,26 @@
 import { X } from "lucide-react";
 import { useAppDispatch } from "@/state/app-state-context";
 import type { CampaignStatus } from "@/state/app-state";
+import type { CampaignSort } from "@/state/parse-campaign-filter";
 import { STATUS_LABELS } from "./status-badge";
+
+const SORT_LABELS: Record<Exclude<CampaignSort, "default">, string> = {
+  "profit-desc": "По прибыли ↓",
+  "conversion-desc": "По конверсии ↓",
+};
 
 interface CampaignFilterChipsProps {
   statuses: CampaignStatus[];
+  sort: CampaignSort;
 }
 
-export function CampaignFilterChips({ statuses }: CampaignFilterChipsProps) {
+export function CampaignFilterChips({
+  statuses,
+  sort,
+}: CampaignFilterChipsProps) {
   const dispatch = useAppDispatch();
-  if (statuses.length === 0) return null;
+  const hasSort = sort !== "default";
+  if (statuses.length === 0 && !hasSort) return null;
 
   return (
     <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -32,6 +43,11 @@ export function CampaignFilterChips({ statuses }: CampaignFilterChipsProps) {
           <X className="h-3 w-3 opacity-60" aria-hidden />
         </button>
       ))}
+      {hasSort && (
+        <span className="inline-flex items-center gap-1 rounded-full border border-primary/40 bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+          {SORT_LABELS[sort]}
+        </span>
+      )}
       <button
         type="button"
         onClick={() => dispatch({ type: "campaigns_filter_clear" })}
