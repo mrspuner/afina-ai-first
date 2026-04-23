@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Check, Plus, Minus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -48,6 +48,14 @@ function TriggerCard({
   onToggle: () => void;
   onConfigChange: (next: TriggerConfig) => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
+
+  // Снятие галочки всегда сворачивает настройку — при повторном выборе
+  // карточка должна открыться компактной.
+  useEffect(() => {
+    if (!selected) setExpanded(false);
+  }, [selected]);
+
   return (
     <div
       className={cn(
@@ -57,32 +65,45 @@ function TriggerCard({
           : "border-border bg-card hover:border-primary/50"
       )}
     >
-      <button
-        type="button"
-        onClick={onToggle}
-        className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm"
-      >
-        <span
-          className={cn(
-            "flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border transition-colors",
-            selected
-              ? "border-primary bg-primary text-primary-foreground"
-              : "border-border bg-background"
-          )}
+      <div className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm">
+        <button
+          type="button"
+          onClick={onToggle}
+          className="flex flex-1 items-center gap-3 text-left"
         >
-          {selected && <Check className="h-3 w-3" />}
-        </span>
-        <span
-          className={cn(
-            "flex-1 font-medium",
-            selected ? "text-foreground" : "text-muted-foreground"
-          )}
-        >
-          {trigger.label}
-        </span>
-      </button>
+          <span
+            className={cn(
+              "flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border transition-colors",
+              selected
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-border bg-background"
+            )}
+          >
+            {selected && <Check className="h-3 w-3" />}
+          </span>
+          <span
+            className={cn(
+              "flex-1 font-medium",
+              selected ? "text-foreground" : "text-muted-foreground"
+            )}
+          >
+            {trigger.label}
+          </span>
+        </button>
 
-      {selected && (
+        {selected && (
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            aria-expanded={expanded}
+            className="shrink-0 rounded-md border border-border bg-background px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            {expanded ? "Свернуть" : "Настроить"}
+          </button>
+        )}
+      </div>
+
+      {selected && expanded && (
         <div className="animate-in fade-in-0 slide-in-from-top-1 flex flex-col gap-3 border-t border-primary/20 bg-background/40 px-3 py-3 [--tw-animation-duration:180ms] [--tw-ease:cubic-bezier(0.23,1,0.32,1)]">
           <div className="flex flex-col gap-1.5">
             <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
