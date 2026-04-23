@@ -166,6 +166,16 @@ export function WorkflowSection() {
     });
   }
 
+  function handleSchedule(iso: string) {
+    if (!currentCampaign) return;
+    dispatch({
+      type: "campaign_status_changed",
+      id: currentCampaign.id,
+      status: "scheduled",
+      timestamp: iso,
+    });
+  }
+
   function handlePause() {
     if (!currentCampaign) return;
     dispatch({
@@ -217,6 +227,7 @@ export function WorkflowSection() {
         onRename={handleRename}
         onSaveDraft={handleSaveDraft}
         onLaunch={handleLaunch}
+        onSchedule={handleSchedule}
         onPause={handlePause}
         onResume={handleResume}
         onDuplicate={handleDuplicate}

@@ -24,6 +24,7 @@ import {
   type View,
 } from "@/state/app-state";
 import { parseStructuralCommands } from "@/state/structural-commands";
+import { parseCampaignFilter } from "@/state/parse-campaign-filter";
 import { useWelcomeChat } from "@/sections/welcome/welcome-chat-context";
 import { OnboardingChatChips } from "@/sections/welcome/onboarding-chat-view";
 
@@ -119,6 +120,14 @@ export function ShellBottomBar() {
 
     if (isOnWelcome(state)) {
       welcomeChat?.submitFreeText(rawText);
+      return;
+    }
+
+    if (view.kind === "section" && view.name === "Кампании") {
+      const statuses = parseCampaignFilter(rawText);
+      if (statuses.length > 0) {
+        dispatch({ type: "campaigns_filter_set", statuses });
+      }
       return;
     }
 

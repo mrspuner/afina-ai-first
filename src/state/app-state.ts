@@ -82,6 +82,7 @@ export type AppState = {
   aiReply: string | null;
   launchFlyoutOpen: boolean;
   activeSection: SectionName | null;
+  campaignFilter: CampaignStatus[];
 };
 
 export type Action =
@@ -98,6 +99,9 @@ export type Action =
   | { type: "campaign_status_changed"; id: string; status: CampaignStatus; timestamp: string }
   | { type: "campaign_duplicated"; id: string }
   | { type: "campaign_schedule_cancelled"; id: string }
+  | { type: "campaigns_filter_set"; statuses: CampaignStatus[] }
+  | { type: "campaigns_filter_remove"; status: CampaignStatus }
+  | { type: "campaigns_filter_clear" }
   | { type: "preset_applied"; preset: Preset }
   | { type: "workflow_command_submit"; text: string }
   | { type: "workflow_command_handled" }
@@ -129,6 +133,7 @@ export const initialState: AppState = {
   aiReply: null,
   launchFlyoutOpen: false,
   activeSection: null,
+  campaignFilter: [],
 };
 
 export function appReducer(state: AppState, action: Action): AppState {
@@ -166,6 +171,7 @@ export function appReducer(state: AppState, action: Action): AppState {
               existing.status === "completed",
           },
           activeSection: null,
+          campaignFilter: [],
         };
       }
       const latestSignal = state.signals[state.signals.length - 1];
@@ -185,6 +191,7 @@ export function appReducer(state: AppState, action: Action): AppState {
           : state.campaigns,
         view: { kind: "workflow", campaign: action.campaign, launched: false },
         activeSection: null,
+        campaignFilter: [],
       };
     }
 
@@ -209,6 +216,7 @@ export function appReducer(state: AppState, action: Action): AppState {
           launched: false,
         },
         activeSection: null,
+        campaignFilter: [],
       };
     }
 
@@ -226,6 +234,7 @@ export function appReducer(state: AppState, action: Action): AppState {
             c.status === "completed",
         },
         activeSection: null,
+        campaignFilter: [],
       };
     }
 
@@ -304,6 +313,7 @@ export function appReducer(state: AppState, action: Action): AppState {
           launched: false,
         },
         activeSection: null,
+        campaignFilter: [],
       };
     }
 
@@ -318,6 +328,27 @@ export function appReducer(state: AppState, action: Action): AppState {
           return next;
         }),
       };
+
+    case "campaigns_filter_set": {
+      const seen = new Set<CampaignStatus>();
+      const dedup: CampaignStatus[] = [];
+      for (const s of action.statuses) {
+        if (!seen.has(s)) {
+          seen.add(s);
+          dedup.push(s);
+        }
+      }
+      return { ...state, campaignFilter: dedup };
+    }
+
+    case "campaigns_filter_remove":
+      return {
+        ...state,
+        campaignFilter: state.campaignFilter.filter((s) => s !== action.status),
+      };
+
+    case "campaigns_filter_clear":
+      return { ...state, campaignFilter: [] };
 
     case "preset_applied": {
       const workflowCampaignId =
@@ -385,6 +416,7 @@ export function appReducer(state: AppState, action: Action): AppState {
         view: { kind: "section", name: "Статистика", campaignId: action.campaignId },
         workflowCommand: null,
         activeSection: "Статистика",
+        campaignFilter: [],
       };
 
     case "sidebar_nav":
@@ -393,6 +425,7 @@ export function appReducer(state: AppState, action: Action): AppState {
         view: { kind: "section", name: action.section },
         workflowCommand: null,
         activeSection: action.section,
+        campaignFilter: [],
       };
 
     case "flyout_open":
@@ -433,6 +466,7 @@ export function appReducer(state: AppState, action: Action): AppState {
         workflowNodeCommand: null,
         workflowStructuralCommands: null,
         aiReply: null,
+        campaignFilter: [],
       };
 
     case "restore_address": {
@@ -448,6 +482,7 @@ export function appReducer(state: AppState, action: Action): AppState {
         workflowNodeCommand: null,
         workflowStructuralCommands: null,
         aiReply: null,
+        campaignFilter: [],
       };
     }
   }

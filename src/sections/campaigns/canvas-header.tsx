@@ -1,8 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Pencil } from "lucide-react";
+import { ChevronDown, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ButtonGroup } from "@/components/ui/button-group";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
   Dialog,
@@ -13,6 +20,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import type { Campaign, Signal } from "@/state/app-state";
+import { ScheduleCampaignDialog } from "./schedule-campaign-dialog";
 
 export interface CanvasHeaderToast {
   kind: "error" | "info";
@@ -27,6 +35,7 @@ interface CanvasHeaderProps {
   onRename: (name: string) => void;
   onSaveDraft: () => void;
   onLaunch: () => void;
+  onSchedule: (iso: string) => void;
   onPause: () => void;
   onResume: () => void;
   onDuplicate: () => void;
@@ -53,6 +62,7 @@ export function CanvasHeader({
   onRename,
   onSaveDraft,
   onLaunch,
+  onSchedule,
   onPause,
   onResume,
   onDuplicate,
@@ -64,6 +74,7 @@ export function CanvasHeader({
   const [editing, setEditing] = useState(false);
   const [draftName, setDraftName] = useState(campaign.name);
   const [confirm, setConfirm] = useState<ConfirmKind | null>(null);
+  const [schedulerOpen, setSchedulerOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Resync draft name when the campaign is renamed externally (e.g.,
@@ -149,7 +160,26 @@ export function CanvasHeader({
               <Button variant="outline" onClick={onSaveDraft}>
                 Сохранить черновик
               </Button>
-              <Button onClick={onLaunch}>Запустить</Button>
+              <ButtonGroup>
+                <Button onClick={onLaunch}>Запустить</Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    render={
+                      <Button
+                        size="icon"
+                        aria-label="Дополнительные действия запуска"
+                      >
+                        <ChevronDown className="h-4 w-4" />
+                      </Button>
+                    }
+                  />
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => setSchedulerOpen(true)}>
+                      Запланировать…
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </ButtonGroup>
             </>
           )}
           {campaign.status === "active" && (
@@ -305,6 +335,13 @@ export function CanvasHeader({
           )}
         </DialogContent>
       </Dialog>
+
+      <ScheduleCampaignDialog
+        open={schedulerOpen}
+        onOpenChange={setSchedulerOpen}
+        onConfirm={onSchedule}
+        campaignName={campaign.name}
+      />
     </div>
   );
 }

@@ -4,6 +4,8 @@ import { useMemo } from "react";
 import { useAppDispatch, useAppState } from "@/state/app-state-context";
 import { CampaignCard } from "./campaign-card";
 import { CampaignsEmptyState } from "./campaigns-empty-state";
+import { CampaignFilterChips } from "./campaign-filter-chips";
+import { CampaignsNoResults } from "./campaigns-no-results";
 import type { Campaign } from "@/state/app-state";
 
 function relevantTimestamp(c: Campaign): string {
@@ -11,7 +13,7 @@ function relevantTimestamp(c: Campaign): string {
 }
 
 export function CampaignsSection() {
-  const { signals, campaigns } = useAppState();
+  const { signals, campaigns, campaignFilter } = useAppState();
   const dispatch = useAppDispatch();
 
   const sorted = useMemo(
@@ -20,6 +22,14 @@ export function CampaignsSection() {
         relevantTimestamp(a) < relevantTimestamp(b) ? 1 : -1
       ),
     [campaigns]
+  );
+
+  const filtered = useMemo(
+    () =>
+      campaignFilter.length === 0
+        ? sorted
+        : sorted.filter((c) => campaignFilter.includes(c.status)),
+    [sorted, campaignFilter]
   );
 
   const signalById = useMemo(
@@ -48,16 +58,21 @@ export function CampaignsSection() {
         <h1 className="mb-6 text-[38px] font-semibold leading-[46px] tracking-tight">
           Кампании
         </h1>
-        <div className="flex flex-col gap-3">
-          {sorted.map((c) => (
-            <CampaignCard
-              key={c.id}
-              campaign={c}
-              signal={signalById.get(c.signalId)}
-              onOpen={(id) => dispatch({ type: "campaign_opened", id })}
-            />
-          ))}
-        </div>
+        <CampaignFilterChips statuses={campaignFilter} />
+        {filtered.length === 0 ? (
+          <CampaignsNoResults />
+        ) : (
+          <div className="flex flex-col gap-3">
+            {filtered.map((c) => (
+              <CampaignCard
+                key={c.id}
+                campaign={c}
+                signal={signalById.get(c.signalId)}
+                onOpen={(id) => dispatch({ type: "campaign_opened", id })}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

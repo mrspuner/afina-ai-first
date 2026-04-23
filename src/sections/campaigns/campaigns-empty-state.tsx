@@ -1,7 +1,6 @@
 "use client";
 
-import { ArrowRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { GhostCard } from "@/components/ui/ghost-card";
 
 interface CampaignsEmptyStateProps {
   onGoToSignals: () => void;
@@ -9,14 +8,10 @@ interface CampaignsEmptyStateProps {
 
 export function CampaignsEmptyState({ onGoToSignals }: CampaignsEmptyStateProps) {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center py-16">
-      <p className="mb-4 max-w-sm text-center text-sm text-muted-foreground">
-        Кампании создаются из Сигналов
-      </p>
-      <Button onClick={onGoToSignals}>
-        Создать сигнал
-        <ArrowRight className="h-4 w-4" />
-      </Button>
-    </div>
+    <GhostCard
+      description="У вас ещё нет кампаний. Создайте сигнал — кампания появится здесь."
+      actionLabel="Создать сигнал"
+      onAction={onGoToSignals}
+    />
   );
 }
