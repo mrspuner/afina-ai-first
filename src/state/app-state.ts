@@ -95,6 +95,7 @@ export type AppState = {
   activeSection: SectionName | null;
   campaignFilter: CampaignStatus[];
   campaignSort: CampaignSort;
+  clientDirection: string;
 };
 
 export type Action =
@@ -132,7 +133,8 @@ export type Action =
   | { type: "flyout_signal_select"; id: string; name: string }
   | { type: "flyout_campaign_select" }
   | { type: "go_welcome" }
-  | { type: "restore_address"; address: ViewAddress };
+  | { type: "restore_address"; address: ViewAddress }
+  | { type: "client_direction_set"; direction: string };
 
 export const initialState: AppState = {
   view: { kind: "welcome" },
@@ -147,6 +149,7 @@ export const initialState: AppState = {
   activeSection: null,
   campaignFilter: [],
   campaignSort: "default",
+  clientDirection: "finance",
 };
 
 export function appReducer(state: AppState, action: Action): AppState {
@@ -507,6 +510,9 @@ export function appReducer(state: AppState, action: Action): AppState {
         campaignSort: "default",
       };
     }
+
+    case "client_direction_set":
+      return { ...state, clientDirection: action.direction };
   }
 }
 
