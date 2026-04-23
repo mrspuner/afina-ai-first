@@ -1,4 +1,4 @@
-export type Msg = { role: "user" | "bot"; text: string };
+export type Msg = { id: number; role: "user" | "bot"; text: string };
 
 export type Chip = {
   id: string;

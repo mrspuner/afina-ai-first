@@ -200,16 +200,29 @@ export function ShellBottomBar() {
         <div
           className={cn(
             "flex w-full max-w-[720px] flex-col gap-3 rounded-[34px] p-6",
-            // Outer frosted card (same on all views).
-            "bg-[rgba(10,10,10,0.55)] backdrop-blur-[2px]",
-            // Drop shadow that lifts the card off the background so it stops
-            // "просвечивать" on busy canvases.
-            "shadow-[0_12px_32px_-8px_rgba(0,0,0,0.55),0_-8px_24px_-12px_rgba(0,0,0,0.35)]"
+            // Outer frosted card (Figma node 18750:213937): dark translucent
+            // panel with a subtle 2px backdrop blur — no outer shadow, the
+            // "solidity" comes from the inner InputGroup's 17px/9px halo.
+            "bg-[rgba(10,10,10,0.55)] backdrop-blur-[2px]"
           )}
         >
           <PromptInput
             onSubmit={handlePromptSubmit}
-            className="rounded-[10px] border border-white/15 bg-white/5 backdrop-blur-[14.8px] shadow-[0_0_17px_9px_rgba(0,0,0,0.19)]"
+            // `className` lands on the <form>, but the visual wrapper is the
+            // inner <InputGroup data-slot="input-group">. Override the
+            // shadcn defaults (border-input, dark:bg-input/30, rounded-lg)
+            // via a descendant selector so the PromptBar matches the Figma:
+            //   bg rgba(255,255,255,0.05) + border rgba(255,255,255,0.15)
+            //   rounded-[10px] + backdrop-blur-[14.8px] + soft dark halo.
+            className={cn(
+              "[&_[data-slot=input-group]]:rounded-[10px]!",
+              "[&_[data-slot=input-group]]:border!",
+              "[&_[data-slot=input-group]]:border-white/15!",
+              "[&_[data-slot=input-group]]:bg-white/5!",
+              "dark:[&_[data-slot=input-group]]:bg-white/5!",
+              "[&_[data-slot=input-group]]:backdrop-blur-[14.8px]",
+              "[&_[data-slot=input-group]]:shadow-[0_0_17px_9px_rgba(0,0,0,0.19)]"
+            )}
           >
             <AttachmentFileList />
             <PromptInputBody>

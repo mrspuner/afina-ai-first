@@ -16,9 +16,15 @@ import {
 export type OnboardingChatState = {
   history: Msg[];
   chips: Chip[];
+  thinking: boolean;
   submitChip: (chip: Chip) => void;
   submitFreeText: (text: string) => void;
 };
+
+// Simulated LLM generation delay before the bot reply materializes. Tuned to
+// feel like real text generation — long enough that the user notices the
+// "thinking" indicator, short enough that the flow doesn't stall.
+const THINK_DELAY_MS = 900;
 
 export function useOnboardingChat(): OnboardingChatState {
   const state = useAppState();
@@ -26,19 +32,38 @@ export function useOnboardingChat(): OnboardingChatState {
   const done = isCampaignDone(state);
   const onWelcome = isOnWelcome(state);
 
+  const msgIdRef = useRef(0);
+  const nextId = () => ++msgIdRef.current;
+
   const [history, setHistory] = useState<Msg[]>([]);
   const [chips, setChips] = useState<Chip[]>(
     done ? POST_ONBOARDING_CHIPS : WAVE_0_CHIPS
   );
+  const [thinking, setThinking] = useState(false);
 
-  // Reset when the user (re-)enters welcome without having finished onboarding,
-  // or when the `done` flag flips (first campaign launched → post-onboarding).
+  const replyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clearReplyTimer = () => {
+    if (replyTimerRef.current) {
+      clearTimeout(replyTimerRef.current);
+      replyTimerRef.current = null;
+    }
+  };
+
+  // Unmount cleanup — cancel any pending simulated reply.
+  useEffect(() => {
+    return () => clearReplyTimer();
+  }, []);
+
+  // Reset when the user (re-)enters welcome without finishing onboarding,
+  // or when `done` flips (first campaign launched → post-onboarding).
   const prevOnWelcome = useRef(onWelcome);
   const prevDone = useRef(done);
   useEffect(() => {
     const enteredWelcome = !prevOnWelcome.current && onWelcome;
     const doneChanged = prevDone.current !== done;
     if (enteredWelcome || doneChanged) {
+      clearReplyTimer();
+      setThinking(false);
       setHistory([]);
       setChips(done ? POST_ONBOARDING_CHIPS : WAVE_0_CHIPS);
     }
@@ -46,58 +71,77 @@ export function useOnboardingChat(): OnboardingChatState {
     prevDone.current = done;
   }, [onWelcome, done]);
 
+  const queueBotReply = useCallback(
+    (botText: string, chipsAfter: Chip[]) => {
+      clearReplyTimer();
+      setThinking(true);
+      setChips([]);
+      replyTimerRef.current = setTimeout(() => {
+        setHistory((h) => [...h, { id: nextId(), role: "bot", text: botText }]);
+        setChips(chipsAfter);
+        setThinking(false);
+        replyTimerRef.current = null;
+      }, THINK_DELAY_MS);
+    },
+    []
+  );
+
   const submitChip = useCallback(
     (chip: Chip) => {
-      const userMsg: Msg = { role: "user", text: chip.label };
+      const userMsg: Msg = { id: nextId(), role: "user", text: chip.label };
 
       if (!done) {
-        // Terminal onboarding chip — take user straight into the signal
-        // creation wizard (the 6-scenario picker is step 1).
+        // Terminal onboarding chip — user goes straight into the signal
+        // creation wizard (6-scenario picker is step 1).
         if (chip.next === "create-signal") {
+          clearReplyTimer();
+          setThinking(false);
           setHistory((h) => [...h, userMsg]);
+          setChips([]);
           dispatch({ type: "start_signal_flow" });
           return;
         }
         const node = WAVES[chip.next];
         if (!node) return;
-        setHistory((h) => [...h, userMsg, { role: "bot", text: node.answer }]);
-        // The wave-3 "extra question" chip is single-use: once the user asks
-        // it (or after a wave-2 chip leads us to the shared wave-3 answer and
-        // the user re-asks it), the chip disappears and only
-        // "Создать первый сигнал →" remains.
-        if (chip.next === "wave-3-repeat") {
-          setChips(node.chips.filter((c) => c.next === "create-signal"));
-        } else {
-          setChips(node.chips);
-        }
+        setHistory((h) => [...h, userMsg]);
+        // Wave-3 "extra question" is single-use — after it's asked, leave
+        // only "Создать первый сигнал →" in the chip row.
+        const nextChips =
+          chip.next === "wave-3-repeat"
+            ? node.chips.filter((c) => c.next === "create-signal")
+            : node.chips;
+        queueBotReply(node.answer, nextChips);
         return;
       }
 
       if (chip.next === "post-create-signal") {
+        clearReplyTimer();
+        setThinking(false);
         setHistory((h) => [...h, userMsg]);
+        setChips([]);
         dispatch({ type: "start_signal_flow" });
         return;
       }
       if (chip.next === "post-create-campaign") {
-        setHistory((h) => [
-          ...h,
-          userMsg,
-          { role: "bot", text: POST_CAMPAIGN_REPLY },
-        ]);
+        setHistory((h) => [...h, userMsg]);
+        queueBotReply(POST_CAMPAIGN_REPLY, POST_ONBOARDING_CHIPS);
       }
     },
-    [dispatch, done]
+    [dispatch, done, queueBotReply]
   );
 
-  const submitFreeText = useCallback((text: string) => {
-    const trimmed = text.trim();
-    if (!trimmed) return;
-    setHistory((h) => [
-      ...h,
-      { role: "user", text: trimmed },
-      { role: "bot", text: FREEFORM_REPLY },
-    ]);
-  }, []);
+  const submitFreeText = useCallback(
+    (text: string) => {
+      const trimmed = text.trim();
+      if (!trimmed) return;
+      setHistory((h) => [
+        ...h,
+        { id: nextId(), role: "user", text: trimmed },
+      ]);
+      queueBotReply(FREEFORM_REPLY, done ? POST_ONBOARDING_CHIPS : chips);
+    },
+    [queueBotReply, done, chips]
+  );
 
-  return { history, chips, submitChip, submitFreeText };
+  return { history, chips, thinking, submitChip, submitFreeText };
 }
