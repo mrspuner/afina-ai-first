@@ -39,7 +39,7 @@ test.describe("Welcome onboarding chat (empty preset)", () => {
     ).toBeVisible();
   });
 
-  test("terminal chip opens LaunchFlyout", async ({ page }) => {
+  test("terminal chip starts the signal creation wizard", async ({ page }) => {
     await page.goto("/");
     await page
       .getByRole("button", { name: "Откуда берутся мои данные?" })
@@ -51,7 +51,45 @@ test.describe("Welcome onboarding chat (empty preset)", () => {
       .getByRole("button", { name: "Создать первый сигнал →" })
       .click();
 
-    await expect(page.getByRole("dialog", { name: "Запустить" })).toBeVisible();
+    // Lands directly on the 6-scenario picker (step 1 of CampaignWorkspace)
+    await expect(
+      page.getByRole("heading", { name: "Выберите тип сигнала" })
+    ).toBeVisible();
+  });
+
+  test("wave 3 extra question is single-use, only 'Создать первый сигнал' remains", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await page
+      .getByRole("button", { name: "Что такое сигнал и кампания?" })
+      .click();
+    await page
+      .getByRole("button", { name: "Какие сценарии кампаний бывают?" })
+      .click();
+    // Both wave-3 chips visible on first landing
+    await expect(
+      page.getByRole("button", {
+        name: "Как платформа узнаёт об активности моих клиентов?",
+      })
+    ).toBeVisible();
+
+    // Ask the extra question
+    await page
+      .getByRole("button", {
+        name: "Как платформа узнаёт об активности моих клиентов?",
+      })
+      .click();
+
+    // Extra-question chip is gone, terminal chip remains
+    await expect(
+      page.getByRole("button", {
+        name: "Как платформа узнаёт об активности моих клиентов?",
+      })
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "Создать первый сигнал →" })
+    ).toBeVisible();
   });
 
   test("history is reset when user leaves welcome and returns", async ({

@@ -46,7 +46,7 @@ export function OnboardingChatChips({
 }) {
   if (chips.length === 0) return null;
   return (
-    <div className="flex flex-wrap justify-center gap-2">
+    <div className="flex flex-wrap justify-start gap-2">
       {chips.map((c) => (
         <button
           key={c.id}

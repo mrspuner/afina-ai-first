@@ -12,7 +12,7 @@ export function WelcomeView({ chat }: { chat: OnboardingChatState }) {
 
   return (
     <div
-      className="flex flex-1 flex-col items-center overflow-y-auto px-6 pt-16"
+      className="flex flex-1 flex-col items-center justify-center overflow-y-auto px-6 pt-16"
       style={{ paddingBottom: "calc(var(--promptbar-height, 220px) + 40px)" }}
     >
       <div className="flex w-full max-w-2xl flex-col items-center gap-8">
