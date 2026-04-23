@@ -6,6 +6,8 @@ import { AppSidebar } from "@/sections/shell/app-sidebar";
 import { LaunchFlyout } from "@/sections/shell/launch-flyout";
 import { ShellBottomBar } from "@/sections/shell/shell-bottom-bar";
 import { WelcomeSection } from "@/sections/welcome/welcome-section";
+import { WelcomeChatProvider } from "@/sections/welcome/welcome-chat-context";
+import { useOnboardingChat } from "@/sections/welcome/use-onboarding-chat";
 import { GuidedSignalSection } from "@/sections/signals/guided-signal-section";
 import { SignalsSection } from "@/sections/signals/signals-section";
 import { CampaignsSection } from "@/sections/campaigns/campaigns-section";
@@ -17,6 +19,7 @@ import { DevPanel } from "@/components/dev/dev-panel";
 export default function Home() {
   const { view, launchFlyoutOpen, activeSection } = useAppState();
   const dispatch = useAppDispatch();
+  const welcomeChat = useOnboardingChat();
 
   function renderMain() {
     if (view.kind === "welcome") return <WelcomeSection />;
@@ -41,24 +44,26 @@ export default function Home() {
 
   return (
     <PromptInputProvider>
-      <div className="flex h-screen overflow-hidden bg-background">
-        <AppSidebar
-          activeNav={activeSection ?? undefined}
-          onNavChange={(nav) => dispatch({ type: "sidebar_nav", section: nav })}
-          onLaunchOpen={() => dispatch({ type: "flyout_open" })}
-          onLogoClick={() => dispatch({ type: "go_welcome" })}
-          flyoutOpen={launchFlyoutOpen}
-        />
-        <LaunchFlyout
-          open={launchFlyoutOpen}
-          onClose={() => dispatch({ type: "flyout_close" })}
-        />
-        <div className="relative flex flex-1 flex-col overflow-hidden">
-          {renderMain()}
-          <ShellBottomBar />
-          <DevPanel />
+      <WelcomeChatProvider value={welcomeChat}>
+        <div className="flex h-screen overflow-hidden bg-background">
+          <AppSidebar
+            activeNav={activeSection ?? undefined}
+            onNavChange={(nav) => dispatch({ type: "sidebar_nav", section: nav })}
+            onLaunchOpen={() => dispatch({ type: "flyout_open" })}
+            onLogoClick={() => dispatch({ type: "go_welcome" })}
+            flyoutOpen={launchFlyoutOpen}
+          />
+          <LaunchFlyout
+            open={launchFlyoutOpen}
+            onClose={() => dispatch({ type: "flyout_close" })}
+          />
+          <div className="relative flex flex-1 flex-col overflow-hidden">
+            {renderMain()}
+            <ShellBottomBar />
+            <DevPanel />
+          </div>
         </div>
-      </div>
+      </WelcomeChatProvider>
     </PromptInputProvider>
   );
 }

@@ -26,7 +26,9 @@ export function OnboardingSteps() {
       n: 2,
       label: "Запуск кампании",
       active: isStep2Active(state),
-      onClick: undefined,
+      onClick: isStep2Active(state)
+        ? () => dispatch({ type: "step2_clicked" })
+        : undefined,
     },
     {
       n: 3,
