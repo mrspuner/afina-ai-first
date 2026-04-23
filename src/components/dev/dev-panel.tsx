@@ -3,16 +3,21 @@
 import { useEffect, useState } from "react";
 import { useAppState, useAppDispatch } from "@/state/app-state-context";
 import { PRESETS, type PresetKey } from "@/state/presets";
+import {
+  BUSINESS_DIRECTIONS,
+  DEFAULT_DIRECTION_ID,
+} from "@/data/business-directions";
 import { cn } from "@/lib/utils";
 import { useDevHotkey } from "./use-dev-hotkey";
 
 const STORAGE_KEY = "afina.dev.preset";
+const DIRECTION_KEY = "afina.dev.direction";
 const KEYS: PresetKey[] = ["empty", "mid", "full"];
 
 export function DevPanel() {
   const [open, setOpen] = useState(false);
   const [activeKey, setActiveKey] = useState<PresetKey>("empty");
-  const { signals, campaigns } = useAppState();
+  const { signals, campaigns, clientDirection } = useAppState();
   const dispatch = useAppDispatch();
 
   // Hydration-safe: read localStorage after mount. setActiveKey + dispatch
@@ -26,6 +31,13 @@ export function DevPanel() {
       setActiveKey(saved);
       dispatch({ type: "preset_applied", preset: PRESETS[saved] });
     }
+    const savedDirection = window.localStorage.getItem(DIRECTION_KEY);
+    if (
+      savedDirection &&
+      BUSINESS_DIRECTIONS.some((d) => d.id === savedDirection)
+    ) {
+      dispatch({ type: "client_direction_set", direction: savedDirection });
+    }
   }, [dispatch]);
 
   useDevHotkey(() => setOpen((o) => !o));
@@ -36,10 +48,20 @@ export function DevPanel() {
     dispatch({ type: "preset_applied", preset: PRESETS[key] });
   }
 
+  function applyDirection(id: string) {
+    window.localStorage.setItem(DIRECTION_KEY, id);
+    dispatch({ type: "client_direction_set", direction: id });
+  }
+
   function clear() {
     window.localStorage.removeItem(STORAGE_KEY);
+    window.localStorage.removeItem(DIRECTION_KEY);
     setActiveKey("empty");
     dispatch({ type: "preset_applied", preset: PRESETS.empty });
+    dispatch({
+      type: "client_direction_set",
+      direction: DEFAULT_DIRECTION_ID,
+    });
   }
 
   if (!open) return null;
@@ -89,6 +111,23 @@ export function DevPanel() {
             </button>
           );
         })}
+      </div>
+
+      <div className="mt-3 border-t border-[#1f1f1f] pt-3">
+        <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.04em] text-[#888]">
+          Направление клиента
+        </div>
+        <select
+          value={clientDirection}
+          onChange={(e) => applyDirection(e.target.value)}
+          className="w-full rounded-md border border-[#2a2a2a] bg-[#1e1e1e] px-2 py-1.5 text-[12px] text-[#e5e5e5] outline-none transition-colors hover:bg-[#242424] focus:border-[#4ade80]"
+        >
+          {BUSINESS_DIRECTIONS.map((d) => (
+            <option key={d.id} value={d.id}>
+              {d.label}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className="mt-3 flex items-center justify-between border-t border-[#1f1f1f] pt-2.5">
