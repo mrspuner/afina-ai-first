@@ -25,6 +25,7 @@ import {
 } from "@/state/app-state";
 import { parseStructuralCommands } from "@/state/structural-commands";
 import { useWelcomeChat } from "@/sections/welcome/welcome-chat-context";
+import { OnboardingChatChips } from "@/sections/welcome/onboarding-chat-view";
 
 function AttachmentFileList() {
   const { files } = usePromptInputAttachments();
@@ -160,11 +161,12 @@ export function ShellBottomBar() {
     "Выберите шаг или задайте вопрос…";
 
   const isWorkflow = isWorkflowView(state);
+  const onWelcome = isOnWelcome(state);
   // Pin near bottom on welcome, section views (Сигналы / Кампании /
   // Статистика) and workflow. Transient wizard steps (guided-signal,
   // awaiting-campaign, campaign-select) keep the 3% offset so they don't
   // cover the step's primary CTA.
-  const pinnedToBottom = isWorkflow || view.kind === "section" || isOnWelcome(state);
+  const pinnedToBottom = isWorkflow || view.kind === "section" || onWelcome;
   const floatBottom = pinnedToBottom ? "20px" : "3%";
 
   const barRef = useRef<HTMLDivElement>(null);
@@ -191,41 +193,70 @@ export function ShellBottomBar() {
       <motion.div
         ref={barRef}
         className={cn(
-          "fixed left-[120px] right-0 z-30 px-8 py-3",
-          // Frosted-glass wrapper (uniform across welcome / section / workflow /
-          // transient). Replaces the former gradient fade-in that lived above
-          // the bar on non-workflow views.
-          "bg-background/55 backdrop-blur-md",
-          // Soft top gradient so the blur starts smoothly rather than with a
-          // hard edge where the wrapper begins.
-          "before:pointer-events-none before:absolute before:inset-x-0 before:-top-8 before:h-8",
-          "before:bg-gradient-to-b before:from-transparent before:to-background/55",
-          // Slight shadow darkens the content just above the frosted panel.
-          "shadow-[0_-8px_24px_-12px_rgba(0,0,0,0.35)]"
+          "fixed left-[120px] right-0 z-30 flex justify-center",
+          onWelcome ? "px-6" : "px-8 py-3",
+          // Non-welcome: frosted wrapper spanning the content area.
+          !onWelcome && [
+            "bg-background/55 backdrop-blur-md",
+            "before:pointer-events-none before:absolute before:inset-x-0 before:-top-8 before:h-8",
+            "before:bg-gradient-to-b before:from-transparent before:to-background/55",
+            "shadow-[0_-8px_24px_-12px_rgba(0,0,0,0.35)]",
+          ]
         )}
         initial={false}
         animate={{ bottom: floatBottom }}
         transition={{ duration: 0.55, ease: [0.32, 0.72, 0, 1] }}
       >
-        <div className="relative mx-auto flex w-full max-w-2xl flex-col gap-2">
-          <PromptInput onSubmit={handlePromptSubmit}>
-            <AttachmentFileList />
-            <PromptInputBody>
-              <PromptInputTextarea
-                className="min-h-[52px] max-h-[120px]"
-                placeholder={chatPlaceholder}
+        {onWelcome ? (
+          <div className="flex w-full max-w-[720px] flex-col gap-3 rounded-[34px] bg-[rgba(10,10,10,0.55)] p-6 backdrop-blur-[2px]">
+            <PromptInput
+              onSubmit={handlePromptSubmit}
+              className="rounded-[10px] border border-white/15 bg-white/5 backdrop-blur-[14.8px] shadow-[0_0_17px_9px_rgba(0,0,0,0.19)]"
+            >
+              <AttachmentFileList />
+              <PromptInputBody>
+                <PromptInputTextarea
+                  className="min-h-[52px] max-h-[120px] bg-transparent text-[#fafafa] placeholder:text-muted-foreground"
+                  placeholder={chatPlaceholder}
+                />
+              </PromptInputBody>
+              <PromptInputFooter>
+                <PromptInputTools>
+                  <PromptInputButton tooltip="Голосовой ввод">
+                    <Mic className="h-4 w-4" />
+                  </PromptInputButton>
+                </PromptInputTools>
+                <PromptInputSubmit />
+              </PromptInputFooter>
+            </PromptInput>
+            {welcomeChat && (
+              <OnboardingChatChips
+                chips={welcomeChat.chips}
+                onChipClick={welcomeChat.submitChip}
               />
-            </PromptInputBody>
-            <PromptInputFooter>
-              <PromptInputTools>
-                <PromptInputButton tooltip="Голосовой ввод">
-                  <Mic className="h-4 w-4" />
-                </PromptInputButton>
-              </PromptInputTools>
-              <PromptInputSubmit />
-            </PromptInputFooter>
-          </PromptInput>
-        </div>
+            )}
+          </div>
+        ) : (
+          <div className="relative mx-auto flex w-full max-w-2xl flex-col gap-2">
+            <PromptInput onSubmit={handlePromptSubmit}>
+              <AttachmentFileList />
+              <PromptInputBody>
+                <PromptInputTextarea
+                  className="min-h-[52px] max-h-[120px]"
+                  placeholder={chatPlaceholder}
+                />
+              </PromptInputBody>
+              <PromptInputFooter>
+                <PromptInputTools>
+                  <PromptInputButton tooltip="Голосовой ввод">
+                    <Mic className="h-4 w-4" />
+                  </PromptInputButton>
+                </PromptInputTools>
+                <PromptInputSubmit />
+              </PromptInputFooter>
+            </PromptInput>
+          </div>
+        )}
       </motion.div>
     </>
   );
