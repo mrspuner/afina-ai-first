@@ -2,12 +2,14 @@
 
 import { createContext, useContext, useReducer, type ReactNode, type Dispatch } from "react";
 import { appReducer, initialState, type AppState, type Action } from "./app-state";
+import { useViewHistory } from "@/hooks/use-view-history";
 
 const StateContext = createContext<AppState | null>(null);
 const DispatchContext = createContext<Dispatch<Action> | null>(null);
 
 export function AppStateProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(appReducer, initialState);
+  useViewHistory(state, dispatch);
   return (
     <StateContext.Provider value={state}>
       <DispatchContext.Provider value={dispatch}>

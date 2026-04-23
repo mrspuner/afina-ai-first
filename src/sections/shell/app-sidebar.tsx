@@ -26,6 +26,7 @@ interface AppSidebarProps {
   activeNav?: SectionName;
   onNavChange?: (nav: SectionName) => void;
   onLaunchOpen?: () => void;
+  onLogoClick?: () => void;
   flyoutOpen?: boolean;
 }
 
@@ -33,6 +34,7 @@ export function AppSidebar({
   activeNav,
   onNavChange,
   onLaunchOpen,
+  onLogoClick,
   flyoutOpen = false,
 }: AppSidebarProps) {
   const navItems = [
@@ -46,9 +48,14 @@ export function AppSidebar({
       {/* Верхняя группа: лого + навигация */}
       <div className="flex flex-col gap-5">
         {/* Logo */}
-        <div className="p-5">
+        <button
+          type="button"
+          onClick={onLogoClick}
+          aria-label="На главный экран"
+          className="p-5 text-left transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
           <Image src="/logo.svg" alt="Afina" width={80} height={20} priority />
-        </div>
+        </button>
 
         <nav className="flex flex-col gap-6 px-2">
           {/* Запустить */}

@@ -46,6 +46,7 @@ export default function Home() {
           activeNav={activeSection ?? undefined}
           onNavChange={(nav) => dispatch({ type: "sidebar_nav", section: nav })}
           onLaunchOpen={() => dispatch({ type: "flyout_open" })}
+          onLogoClick={() => dispatch({ type: "go_welcome" })}
           flyoutOpen={launchFlyoutOpen}
         />
         <LaunchFlyout

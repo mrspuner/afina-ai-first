@@ -59,6 +59,18 @@ export type View =
   | { kind: "workflow"; campaign: { id: string; name: string }; launched: boolean }
   | { kind: "section"; name: SectionName; campaignId?: string };
 
+// A "browser-history address" — what we persist to history.state so back/forward
+// can restore a section. Intentionally coarser than View: no launched flag, no
+// selectedWorkflowNode, no in-flight commands. On popstate we rehydrate the
+// full View from this address + current campaigns[].
+export type ViewAddress =
+  | { kind: "welcome" }
+  | { kind: "guided-signal"; scenarioId?: string; scenarioName?: string }
+  | { kind: "awaiting-campaign" }
+  | { kind: "campaign-select" }
+  | { kind: "workflow"; campaignId: string }
+  | { kind: "section"; name: SectionName; campaignId?: string };
+
 export type AppState = {
   view: View;
   signals: Signal[];
@@ -102,7 +114,9 @@ export type Action =
   | { type: "flyout_open" }
   | { type: "flyout_close" }
   | { type: "flyout_signal_select"; id: string; name: string }
-  | { type: "flyout_campaign_select" };
+  | { type: "flyout_campaign_select" }
+  | { type: "go_welcome" }
+  | { type: "restore_address"; address: ViewAddress };
 
 export const initialState: AppState = {
   view: { kind: "welcome" },
@@ -407,6 +421,91 @@ export function appReducer(state: AppState, action: Action): AppState {
         activeSection: hasSignal ? null : "Сигналы",
       };
     }
+
+    case "go_welcome":
+      return {
+        ...state,
+        view: { kind: "welcome" },
+        activeSection: null,
+        launchFlyoutOpen: false,
+        selectedWorkflowNode: null,
+        workflowCommand: null,
+        workflowNodeCommand: null,
+        workflowStructuralCommands: null,
+        aiReply: null,
+      };
+
+    case "restore_address": {
+      const addr = action.address;
+      const rebuilt = rebuildViewFromAddress(addr, state.campaigns);
+      return {
+        ...state,
+        view: rebuilt,
+        activeSection: addr.kind === "section" ? addr.name : null,
+        launchFlyoutOpen: false,
+        selectedWorkflowNode: null,
+        workflowCommand: null,
+        workflowNodeCommand: null,
+        workflowStructuralCommands: null,
+        aiReply: null,
+      };
+    }
+  }
+}
+
+function rebuildViewFromAddress(addr: ViewAddress, campaigns: Campaign[]): View {
+  switch (addr.kind) {
+    case "welcome":
+      return { kind: "welcome" };
+    case "guided-signal":
+      return {
+        kind: "guided-signal",
+        initialScenario:
+          addr.scenarioId && addr.scenarioName
+            ? { id: addr.scenarioId, name: addr.scenarioName }
+            : undefined,
+      };
+    case "awaiting-campaign":
+      return { kind: "awaiting-campaign" };
+    case "campaign-select":
+      return { kind: "campaign-select" };
+    case "workflow": {
+      const c = campaigns.find((cc) => cc.id === addr.campaignId);
+      // If the campaign no longer exists, fall back to campaign list rather than
+      // rendering an empty workflow.
+      if (!c) return { kind: "section", name: "Кампании" };
+      return {
+        kind: "workflow",
+        campaign: { id: c.id, name: c.name },
+        launched:
+          c.status === "active" ||
+          c.status === "paused" ||
+          c.status === "completed",
+      };
+    }
+    case "section":
+      return { kind: "section", name: addr.name, campaignId: addr.campaignId };
+  }
+}
+
+export function viewToAddress(view: View): ViewAddress {
+  switch (view.kind) {
+    case "welcome":
+      return { kind: "welcome" };
+    case "guided-signal":
+      return {
+        kind: "guided-signal",
+        scenarioId: view.initialScenario?.id,
+        scenarioName: view.initialScenario?.name,
+      };
+    case "awaiting-campaign":
+      return { kind: "awaiting-campaign" };
+    case "campaign-select":
+      return { kind: "campaign-select" };
+    case "workflow":
+      return { kind: "workflow", campaignId: view.campaign.id };
+    case "section":
+      return { kind: "section", name: view.name, campaignId: view.campaignId };
   }
 }
 
