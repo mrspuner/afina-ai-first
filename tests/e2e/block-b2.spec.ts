@@ -53,10 +53,11 @@ test.describe("Block B1 — PromptBar pinned + canvas overlay", () => {
     const shell = await promptBarShellLocator(page).boundingBox();
     expect(shell).not.toBeNull();
     if (shell) {
-      // Shell's bottom edge should sit at viewport bottom (bottom: 0%).
-      expect(
-        Math.abs(viewport.height - (shell.y + shell.height))
-      ).toBeLessThan(10);
+      // Shell is now pinned ≈ 20px above the viewport bottom (frosted
+      // floating panel). Allow ±8px variance around 20 for motion settle.
+      const gap = viewport.height - (shell.y + shell.height);
+      expect(gap).toBeGreaterThanOrEqual(12);
+      expect(gap).toBeLessThanOrEqual(28);
     }
   });
 

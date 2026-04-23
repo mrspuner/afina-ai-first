@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { motion } from "motion/react";
-import { Mic, ChevronRight } from "lucide-react";
+import { Mic } from "lucide-react";
 import type { PromptInputMessage } from "@/components/ai-elements/prompt-input";
 import {
   PromptInput,
@@ -19,15 +19,12 @@ import {
 import { cn } from "@/lib/utils";
 import { useAppState, useAppDispatch } from "@/state/app-state-context";
 import {
-  isCampaignDone,
   isOnWelcome,
-  isStep1Active,
-  isStep2Active,
-  isStep3Active,
   isWorkflowView,
   type View,
 } from "@/state/app-state";
 import { parseStructuralCommands } from "@/state/structural-commands";
+import { useWelcomeChat } from "@/sections/welcome/welcome-chat-context";
 
 function AttachmentFileList() {
   const { files } = usePromptInputAttachments();
@@ -113,23 +110,17 @@ function parseTagSegments(
 export function ShellBottomBar() {
   const state = useAppState();
   const dispatch = useAppDispatch();
-  const { view, signals, selectedWorkflowNode } = state;
-  const latestSignal = signals.length > 0 ? signals[signals.length - 1] : null;
-
-  const [stepTwoNew, setStepTwoNew] = useState(false);
-  const prevViewKind = useRef<View["kind"] | null>(null);
-  useEffect(() => {
-    if (view.kind === "awaiting-campaign" && prevViewKind.current !== "awaiting-campaign") {
-      setStepTwoNew(true);
-      const t = setTimeout(() => setStepTwoNew(false), 1400);
-      prevViewKind.current = view.kind;
-      return () => clearTimeout(t);
-    }
-    prevViewKind.current = view.kind;
-  }, [view.kind]);
+  const { view, selectedWorkflowNode } = state;
+  const welcomeChat = useWelcomeChat();
 
   function handlePromptSubmit(message: PromptInputMessage) {
     const rawText = message.text ?? "";
+
+    if (isOnWelcome(state)) {
+      welcomeChat?.submitFreeText(rawText);
+      return;
+    }
+
     if (view.kind !== "workflow" || view.launched) return;
 
     const structural = parseStructuralCommands(rawText);
@@ -161,6 +152,7 @@ export function ShellBottomBar() {
   }
 
   const chatPlaceholder =
+    isOnWelcome(state) ? "Задайте вопрос…" :
     isWorkflowView(state) ? "Опишите изменение сценария..." :
     view.kind === "campaign-select" ? "Опишите вашу кампанию..." :
     view.kind === "guided-signal" ? "Введите ваши параметры или задайте вопрос" :
@@ -168,12 +160,12 @@ export function ShellBottomBar() {
     "Выберите шаг или задайте вопрос…";
 
   const isWorkflow = isWorkflowView(state);
-  // Pin to bottom on section views (Сигналы / Кампании / Статистика) and on
-  // workflow. Transient wizard steps (guided-signal, awaiting-campaign,
-  // campaign-select) keep the 3% offset so they don't cover the step's
-  // primary CTA. Welcome renders its own inline PromptBar inside WelcomeView.
-  const pinnedToBottom = isWorkflow || view.kind === "section";
-  const floatBottom = pinnedToBottom ? "0%" : "3%";
+  // Pin near bottom on welcome, section views (Сигналы / Кампании /
+  // Статистика) and workflow. Transient wizard steps (guided-signal,
+  // awaiting-campaign, campaign-select) keep the 3% offset so they don't
+  // cover the step's primary CTA.
+  const pinnedToBottom = isWorkflow || view.kind === "section" || isOnWelcome(state);
+  const floatBottom = pinnedToBottom ? "20px" : "3%";
 
   const barRef = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
@@ -192,8 +184,6 @@ export function ShellBottomBar() {
     };
   }, [view.kind]);
 
-  if (isOnWelcome(state)) return null;
-
   return (
     <>
       <SelectedNodeEffect selected={selectedWorkflowNode} />
@@ -201,21 +191,30 @@ export function ShellBottomBar() {
       <motion.div
         ref={barRef}
         className={cn(
-          "fixed left-[120px] right-0 z-30 px-8 pb-4",
-          isWorkflow ? "bg-background/80 backdrop-blur-sm" : "bg-background"
+          "fixed left-[120px] right-0 z-30 px-8 py-3",
+          // Frosted-glass wrapper (uniform across welcome / section / workflow /
+          // transient). Replaces the former gradient fade-in that lived above
+          // the bar on non-workflow views.
+          "bg-background/55 backdrop-blur-md",
+          // Soft top gradient so the blur starts smoothly rather than with a
+          // hard edge where the wrapper begins.
+          "before:pointer-events-none before:absolute before:inset-x-0 before:-top-8 before:h-8",
+          "before:bg-gradient-to-b before:from-transparent before:to-background/55",
+          // Slight shadow darkens the content just above the frosted panel.
+          "shadow-[0_-8px_24px_-12px_rgba(0,0,0,0.35)]"
         )}
         initial={false}
         animate={{ bottom: floatBottom }}
         transition={{ duration: 0.55, ease: [0.32, 0.72, 0, 1] }}
       >
-        {!isWorkflow && (
-          <div className="pointer-events-none absolute inset-x-0 -top-10 h-10 bg-gradient-to-t from-background to-transparent" />
-        )}
-        <div className="relative mx-auto flex w-full max-w-2xl flex-col gap-2 pt-2">
+        <div className="relative mx-auto flex w-full max-w-2xl flex-col gap-2">
           <PromptInput onSubmit={handlePromptSubmit}>
             <AttachmentFileList />
             <PromptInputBody>
-              <PromptInputTextarea placeholder={chatPlaceholder} />
+              <PromptInputTextarea
+                className="min-h-[52px] max-h-[120px]"
+                placeholder={chatPlaceholder}
+              />
             </PromptInputBody>
             <PromptInputFooter>
               <PromptInputTools>
@@ -226,73 +225,6 @@ export function ShellBottomBar() {
               <PromptInputSubmit />
             </PromptInputFooter>
           </PromptInput>
-
-          {!isCampaignDone(state) && (
-            <div className="flex gap-2">
-              {([
-                {
-                  n: 1,
-                  label: "Получение сигнала",
-                  active: isStep1Active(state),
-                  onClick: isOnWelcome(state)
-                    ? () => dispatch({ type: "start_signal_flow" })
-                    : undefined,
-                },
-                {
-                  n: 2,
-                  label: "Запуск кампании",
-                  active: isStep2Active(state),
-                  onClick:
-                    view.kind === "awaiting-campaign"
-                      ? () => dispatch({ type: "step2_clicked" })
-                      : undefined,
-                },
-                {
-                  n: 3,
-                  label: "Статистика кампании",
-                  active: isStep3Active(state),
-                  onClick: undefined,
-                },
-              ] as const).map(({ n, label, active, onClick }) => (
-                <button
-                  key={n}
-                  type="button"
-                  disabled={!active}
-                  onClick={onClick}
-                  className={cn(
-                    "flex items-center gap-2 rounded-lg border px-3 py-2 text-left transition-colors",
-                    active
-                      ? onClick
-                        ? "cursor-pointer border-border bg-card hover:bg-accent"
-                        : "cursor-default border-border bg-card"
-                      : "cursor-not-allowed border-border/40 bg-card/40 opacity-35"
-                  )}
-                  style={
-                    stepTwoNew && n === 2
-                      ? { animation: "step-badge-pulse 1.4s ease-in-out" }
-                      : undefined
-                  }
-                >
-                  <span className="shrink-0 text-[11px] font-semibold text-muted-foreground">
-                    Шаг {n}
-                  </span>
-                  <div className="h-3 w-px shrink-0 bg-border" />
-                  <span className="text-sm font-medium text-foreground">{label}</span>
-                  {active && onClick && (
-                    <ChevronRight className="ml-1 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
-
-          <style>{`
-            @keyframes step-badge-pulse {
-              0%, 100% { border-color: #1e1e1e; box-shadow: none; }
-              20%, 60% { border-color: #4ade80; box-shadow: 0 0 8px rgba(74,222,128,0.35); }
-              40%, 80% { border-color: #1e1e1e; box-shadow: none; }
-            }
-          `}</style>
         </div>
       </motion.div>
     </>
