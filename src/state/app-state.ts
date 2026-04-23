@@ -9,6 +9,15 @@ export type SignalType =
   | "Возврат"
   | "Удержание";
 
+export const SIGNAL_TYPES = [
+  "Регистрация",
+  "Первая сделка",
+  "Апсейл",
+  "Реактивация",
+  "Возврат",
+  "Удержание",
+] as const satisfies readonly SignalType[];
+
 export type Signal = {
   id: string;
   type: SignalType;
@@ -21,6 +30,7 @@ export type Signal = {
   };
   createdAt: string;
   updatedAt: string;
+  isCustom?: boolean;
 };
 
 export type CampaignStatus =

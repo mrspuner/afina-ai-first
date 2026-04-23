@@ -1,5 +1,6 @@
 "use client";
 
+import { Card } from "@/components/ui/card";
 import { NewSignalMenu } from "./new-signal-menu";
 
 interface SignalsEmptyStateProps {
@@ -9,11 +10,14 @@ interface SignalsEmptyStateProps {
 
 export function SignalsEmptyState({ onCreate, onUpload }: SignalsEmptyStateProps) {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center py-16">
-      <p className="mb-4 max-w-sm text-center text-sm text-muted-foreground">
-        Ещё нет сигналов. Создайте первый — или загрузите готовую базу с устройства.
+    <Card className="gap-2 border-2 border-dashed border-border bg-transparent px-5 py-4 ring-0">
+      <p className="text-sm font-semibold text-foreground">Ещё нет сигналов</p>
+      <p className="text-xs text-muted-foreground">
+        Создайте первый — или загрузите готовую базу с устройства.
       </p>
-      <NewSignalMenu onCreate={onCreate} onUpload={onUpload} variant="primary" />
-    </div>
+      <div className="mt-2 flex items-center gap-2">
+        <NewSignalMenu onCreate={onCreate} onUpload={onUpload} variant="primary" />
+      </div>
+    </Card>
   );
 }
