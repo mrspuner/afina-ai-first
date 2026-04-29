@@ -664,6 +664,57 @@ describe("isCampaignDone", () => {
   });
 });
 
+describe("appReducer — survey actions", () => {
+  it("survey_updated patches fields without changing status", () => {
+    const next = appReducer(initialState, {
+      type: "survey_updated",
+      patch: { companyName: "Acme" },
+    });
+    expect(next.survey.companyName).toBe("Acme");
+    expect(next.survey.companyWebsite).toBe("");
+    expect(next.survey.directionId).toBeNull();
+    expect(next.surveyStatus).toBe("not_started");
+  });
+
+  it("survey_completed stamps the survey and flips status", () => {
+    const next = appReducer(initialState, {
+      type: "survey_completed",
+      survey: {
+        companyName: "Acme",
+        companyWebsite: "https://acme.com",
+        directionId: "banking",
+      },
+    });
+    expect(next.surveyStatus).toBe("completed");
+    expect(next.survey).toEqual({
+      companyName: "Acme",
+      companyWebsite: "https://acme.com",
+      directionId: "banking",
+    });
+  });
+
+  it("survey_skipped flips status without writing data", () => {
+    const next = appReducer(initialState, { type: "survey_skipped" });
+    expect(next.surveyStatus).toBe("skipped");
+    expect(next.survey).toEqual({
+      companyName: "",
+      companyWebsite: "",
+      directionId: null,
+    });
+  });
+
+  it("does not mutate unrelated slices", () => {
+    const state: AppState = {
+      ...initialState,
+      signals: [makeSignal()],
+      campaigns: [makeCampaign()],
+    };
+    const next = appReducer(state, { type: "survey_skipped" });
+    expect(next.signals).toBe(state.signals);
+    expect(next.campaigns).toBe(state.campaigns);
+  });
+});
+
 describe("appReducer — workflow_structural_commands", () => {
   it("workflow_structural_commands_submit captures ops and deselects", () => {
     const state: AppState = {
