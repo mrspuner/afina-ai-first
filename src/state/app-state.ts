@@ -150,7 +150,11 @@ export type Action =
   | { type: "client_direction_set"; direction: string }
   | { type: "survey_updated"; patch: Partial<Survey> }
   | { type: "survey_completed"; survey: Survey }
-  | { type: "survey_skipped" };
+  | { type: "survey_skipped" }
+  | { type: "balance_topup"; amount: number }
+  | { type: "signal_status_changed"; id: string; status: SignalStatus }
+  | { type: "signal_deleted"; id: string }
+  | { type: "signals_badge_set"; value: boolean };
 // PARALLEL-WORKTREE INSERTION POINT — survey actions (B), billing/signal-status actions (E).
 // Each worktree appends its own action variants to the union above; resolve merges by
 // keeping every appended line and adding the matching reducer case at the end of appReducer.
@@ -549,6 +553,38 @@ export function appReducer(state: AppState, action: Action): AppState {
 
     case "survey_skipped":
       return { ...state, surveyStatus: "skipped" };
+
+    case "balance_topup":
+      return { ...state, balance: state.balance + Math.max(0, action.amount) };
+
+    case "signal_status_changed": {
+      const exists = state.signals.some((s) => s.id === action.id);
+      if (!exists) return state;
+      return {
+        ...state,
+        signals: state.signals.map((s) =>
+          s.id === action.id
+            ? { ...s, status: action.status, updatedAt: new Date().toISOString() }
+            : s
+        ),
+        notifications:
+          action.status === "ready" || action.status === "error" || action.status === "expired"
+            ? { ...state.notifications, signalsBadge: true }
+            : state.notifications,
+      };
+    }
+
+    case "signal_deleted":
+      return {
+        ...state,
+        signals: state.signals.filter((s) => s.id !== action.id),
+      };
+
+    case "signals_badge_set":
+      return {
+        ...state,
+        notifications: { ...state.notifications, signalsBadge: action.value },
+      };
     // PARALLEL-WORTREE INSERTION POINT — append survey/billing/signal-status cases
     // immediately above this comment to keep merges trivial.
   }

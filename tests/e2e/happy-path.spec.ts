@@ -36,20 +36,24 @@ test("happy path: welcome → guided signal → campaign type → launch → sta
   await expect(page.getByText("test-base.csv")).toBeVisible();
   await page.getByRole("button", { name: "Далее" }).last().click();
 
-  // 8. Step 6: summary → Подтвердить и запустить
-  await expect(page.getByRole("heading", { name: "Проверьте настройки кампании" })).toBeVisible({
+  // 8. Step 6: summary → top-up via dev panel, then launch
+  await expect(page.getByRole("heading", { name: "Проверьте настройки сигнала" })).toBeVisible({
     timeout: 15_000,
   });
-  await page.getByRole("button", { name: "Подтвердить и запустить" }).click();
+  // Seed balance via dev panel so launch doesn't open the top-up modal.
+  await page.keyboard.press("Meta+Shift+E");
+  await page.getByRole("button", { name: "+ ₽ 10 000" }).click();
+  await page.keyboard.press("Meta+Shift+E");
+  await page.getByRole("button", { name: "Запустить" }).first().click();
 
-  // 9. Step 7: auto-progress (~4.2s) → Step 8 appears
-  await expect(page.getByRole("heading", { name: "Ваша кампания обрабатывается" })).toBeVisible();
+  // 9. Step 7: processing screen
+  await expect(page.getByRole("heading", { name: "Ваша база обрабатывается" })).toBeVisible();
 
-  // 10. Step 8: click Запустить кампанию
-  await expect(page.getByRole("heading", { name: /Мы собрали сигналы/ })).toBeVisible({
-    timeout: 10_000,
+  // 10. Step 8: click Использовать в кампании
+  await expect(page.getByRole("heading", { name: /Сигналы готовы/ })).toBeVisible({
+    timeout: 15_000,
   });
-  await page.getByRole("button", { name: "Запустить кампанию" }).click();
+  await page.getByRole("button", { name: "Использовать в кампании" }).click();
 
   // 11. CampaignTypeView: pick first campaign type
   await expect(page.getByText("Выберите тип кампании")).toBeVisible();

@@ -17,7 +17,7 @@ const KEYS: PresetKey[] = ["empty", "mid", "full"];
 export function DevPanel() {
   const [open, setOpen] = useState(false);
   const [activeKey, setActiveKey] = useState<PresetKey>("empty");
-  const { signals, campaigns, clientDirection } = useAppState();
+  const { signals, campaigns, clientDirection, balance } = useAppState();
   const dispatch = useAppDispatch();
 
   // Hydration-safe: read localStorage after mount. setActiveKey + dispatch
@@ -128,6 +128,33 @@ export function DevPanel() {
             </option>
           ))}
         </select>
+      </div>
+
+      <div className="mt-3 border-t border-[#1f1f1f] pt-3">
+        <div className="mb-2 flex items-center justify-between">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.04em] text-[#888]">
+            Баланс
+          </div>
+          <span className="tabular-nums text-[12px] text-[#e5e5e5]">
+            ₽ {balance.toLocaleString("ru-RU", { maximumFractionDigits: 2 })}
+          </span>
+        </div>
+        <div className="flex gap-1.5">
+          <button
+            type="button"
+            onClick={() => dispatch({ type: "balance_topup", amount: 1000 })}
+            className="flex-1 rounded-md border border-[#2a2a2a] bg-[#1e1e1e] px-2 py-1.5 text-[11px] transition-colors hover:bg-[#242424]"
+          >
+            + ₽ 1 000
+          </button>
+          <button
+            type="button"
+            onClick={() => dispatch({ type: "balance_topup", amount: 10000 })}
+            className="flex-1 rounded-md border border-[#2a2a2a] bg-[#1e1e1e] px-2 py-1.5 text-[11px] transition-colors hover:bg-[#242424]"
+          >
+            + ₽ 10 000
+          </button>
+        </div>
       </div>
 
       <div className="mt-3 flex items-center justify-between border-t border-[#1f1f1f] pt-2.5">
