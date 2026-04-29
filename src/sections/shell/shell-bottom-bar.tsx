@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { motion } from "motion/react";
-import { Mic } from "lucide-react";
+import { Mic, Loader2 } from "lucide-react";
 import type { PromptInputMessage } from "@/components/ai-elements/prompt-input";
 import {
   PromptInput,
@@ -28,6 +28,7 @@ import { parseCampaignQuery } from "@/state/parse-campaign-filter";
 import { useWelcomeChat } from "@/sections/welcome/welcome-chat-context";
 import { OnboardingChatChips } from "@/sections/welcome/onboarding-chat-view";
 import { CampaignsPromptChips } from "@/sections/campaigns/campaigns-prompt-chips";
+import { useTriggerEdit } from "@/state/trigger-edit-context";
 
 function AttachmentFileList() {
   const { files } = usePromptInputAttachments();
@@ -110,14 +111,56 @@ function parseTagSegments(
   return out;
 }
 
+/**
+ * Swaps the prompt-bar text whenever the user switches between selected
+ * triggers in Step 2. Saves the current draft against the previously active
+ * trigger before loading the new one. No-op when no edit is active.
+ */
+function TriggerEditDraftSwap() {
+  const triggerEdit = useTriggerEdit();
+  const { textInput } = usePromptInputController();
+  const prevId = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!triggerEdit) return;
+    const currentId = triggerEdit.active?.id ?? null;
+    if (currentId === prevId.current) return;
+    // Save outgoing draft.
+    if (prevId.current) {
+      triggerEdit.saveDraft(prevId.current, textInput.value);
+    }
+    // Load incoming draft (or clear if leaving edit mode).
+    if (currentId) {
+      const next = triggerEdit.getDraft(currentId);
+      textInput.setInput(next);
+    } else if (prevId.current) {
+      textInput.setInput("");
+    }
+    prevId.current = currentId;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [triggerEdit?.active?.id]);
+
+  return null;
+}
+
 export function ShellBottomBar() {
   const state = useAppState();
   const dispatch = useAppDispatch();
   const { view, selectedWorkflowNode } = state;
   const welcomeChat = useWelcomeChat();
+  const triggerEdit = useTriggerEdit();
 
   function handlePromptSubmit(message: PromptInputMessage) {
     const rawText = message.text ?? "";
+
+    // Trigger-edit mode: when Step 2 has an active trigger, all prompt-bar
+    // submissions go through the trigger-edit pipeline (regex parser).
+    if (triggerEdit?.active) {
+      // Fire-and-forget — the host clears its own UI state. The PromptInput
+      // textarea is cleared by the form's submit handler regardless.
+      void triggerEdit.submit(rawText);
+      return;
+    }
 
     if (isOnWelcome(state)) {
       welcomeChat?.submitFreeText(rawText);
@@ -163,6 +206,7 @@ export function ShellBottomBar() {
   }
 
   const chatPlaceholder =
+    triggerEdit?.active ? "добавь d1.ru, d2.ru   или   исключи d3.ru" :
     isOnWelcome(state) ? "Задайте вопрос…" :
     isWorkflowView(state) ? "Опишите изменение сценария..." :
     view.kind === "campaign-select" ? "Опишите вашу кампанию..." :
@@ -200,6 +244,7 @@ export function ShellBottomBar() {
     <>
       <SelectedNodeEffect selected={selectedWorkflowNode} />
       <ClearOnLeaveWorkflowEffect viewKind={view.kind} />
+      <TriggerEditDraftSwap />
       <motion.div
         ref={barRef}
         className="fixed left-[120px] right-0 z-30 flex justify-center px-6"
@@ -216,6 +261,30 @@ export function ShellBottomBar() {
             "bg-[rgba(10,10,10,0.75)] backdrop-blur-[2px]"
           )}
         >
+          {triggerEdit?.active && (
+            <div
+              data-testid="trigger-edit-hint"
+              className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/80"
+            >
+              {triggerEdit.processing ? (
+                <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-primary" />
+              ) : (
+                <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+              )}
+              <span className="leading-snug">
+                Редактируем триггер «{triggerEdit.active.label}». Напишите,
+                какие сайты добавить или исключить.
+              </span>
+            </div>
+          )}
+          {triggerEdit?.hintMessage && (
+            <div
+              data-testid="trigger-edit-error"
+              className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-100"
+            >
+              {triggerEdit.hintMessage}
+            </div>
+          )}
           <PromptInput
             onSubmit={handlePromptSubmit}
             // `className` lands on the <form>, but the visual wrapper is the
