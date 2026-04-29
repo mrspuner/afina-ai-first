@@ -1,6 +1,9 @@
 import { nanoid } from "nanoid";
 import type { StructuralOp } from "./structural-commands";
 import type { CampaignSort } from "./parse-campaign-filter";
+import type { Survey, SurveyStatus } from "@/types/survey";
+import { EMPTY_SURVEY } from "@/types/survey";
+import type { SignalStatus } from "@/types/signal-status";
 
 export type SignalType =
   | "Регистрация"
@@ -32,6 +35,9 @@ export type Signal = {
   createdAt: string;
   updatedAt: string;
   isCustom?: boolean;
+  // Owned by feature/signal-flow worktree (E). Defaults to "ready" when
+  // omitted — preserves behaviour of existing presets that don't set status.
+  status?: SignalStatus;
 };
 
 export type CampaignStatus =
@@ -96,6 +102,13 @@ export type AppState = {
   campaignFilter: CampaignStatus[];
   campaignSort: CampaignSort;
   clientDirection: string;
+  // ----- shared state slices added by data-foundations -----
+  // Owned by feature/anketa worktree (B):
+  survey: Survey;
+  surveyStatus: SurveyStatus;
+  // Owned by feature/signal-flow worktree (E):
+  balance: number;
+  notifications: { signalsBadge: boolean };
 };
 
 export type Action =
@@ -135,6 +148,9 @@ export type Action =
   | { type: "go_welcome" }
   | { type: "restore_address"; address: ViewAddress }
   | { type: "client_direction_set"; direction: string };
+// PARALLEL-WORKTREE INSERTION POINT — survey actions (B), billing/signal-status actions (E).
+// Each worktree appends its own action variants to the union above; resolve merges by
+// keeping every appended line and adding the matching reducer case at the end of appReducer.
 
 export const initialState: AppState = {
   view: { kind: "welcome" },
@@ -150,6 +166,10 @@ export const initialState: AppState = {
   campaignFilter: [],
   campaignSort: "default",
   clientDirection: "finance",
+  survey: EMPTY_SURVEY,
+  surveyStatus: "not_started",
+  balance: 0,
+  notifications: { signalsBadge: false },
 };
 
 export function appReducer(state: AppState, action: Action): AppState {
@@ -513,6 +533,8 @@ export function appReducer(state: AppState, action: Action): AppState {
 
     case "client_direction_set":
       return { ...state, clientDirection: action.direction };
+    // PARALLEL-WORTREE INSERTION POINT — append survey/billing/signal-status cases
+    // immediately above this comment to keep merges trivial.
   }
 }
 
