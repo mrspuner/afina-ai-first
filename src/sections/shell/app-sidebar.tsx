@@ -19,6 +19,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useAppState } from "@/state/app-state-context";
 import { cn } from "@/lib/utils";
 import type { SectionName } from "@/state/app-state";
 
@@ -37,6 +38,8 @@ export function AppSidebar({
   onLogoClick,
   flyoutOpen = false,
 }: AppSidebarProps) {
+  const { balance, notifications } = useAppState();
+
   const navItems = [
     { icon: Bell, label: "Сигналы" },
     { icon: Megaphone, label: "Кампании" },
@@ -69,21 +72,32 @@ export function AppSidebar({
 
           {/* Основная навигация */}
           <div className="flex flex-col">
-            {navItems.map(({ icon: Icon, label }) => (
-              <button
-                key={label}
-                onClick={() => onNavChange?.(label)}
-                className={cn(
-                  "relative flex h-[68px] flex-col items-center gap-1 rounded-md py-3 transition-colors",
-                  activeNav === label
-                    ? "bg-accent text-accent-foreground"
-                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                )}
-              >
-                <Icon className="h-6 w-6" />
-                <span className="text-xs font-medium">{label}</span>
-              </button>
-            ))}
+            {navItems.map(({ icon: Icon, label }) => {
+              const showBadge = label === "Сигналы" && notifications.signalsBadge;
+              return (
+                <button
+                  key={label}
+                  onClick={() => onNavChange?.(label)}
+                  className={cn(
+                    "relative flex h-[68px] flex-col items-center gap-1 rounded-md py-3 transition-colors",
+                    activeNav === label
+                      ? "bg-accent text-accent-foreground"
+                      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                  )}
+                >
+                  <span className="relative">
+                    <Icon className="h-6 w-6" />
+                    {showBadge && (
+                      <span
+                        aria-label="Есть новые сигналы"
+                        className="absolute -right-1.5 -top-1 inline-flex h-2.5 w-2.5 rounded-full bg-amber-500 ring-2 ring-background"
+                      />
+                    )}
+                  </span>
+                  <span className="text-xs font-medium">{label}</span>
+                </button>
+              );
+            })}
           </div>
         </nav>
       </div>
@@ -94,8 +108,13 @@ export function AppSidebar({
           <p className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground">
             Баланс
           </p>
-          <p className="text-sm font-semibold text-foreground">
-            ₽ 24 800
+          <p
+            className={cn(
+              "text-sm font-semibold tabular-nums",
+              balance === 0 ? "text-muted-foreground" : "text-foreground"
+            )}
+          >
+            ₽ {balance.toLocaleString("ru-RU", { maximumFractionDigits: 2 })}
           </p>
         </div>
 

@@ -692,3 +692,130 @@ describe("appReducer — workflow_structural_commands", () => {
     expect(next.workflowStructuralCommands).toBeNull();
   });
 });
+
+describe("appReducer — balance_topup", () => {
+  it("adds positive amounts to the balance", () => {
+    const state: AppState = { ...initialState, balance: 100 };
+    const next = appReducer(state, { type: "balance_topup", amount: 250 });
+    expect(next.balance).toBe(350);
+  });
+
+  it("clamps negative amounts to zero (no debit via this action)", () => {
+    const state: AppState = { ...initialState, balance: 100 };
+    const next = appReducer(state, { type: "balance_topup", amount: -50 });
+    expect(next.balance).toBe(100);
+  });
+
+  it("works from a zero starting balance", () => {
+    const next = appReducer(initialState, {
+      type: "balance_topup",
+      amount: 1500,
+    });
+    expect(next.balance).toBe(1500);
+  });
+});
+
+describe("appReducer — signal_status_changed", () => {
+  it("updates the matching signal's status", () => {
+    const state: AppState = {
+      ...initialState,
+      signals: [makeSignal({ id: "sig_1", status: "awaiting_payment" })],
+    };
+    const next = appReducer(state, {
+      type: "signal_status_changed",
+      id: "sig_1",
+      status: "processing",
+    });
+    expect(next.signals[0].status).toBe("processing");
+  });
+
+  it("sets signalsBadge=true when transitioning to ready", () => {
+    const state: AppState = {
+      ...initialState,
+      signals: [makeSignal({ id: "sig_1", status: "processing" })],
+    };
+    const next = appReducer(state, {
+      type: "signal_status_changed",
+      id: "sig_1",
+      status: "ready",
+    });
+    expect(next.notifications.signalsBadge).toBe(true);
+  });
+
+  it("does not set badge for processing transitions", () => {
+    const state: AppState = {
+      ...initialState,
+      signals: [makeSignal({ id: "sig_1", status: "awaiting_payment" })],
+    };
+    const next = appReducer(state, {
+      type: "signal_status_changed",
+      id: "sig_1",
+      status: "processing",
+    });
+    expect(next.notifications.signalsBadge).toBe(false);
+  });
+
+  it("does nothing for an unknown signal id", () => {
+    const state: AppState = {
+      ...initialState,
+      signals: [makeSignal({ id: "sig_1" })],
+    };
+    const next = appReducer(state, {
+      type: "signal_status_changed",
+      id: "missing",
+      status: "ready",
+    });
+    expect(next).toBe(state);
+  });
+
+  it("flips badge for error and expired transitions too", () => {
+    const stateError: AppState = {
+      ...initialState,
+      signals: [makeSignal({ id: "sig_1" })],
+    };
+    expect(
+      appReducer(stateError, {
+        type: "signal_status_changed",
+        id: "sig_1",
+        status: "error",
+      }).notifications.signalsBadge
+    ).toBe(true);
+    expect(
+      appReducer(stateError, {
+        type: "signal_status_changed",
+        id: "sig_1",
+        status: "expired",
+      }).notifications.signalsBadge
+    ).toBe(true);
+  });
+});
+
+describe("appReducer — signal_deleted", () => {
+  it("removes the matching signal", () => {
+    const state: AppState = {
+      ...initialState,
+      signals: [
+        makeSignal({ id: "sig_1" }),
+        makeSignal({ id: "sig_2", type: "Апсейл" }),
+      ],
+    };
+    const next = appReducer(state, { type: "signal_deleted", id: "sig_1" });
+    expect(next.signals.map((s) => s.id)).toEqual(["sig_2"]);
+  });
+});
+
+describe("appReducer — signals_badge_set", () => {
+  it("sets the badge value", () => {
+    const next = appReducer(initialState, {
+      type: "signals_badge_set",
+      value: true,
+    });
+    expect(next.notifications.signalsBadge).toBe(true);
+
+    const cleared = appReducer(next, {
+      type: "signals_badge_set",
+      value: false,
+    });
+    expect(cleared.notifications.signalsBadge).toBe(false);
+  });
+});

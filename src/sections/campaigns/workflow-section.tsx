@@ -6,6 +6,7 @@ import { Sparkles, X } from "lucide-react";
 import { useAppState, useAppDispatch } from "@/state/app-state-context";
 import { CanvasHeader, type CanvasHeaderToast } from "./canvas-header";
 import { WorkflowView } from "./workflow-view";
+import { TopUpModal, computeShortfall } from "@/sections/signals/top-up-modal";
 import { validateWorkflow } from "@/state/workflow-validation";
 import { normalizeNodeRef } from "@/state/structural-commands";
 import type {
@@ -35,6 +36,7 @@ export function WorkflowSection() {
     aiReply,
     signals,
     campaigns,
+    balance,
   } = useAppState();
   const dispatch = useAppDispatch();
 
@@ -43,6 +45,12 @@ export function WorkflowSection() {
   const [toast, setToast] = useState<CanvasHeaderToast | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const aiReplyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [topUpOpen, setTopUpOpen] = useState(false);
+
+  // Flat prototype cost for launching a campaign — keeps the create-entity →
+  // balance-check → top-up → launch mechanic identical between signals and
+  // campaigns, per spec.
+  const CAMPAIGN_LAUNCH_COST = 500;
 
   const handleCommandHandled = useCallback(
     () => dispatch({ type: "workflow_command_handled" }),
@@ -149,12 +157,29 @@ export function WorkflowSection() {
       });
       return;
     }
+    // Reuse signal-flow mechanic: balance check → top-up modal → launch.
+    if (computeShortfall(balance, CAMPAIGN_LAUNCH_COST) > 0) {
+      setTopUpOpen(true);
+      return;
+    }
     dispatch({
       type: "campaign_status_changed",
       id: currentCampaign.id,
       status: "active",
       timestamp: new Date().toISOString(),
     });
+  }
+
+  function handleCampaignTopUpSuccess(amount: number) {
+    if (!currentCampaign) return;
+    dispatch({ type: "balance_topup", amount });
+    dispatch({
+      type: "campaign_status_changed",
+      id: currentCampaign.id,
+      status: "active",
+      timestamp: new Date().toISOString(),
+    });
+    setTopUpOpen(false);
   }
 
   function handleSchedule(iso: string) {
@@ -245,6 +270,15 @@ export function WorkflowSection() {
           onPaneClick={handlePaneClick}
         />
       </div>
+
+      <TopUpModal
+        open={topUpOpen}
+        onOpenChange={setTopUpOpen}
+        balance={balance}
+        cost={CAMPAIGN_LAUNCH_COST}
+        entityLabel={currentCampaign ? currentCampaign.name : undefined}
+        onPaymentSuccess={handleCampaignTopUpSuccess}
+      />
 
       <AnimatePresence>
         {aiReply && (

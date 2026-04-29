@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { StepContent } from "@/sections/signals/steps/step-content";
 import { StepProps } from "@/types/campaign";
+import { useAppState } from "@/state/app-state-context";
+import { computeShortfall } from "@/sections/signals/top-up-modal";
 import { cn } from "@/lib/utils";
 
 const SCENARIO_NAMES: Record<string, string> = {
@@ -28,6 +30,10 @@ const SEGMENT_PRICES: Record<string, number> = {
   high: 0.25,
   medium: 0.07,
 };
+
+function formatRub(amount: number): string {
+  return `₽ ${amount.toLocaleString("ru-RU", { maximumFractionDigits: 2 })}`;
+}
 
 function SummaryRow({
   label,
@@ -55,6 +61,7 @@ function SummaryRow({
 }
 
 export function Step6Summary({ data, onNext, onGoToStep }: StepProps) {
+  const { balance } = useAppState();
   const budget = data.budget ?? 0;
   const prices = data.segments.map((s) => SEGMENT_PRICES[s] ?? 0).filter(Boolean);
   const minSignals = prices.length ? Math.floor(budget / Math.max(...prices)) : 0;
@@ -64,11 +71,15 @@ export function Step6Summary({ data, onNext, onGoToStep }: StepProps) {
       ? `${maxSignals.toLocaleString("ru")} сигналов`
       : `${minSignals.toLocaleString("ru")} – ${maxSignals.toLocaleString("ru")} сигналов`;
 
+  const cost = budget;
+  const shortfall = computeShortfall(balance, cost);
+  const enoughBalance = shortfall <= 0;
+
   const goto = onGoToStep;
 
   return (
     <StepContent
-      title="Проверьте настройки кампании"
+      title="Проверьте настройки сигнала"
       subtitle="Нажмите на строку, чтобы вернуться к шагу для редактирования"
     >
       <div className="rounded-lg border border-border bg-card">
@@ -99,7 +110,7 @@ export function Step6Summary({ data, onNext, onGoToStep }: StepProps) {
           />
           <SummaryRow
             label="Максимальный бюджет"
-            value={budget ? `₽ ${budget.toFixed(2)}` : "—"}
+            value={budget ? formatRub(budget) : "—"}
             onClick={goto ? () => goto(4) : undefined}
           />
           <SummaryRow
@@ -114,10 +125,37 @@ export function Step6Summary({ data, onNext, onGoToStep }: StepProps) {
         </div>
       </div>
 
+      {/* Стоимость / Баланс */}
+      <div
+        className={cn(
+          "mt-4 rounded-lg border bg-card px-4 py-3.5",
+          enoughBalance ? "border-border" : "border-amber-500/30 bg-amber-50/40 dark:bg-amber-500/5"
+        )}
+      >
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">Стоимость</span>
+          <span className="font-semibold tabular-nums">{formatRub(cost)}</span>
+        </div>
+        <div className="mt-1.5 flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">Баланс</span>
+          <span className="font-medium tabular-nums">{formatRub(balance)}</span>
+        </div>
+        {!enoughBalance && (
+          <div className="mt-2 border-t border-border pt-2 flex items-center justify-between text-sm">
+            <span className="text-foreground">Не хватает</span>
+            <span className="font-semibold tabular-nums text-amber-700 dark:text-amber-400">
+              {formatRub(shortfall)}
+            </span>
+          </div>
+        )}
+      </div>
+
       <Separator className="my-4" />
 
       <div className="flex justify-end">
-        <Button onClick={() => onNext({})}>Подтвердить и запустить</Button>
+        <Button onClick={() => onNext({})}>
+          {enoughBalance ? "Запустить" : "Пополнить и запустить"}
+        </Button>
       </div>
     </StepContent>
   );

@@ -1,16 +1,30 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAppDispatch, useAppState } from "@/state/app-state-context";
+import type { Signal } from "@/state/app-state";
+import { TopUpModal, computeShortfall } from "./top-up-modal";
 import { NewSignalMenu } from "./new-signal-menu";
 import { SignalCard } from "./signal-card";
 import { SignalsEmptyState } from "./signals-empty-state";
 import { UploadSignalDialog } from "./upload-signal-dialog";
 
+const PROCESSING_DURATION_MS = 6000;
+
 export function SignalsSection() {
-  const { signals } = useAppState();
+  const { signals, balance, notifications } = useAppState();
   const dispatch = useAppDispatch();
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [resumeSignal, setResumeSignal] = useState<Signal | null>(null);
+
+  // Opening the section clears the badge.
+  useEffect(() => {
+    if (notifications.signalsBadge) {
+      dispatch({ type: "signals_badge_set", value: false });
+    }
+    // Run only on mount of this section to avoid loops.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const sorted = useMemo(
     () => [...signals].sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1)),
@@ -28,6 +42,38 @@ export function SignalsSection() {
   function handleDownload(signalId: string) {
     console.log("download signal", signalId);
   }
+
+  function handleResumeAwaiting(signalId: string) {
+    const sig = signals.find((s) => s.id === signalId);
+    if (!sig) return;
+    setResumeSignal(sig);
+  }
+
+  function handleDelete(signalId: string) {
+    dispatch({ type: "signal_deleted", id: signalId });
+  }
+
+  function handleResumePaymentSuccess(amount: number) {
+    if (!resumeSignal) return;
+    dispatch({ type: "balance_topup", amount });
+    dispatch({
+      type: "signal_status_changed",
+      id: resumeSignal.id,
+      status: "processing",
+    });
+    const id = resumeSignal.id;
+    window.setTimeout(() => {
+      dispatch({ type: "signal_status_changed", id, status: "ready" });
+    }, PROCESSING_DURATION_MS);
+    setResumeSignal(null);
+  }
+
+  // Best-effort cost reconstruction for an existing signal — for the
+  // prototype we estimate from total count × cheapest segment price.
+  const resumeCost = resumeSignal
+    ? Math.max(50, resumeSignal.count * 0.07)
+    : 0;
+  const resumeShortfall = resumeSignal ? computeShortfall(balance, resumeCost) : 0;
 
   return (
     <div className="flex flex-1 flex-col overflow-y-auto px-8 pb-40 pt-[140px]">
@@ -51,6 +97,8 @@ export function SignalsSection() {
                 signal={s}
                 onCreateCampaign={handleCreateCampaign}
                 onDownload={handleDownload}
+                onResumeAwaiting={handleResumeAwaiting}
+                onDelete={handleDelete}
               />
             ))}
           </div>
@@ -58,6 +106,20 @@ export function SignalsSection() {
       </div>
 
       <UploadSignalDialog open={uploadOpen} onOpenChange={setUploadOpen} />
+      <TopUpModal
+        open={resumeSignal !== null}
+        onOpenChange={(open) => {
+          if (!open) setResumeSignal(null);
+        }}
+        balance={balance}
+        cost={resumeShortfall > 0 ? resumeCost : balance + 1}
+        entityLabel={
+          resumeSignal
+            ? `${resumeSignal.type} · ${resumeSignal.count.toLocaleString("ru-RU")}`
+            : undefined
+        }
+        onPaymentSuccess={handleResumePaymentSuccess}
+      />
     </div>
   );
 }
