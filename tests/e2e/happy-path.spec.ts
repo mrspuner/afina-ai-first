@@ -14,9 +14,9 @@ test("happy path: welcome → guided signal → campaign type → launch → sta
   await expect(page.getByRole("heading", { name: "Выберите тип сигнала" })).toBeVisible();
   await page.getByRole("button", { name: /Регистрация/ }).first().click();
 
-  // 4. Step 2: pick one interest tag + Продолжить
+  // 4. Step 2: pick one interest tag + Продолжить (default direction → finance vertical)
   await expect(page.getByRole("heading", { name: /Какие интересы и триггеры/ })).toBeVisible();
-  await page.getByRole("button", { name: "Недвижимость" }).click();
+  await page.getByRole("button", { name: "Кредитование" }).click();
   await page.getByRole("button", { name: "Продолжить" }).last().click();
 
   // 5. Step 3: pick segment + Продолжить

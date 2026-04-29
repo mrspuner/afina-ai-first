@@ -1,6 +1,7 @@
 "use client";
 
 import { PromptInputProvider } from "@/components/ai-elements/prompt-input";
+import { TriggerEditProvider } from "@/state/trigger-edit-context";
 import { useAppState, useAppDispatch } from "@/state/app-state-context";
 import { AppSidebar } from "@/sections/shell/app-sidebar";
 import { LaunchFlyout } from "@/sections/shell/launch-flyout";
@@ -44,6 +45,7 @@ export default function Home() {
 
   return (
     <PromptInputProvider>
+      <TriggerEditProvider>
       <WelcomeChatProvider value={welcomeChat}>
         <div className="flex h-screen overflow-hidden bg-background">
           <AppSidebar
@@ -64,6 +66,7 @@ export default function Home() {
           </div>
         </div>
       </WelcomeChatProvider>
+      </TriggerEditProvider>
     </PromptInputProvider>
   );
 }
