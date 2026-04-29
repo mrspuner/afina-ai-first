@@ -147,7 +147,10 @@ export type Action =
   | { type: "flyout_campaign_select" }
   | { type: "go_welcome" }
   | { type: "restore_address"; address: ViewAddress }
-  | { type: "client_direction_set"; direction: string };
+  | { type: "client_direction_set"; direction: string }
+  | { type: "survey_updated"; patch: Partial<Survey> }
+  | { type: "survey_completed"; survey: Survey }
+  | { type: "survey_skipped" };
 // PARALLEL-WORKTREE INSERTION POINT — survey actions (B), billing/signal-status actions (E).
 // Each worktree appends its own action variants to the union above; resolve merges by
 // keeping every appended line and adding the matching reducer case at the end of appReducer.
@@ -533,6 +536,19 @@ export function appReducer(state: AppState, action: Action): AppState {
 
     case "client_direction_set":
       return { ...state, clientDirection: action.direction };
+
+    case "survey_updated":
+      return { ...state, survey: { ...state.survey, ...action.patch } };
+
+    case "survey_completed":
+      return {
+        ...state,
+        survey: action.survey,
+        surveyStatus: "completed",
+      };
+
+    case "survey_skipped":
+      return { ...state, surveyStatus: "skipped" };
     // PARALLEL-WORTREE INSERTION POINT — append survey/billing/signal-status cases
     // immediately above this comment to keep merges trivial.
   }
