@@ -1,16 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { ChevronDown, Download, MessageCircle, RotateCcw, Zap } from "lucide-react";
+import { Download, MessageCircle, RotateCcw, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { StepContent } from "@/sections/signals/steps/step-content";
-import type { StepData } from "@/types/campaign";
 import type { Signal } from "@/state/app-state";
-import { cn } from "@/lib/utils";
 
 interface Step8ResultProps {
-  data: StepData;
   signal: Signal | null;
   onUseInCampaign: () => void;
 }
@@ -25,17 +21,7 @@ function formatExpiry(): string {
   return `Актуальны ещё ${days} дней`;
 }
 
-const SCENARIO_NAMES: Record<string, string> = {
-  registration: "Регистрация",
-  "first-deal": "Первая сделка",
-  upsell: "Апсейл",
-  retention: "Удержание",
-  return: "Возврат",
-  reactivation: "Реактивация",
-};
-
-export function Step8Result({ data, signal, onUseInCampaign }: Step8ResultProps) {
-  const [triggerOpen, setTriggerOpen] = useState(false);
+export function Step8Result({ signal, onUseInCampaign }: Step8ResultProps) {
   const errorState = signal?.status === "error";
   const totalSignals = signal
     ? signal.segments.max +
@@ -90,8 +76,6 @@ export function Step8Result({ data, signal, onUseInCampaign }: Step8ResultProps)
     );
   }
 
-  const segments = signal?.segments;
-
   return (
     <StepContent
       title="Сигналы готовы"
@@ -106,60 +90,6 @@ export function Step8Result({ data, signal, onUseInCampaign }: Step8ResultProps)
           <p className="mt-1 text-sm text-muted-foreground">сигналов найдено</p>
           <p className="mt-2 text-xs text-muted-foreground">{formatExpiry()}</p>
         </div>
-
-        {/* Segments */}
-        {segments && (
-          <div className="rounded-lg border border-border bg-card divide-y divide-border">
-            <SegmentRow label="Сильно склонные" value={segments.max} tone="strong" />
-            <SegmentRow label="Высоко склонные" value={segments.high} tone="high" />
-            <SegmentRow label="Средне склонные" value={segments.mid} tone="mid" />
-            <SegmentRow label="Слабо склонные" value={segments.low} tone="low" />
-          </div>
-        )}
-
-        {/* Trigger breakdown — collapsed by default */}
-        <button
-          type="button"
-          onClick={() => setTriggerOpen((v) => !v)}
-          className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3 text-left transition-colors hover:bg-accent/40"
-          aria-expanded={triggerOpen}
-        >
-          <span className="text-sm font-medium">Разбивка по триггерам</span>
-          <ChevronDown
-            className={cn(
-              "h-4 w-4 text-muted-foreground transition-transform",
-              triggerOpen && "rotate-180"
-            )}
-          />
-        </button>
-        {triggerOpen && (
-          <div className="rounded-lg border border-border bg-muted/30 px-4 py-3">
-            {data.triggers.length ? (
-              <ul className="flex flex-col gap-1.5 text-sm">
-                {data.triggers.map((t) => (
-                  <li
-                    key={t}
-                    className="flex items-center justify-between text-muted-foreground"
-                  >
-                    <span>{t}</span>
-                    <span className="tabular-nums text-foreground">
-                      {formatNumber(Math.floor(totalSignals / Math.max(1, data.triggers.length)))}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Триггеры не указаны.
-              </p>
-            )}
-            {data.scenario && (
-              <p className="mt-2 border-t border-border pt-2 text-xs text-muted-foreground">
-                Сценарий: {SCENARIO_NAMES[data.scenario] ?? data.scenario}
-              </p>
-            )}
-          </div>
-        )}
 
         <Separator />
 
@@ -176,33 +106,5 @@ export function Step8Result({ data, signal, onUseInCampaign }: Step8ResultProps)
         </div>
       </div>
     </StepContent>
-  );
-}
-
-function SegmentRow({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: number;
-  tone: "strong" | "high" | "mid" | "low";
-}) {
-  const dotClass =
-    tone === "strong"
-      ? "bg-emerald-500"
-      : tone === "high"
-      ? "bg-emerald-400"
-      : tone === "mid"
-      ? "bg-amber-400"
-      : "bg-muted-foreground/50";
-  return (
-    <div className="flex items-center justify-between px-4 py-2.5 text-sm">
-      <span className="flex items-center gap-2 text-muted-foreground">
-        <span className={cn("h-2 w-2 rounded-full", dotClass)} />
-        {label}
-      </span>
-      <span className="font-semibold tabular-nums">{formatNumber(value)}</span>
-    </div>
   );
 }

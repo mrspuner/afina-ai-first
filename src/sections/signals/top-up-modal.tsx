@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CreditCard, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -12,7 +11,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
 
 export interface TopUpModalProps {
   open: boolean;
@@ -26,13 +24,6 @@ export interface TopUpModalProps {
   /** Called once payment is "успешно". Carries the topped-up amount. */
   onPaymentSuccess: (amount: number) => void;
 }
-
-type Method = "card" | "invoice";
-
-const METHODS: { id: Method; label: string; hint: string; icon: typeof CreditCard }[] = [
-  { id: "card", label: "Банковская карта", hint: "Visa / MasterCard / МИР", icon: CreditCard },
-  { id: "invoice", label: "Счёт на оплату", hint: "Юр. лицо · 1–3 дня", icon: Wallet },
-];
 
 /** Bare minimum to top up to cover cost. Negative shortfalls clamp to 0. */
 export function computeShortfall(balance: number, cost: number): number {
@@ -53,7 +44,6 @@ export function TopUpModal({
 }: TopUpModalProps) {
   const shortfall = useMemo(() => computeShortfall(balance, cost), [balance, cost]);
   const [amount, setAmount] = useState<string>(String(shortfall));
-  const [method, setMethod] = useState<Method>("card");
   const [paying, setPaying] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -64,7 +54,6 @@ export function TopUpModal({
     if (!open) return;
     /* eslint-disable react-hooks/set-state-in-effect */
     setAmount(String(shortfall));
-    setMethod("card");
     setPaying(false);
     setError(null);
     /* eslint-enable react-hooks/set-state-in-effect */
@@ -140,41 +129,6 @@ export function TopUpModal({
                 Минимальная сумма для запуска — {formatRub(shortfall)}.
               </p>
             )}
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <p className="text-xs font-medium text-foreground">Способ оплаты</p>
-            <div className="flex flex-col gap-2">
-              {METHODS.map((m) => {
-                const Icon = m.icon;
-                const active = method === m.id;
-                return (
-                  <button
-                    key={m.id}
-                    type="button"
-                    onClick={() => setMethod(m.id)}
-                    className={cn(
-                      "flex items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors",
-                      active
-                        ? "border-foreground/40 bg-accent"
-                        : "border-border hover:bg-accent/60"
-                    )}
-                  >
-                    <Icon className="h-4 w-4 text-muted-foreground" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">{m.label}</p>
-                      <p className="text-xs text-muted-foreground">{m.hint}</p>
-                    </div>
-                    <span
-                      className={cn(
-                        "h-3 w-3 shrink-0 rounded-full border",
-                        active ? "border-foreground bg-foreground" : "border-border"
-                      )}
-                    />
-                  </button>
-                );
-              })}
-            </div>
           </div>
 
           {error && (

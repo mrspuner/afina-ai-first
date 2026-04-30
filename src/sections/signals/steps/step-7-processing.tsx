@@ -5,7 +5,6 @@ import { Check, CircleDashed, Loader2, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StepContent } from "@/sections/signals/steps/step-content";
 import type { StepData } from "@/types/campaign";
-import { useAppDispatch } from "@/state/app-state-context";
 import type { Signal } from "@/state/app-state";
 
 interface Step7ProcessingProps {
@@ -31,7 +30,6 @@ function formatNumber(n: number): string {
 }
 
 export function Step7Processing({ data, signal, onAdvance }: Step7ProcessingProps) {
-  const dispatch = useAppDispatch();
   const status = signal?.status ?? "processing";
 
   // Auto-advance once the signal flips to "ready". Safe to revisit:
@@ -124,7 +122,7 @@ export function Step7Processing({ data, signal, onAdvance }: Step7ProcessingProp
           </div>
         )}
 
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center justify-start">
           <Button
             variant="outline"
             onClick={supportClick}
@@ -132,11 +130,6 @@ export function Step7Processing({ data, signal, onAdvance }: Step7ProcessingProp
           >
             <MessageCircle className="h-4 w-4" />
             Связаться с поддержкой
-          </Button>
-          <Button
-            onClick={() => dispatch({ type: "sidebar_nav", section: "Сигналы" })}
-          >
-            Понятно, я подожду
           </Button>
         </div>
       </div>
