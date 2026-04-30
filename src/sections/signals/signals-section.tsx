@@ -48,6 +48,10 @@ export function SignalsSection() {
     setResumeSignal(sig);
   }
 
+  function handleResumeEdit(signalId: string) {
+    dispatch({ type: "resume_signal_in_wizard", signalId });
+  }
+
   function handleDelete(signalId: string) {
     dispatch({ type: "signal_deleted", id: signalId });
   }
@@ -100,6 +104,7 @@ export function SignalsSection() {
                 onCreateCampaign={handleCreateCampaign}
                 onDownload={handleDownload}
                 onResumeAwaiting={handleResumeAwaiting}
+                onResumeEdit={handleResumeEdit}
                 onDelete={handleDelete}
               />
             ))}

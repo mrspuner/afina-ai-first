@@ -36,6 +36,12 @@ interface SignalCardProps {
   onCreateCampaign: (signalId: string) => void;
   onDownload: (signalId: string) => void;
   onResumeAwaiting?: (signalId: string) => void;
+  /**
+   * Reopen the wizard for an awaiting-payment signal at the summary step
+   * with all fields hydrated. Distinct from `onResumeAwaiting`, which
+   * launches the payment modal directly.
+   */
+  onResumeEdit?: (signalId: string) => void;
   onDelete?: (signalId: string) => void;
 }
 
@@ -44,6 +50,7 @@ export function SignalCard({
   onCreateCampaign,
   onDownload,
   onResumeAwaiting,
+  onResumeEdit,
   onDelete,
 }: SignalCardProps) {
   const { type, count, segments, updatedAt, id } = signal;
@@ -130,7 +137,9 @@ export function SignalCard({
                   }
                 />
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => onResumeAwaiting?.(id)}>
+                  <DropdownMenuItem
+                    onClick={() => (onResumeEdit ?? onResumeAwaiting)?.(id)}
+                  >
                     <Pencil className="mr-2 h-4 w-4" />
                     Открыть и редактировать
                   </DropdownMenuItem>
