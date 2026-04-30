@@ -270,11 +270,59 @@ export function Step2Interests({ data, onNext }: StepProps) {
     [clientDirection, vertical]
   );
 
+  // Deterministic seeded RNG so the AI-fill prefill is stable for a given
+  // direction across remounts within the same session, while still varying
+  // between directions.
+  function seededRandom(seed: number): () => number {
+    let a = seed >>> 0 || 1;
+    return () => {
+      a = (a + 0x6d2b79f5) >>> 0;
+      let t = a;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function pickN<T>(items: readonly T[], n: number, rng: () => number): T[] {
+    if (n >= items.length) return [...items];
+    const copy = [...items];
+    // Fisher-Yates shuffle, take first n.
+    for (let i = copy.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+    return copy.slice(0, n);
+  }
+
+  // Pre-fill on first mount when the wizard hasn't filled this step yet —
+  // demonstrates the "AI already prepared this for you" behavior described in
+  // the subtitle. We seed off the direction so finance vs auto pick different
+  // suggestions, but the result is stable inside one direction.
+  const initialPrefill = useMemo(() => {
+    if (data.interests.length > 0 || data.triggers.length > 0) {
+      return { interestIds: data.interests, triggerIds: data.triggers };
+    }
+    const rng = seededRandom(clientDirection.length || 1);
+    const interestIds = pickN(
+      interestsForDirection.map((i) => i.id),
+      Math.min(3, interestsForDirection.length),
+      rng
+    );
+    const availableTriggerIds = interestsForDirection
+      .filter((i) => interestIds.includes(i.id))
+      .flatMap((i) => i.triggers.map((t) => t.id));
+    const triggerIds = pickN(availableTriggerIds, Math.min(5, availableTriggerIds.length), rng);
+    return { interestIds, triggerIds };
+    // We intentionally compute this once on mount — that's the AI-fill UX.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const [selectedInterests, setSelectedInterests] = useState<string[]>(
-    data.interests
+    initialPrefill.interestIds
   );
   const [selectedTriggers, setSelectedTriggers] = useState<string[]>(
-    data.triggers
+    initialPrefill.triggerIds
   );
   const [deltas, setDeltas] = useState<Record<string, TriggerDelta>>({});
   const [highlightedTriggerIds, setHighlightedTriggerIds] = useState<
@@ -494,7 +542,7 @@ export function Step2Interests({ data, onNext }: StepProps) {
   return (
     <StepContent
       title="Какие интересы и триггеры вы ищете?"
-      subtitle={`Направление: ${vertical.label}. Выберите интересы, затем уточните триггеры — у выбранного триггера можно настроить, что включать и что исключить через AI`}
+      subtitle={`Направление: ${vertical.label}. Мы уже сгенерили настройки под вас — выберите интересы и триггеры в любом порядке.`}
     >
       <div className="flex flex-col gap-6">
         {/* Interests */}
