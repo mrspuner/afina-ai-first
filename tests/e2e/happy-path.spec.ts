@@ -8,7 +8,7 @@ test("happy path: welcome → guided signal → campaign type → launch → sta
   await expect(page.getByRole("heading", { name: "Добро пожаловать" })).toBeVisible();
 
   // 2. Click Шаг 1 badge → guided signal flow
-  await page.getByRole("button", { name: /Шаг 1.*Получение сигнала/s }).click();
+  await page.getByRole("button", { name: /Шаг 1.*Получение сигнала/ }).click();
 
   // 3. Step 1: pick scenario (auto-advances on click)
   await expect(page.getByRole("heading", { name: "Выберите тип сигнала" })).toBeVisible();
