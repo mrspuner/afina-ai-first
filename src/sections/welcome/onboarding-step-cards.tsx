@@ -95,8 +95,8 @@ export function OnboardingStepCards() {
           cta={
             step1Active ? (
               <Button
-                size="sm"
-                className="mt-4"
+                size="default"
+                className="mt-4 w-full"
                 onClick={() => dispatch({ type: "start_signal_flow" })}
               >
                 Создать сигнал

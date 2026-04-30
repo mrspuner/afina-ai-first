@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
+import { useAppState } from "@/state/app-state-context";
 
 import { PeriodField } from "./fields/period-field";
 import {
@@ -101,6 +102,13 @@ function buildCsv(
 
 export function StatisticsView({ campaignId }: { campaignId?: string } = {}) {
   const filterByCampaign = Boolean(campaignId);
+  const { signals, campaigns } = useAppState();
+
+  // Empty preset: no signals and no campaigns yet — there is nothing to
+  // report on, so we render a soft empty state instead of a table populated
+  // with mock-generated rows. We keep the unconditional hook calls below so
+  // the early return doesn't break React's rules of hooks.
+  const noData = signals.length === 0 && campaigns.length === 0;
 
   const [templates, setTemplates] = useState<ReportTemplate[]>(
     () => BUILTIN_TEMPLATES,
@@ -220,6 +228,13 @@ export function StatisticsView({ campaignId }: { campaignId?: string } = {}) {
     : activeTemplate.kind === "builtin"
       ? "Шаблонный отчёт"
       : "Пользовательский отчёт";
+
+  // Show the empty state only on the global statistics view. Per-campaign
+  // statistics (when `campaignId` is set) always belong to a real campaign
+  // and never hit this empty branch.
+  if (noData && !filterByCampaign) {
+    return <StatisticsEmptyState />;
+  }
 
   return (
     <main className="flex flex-1 flex-col overflow-hidden">
@@ -466,5 +481,20 @@ function TemplateItem({
       <span>{template.name}</span>
       {active && <span className="text-xs text-muted-foreground">текущий</span>}
     </button>
+  );
+}
+
+function StatisticsEmptyState() {
+  return (
+    <main className="flex flex-1 flex-col items-center justify-center px-8 py-16 text-center">
+      <div className="flex max-w-sm flex-col items-center gap-2">
+        <h1 className="text-base font-medium text-foreground">
+          Пока нет статистики
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          Запустите кампании, чтобы увидеть результаты.
+        </p>
+      </div>
+    </main>
   );
 }
