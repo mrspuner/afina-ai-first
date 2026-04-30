@@ -106,7 +106,13 @@ function ClearChipsOnViewChangeEffect({
 export function ShellBottomBar() {
   const state = useAppState();
   const dispatch = useAppDispatch();
-  const { view, selectedWorkflowNode, campaigns } = state;
+  const {
+    view,
+    selectedWorkflowNode,
+    campaigns,
+    wizardCurrentStep,
+    budgetHelpShown,
+  } = state;
   const welcomeChat = useWelcomeChat();
   const triggerEdit = useTriggerEdit();
   const chipsApi = usePromptChips();
@@ -270,6 +276,36 @@ export function ShellBottomBar() {
               {triggerEdit.hintMessage}
             </div>
           )}
+          {/* Budget-step help: clicking the chip below the prompt-bar swaps
+              it for a mascot-styled answer block here, mirroring how the
+              trigger-edit hint surfaces on the interests step. */}
+          {view.kind === "guided-signal" &&
+            wizardCurrentStep === 5 &&
+            budgetHelpShown && (
+              <motion.div
+                key="budget-help-answer"
+                initial={{ y: 6, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ duration: 0.26, ease: [0.23, 1, 0.32, 1] }}
+                data-testid="budget-help-answer"
+                className="flex items-start gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/80"
+              >
+                <Image
+                  src="/mascot-icon.svg"
+                  alt=""
+                  width={16}
+                  height={16}
+                  className="mt-0.5 shrink-0"
+                  aria-hidden
+                />
+                <span className="leading-snug">
+                  Рекомендуемая сумма рассчитана из размера вашей базы и средних
+                  цен по сегментам. Мы заложили её так, чтобы хватило на полный
+                  цикл сбора сигналов без перерасхода — обычно это 5–35% от
+                  размера базы в рублях.
+                </span>
+              </motion.div>
+            )}
           <PromptInput
             onSubmit={handlePromptSubmit}
             // `className` lands on the <form>, but the visual wrapper is the
@@ -319,6 +355,23 @@ export function ShellBottomBar() {
               }}
             />
           )}
+          {view.kind === "guided-signal" &&
+            wizardCurrentStep === 5 &&
+            !budgetHelpShown && (
+              <div className="flex flex-wrap justify-start gap-2">
+                <motion.button
+                  type="button"
+                  onClick={() => dispatch({ type: "budget_help_shown" })}
+                  initial={{ y: 6, opacity: 0, scale: 0.96 }}
+                  animate={{ y: 0, opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.26, ease: [0.23, 1, 0.32, 1] }}
+                  whileTap={{ scale: 0.97 }}
+                  className="rounded-full border border-white/10 bg-[#171717] px-[13px] py-[7px] text-[12px] text-white transition-colors duration-150 ease-out hover:bg-[#1f1f1f]"
+                >
+                  Как рассчитывается рекомендуемый бюджет?
+                </motion.button>
+              </div>
+            )}
         </div>
       </motion.div>
     </>

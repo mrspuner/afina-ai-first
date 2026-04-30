@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { CampaignStepper } from "@/sections/signals/campaign-stepper";
+import { useAppDispatch } from "@/state/app-state-context";
 import { StepData, initialStepData } from "@/types/campaign";
 import { Step1Scenario } from "@/sections/signals/steps/step-1-scenario";
 import { Step2Interests } from "@/sections/signals/steps/step-2-interests";
@@ -57,6 +58,20 @@ function WorkspaceInner({
   );
   const stepRefs = useRef<Record<number, HTMLDivElement | null>>({});
   const pendingScroll = useRef<{ step: number; behavior: ScrollBehavior } | null>(null);
+  const dispatch = useAppDispatch();
+
+  // Publish the visible step into shared state so the prompt-bar can render
+  // step-specific helpers (budget-help chip on step 5). Cleared on unmount
+  // so navigating away kills the chip immediately.
+  useEffect(() => {
+    dispatch({ type: "wizard_step_changed", step: currentStep });
+  }, [currentStep, dispatch]);
+  useEffect(
+    () => () => {
+      dispatch({ type: "wizard_step_changed", step: null });
+    },
+    [dispatch]
+  );
 
   function scrollToStep(step: number, behavior: ScrollBehavior = "smooth") {
     stepRefs.current[step]?.scrollIntoView({ behavior, block: "start" });

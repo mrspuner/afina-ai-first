@@ -137,6 +137,18 @@ export type AppState = {
    * skipped on the second pass.
    */
   wizardSessionId: number;
+  /**
+   * Currently visible step in the signal wizard (1–8) — `null` when the
+   * wizard isn't mounted. Lets the shared prompt-bar render step-specific
+   * helpers like the budget-help chip on step 5.
+   */
+  wizardCurrentStep: number | null;
+  /**
+   * Whether the user clicked the budget-help chip on step 5; flips the
+   * prompt-bar from "show chip" to "show mascot answer". Auto-resets when
+   * the wizard moves off step 5 or unmounts.
+   */
+  budgetHelpShown: boolean;
 };
 
 export type Action =
@@ -186,7 +198,9 @@ export type Action =
   | { type: "signal_deleted"; id: string }
   | { type: "signals_badge_set"; value: boolean }
   | { type: "resume_signal_in_wizard"; signalId: string }
-  | { type: "resume_signal_in_wizard_handled" };
+  | { type: "resume_signal_in_wizard_handled" }
+  | { type: "wizard_step_changed"; step: number | null }
+  | { type: "budget_help_shown" };
 // PARALLEL-WORKTREE INSERTION POINT — survey actions (B), billing/signal-status actions (E).
 // Each worktree appends its own action variants to the union above; resolve merges by
 // keeping every appended line and adding the matching reducer case at the end of appReducer.
@@ -210,6 +224,8 @@ export const initialState: AppState = {
   balance: 0,
   notifications: { signalsBadge: false },
   wizardSessionId: 0,
+  wizardCurrentStep: null,
+  budgetHelpShown: false,
 };
 
 export function appReducer(state: AppState, action: Action): AppState {
@@ -654,6 +670,19 @@ export function appReducer(state: AppState, action: Action): AppState {
         ...state,
         resumingSignalId: undefined,
       };
+
+    case "wizard_step_changed":
+      return {
+        ...state,
+        wizardCurrentStep: action.step,
+        // Auto-hide the budget help answer when leaving step 5 (or the
+        // wizard altogether) — re-entering should start fresh.
+        budgetHelpShown:
+          action.step === 5 ? state.budgetHelpShown : false,
+      };
+
+    case "budget_help_shown":
+      return { ...state, budgetHelpShown: true };
     // PARALLEL-WORTREE INSERTION POINT — append survey/billing/signal-status cases
     // immediately above this comment to keep merges trivial.
   }
