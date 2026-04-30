@@ -1,6 +1,13 @@
 import { nanoid } from "nanoid";
 import type { StructuralOp } from "./structural-commands";
 import type { CampaignSort } from "./parse-campaign-filter";
+import type { Survey, SurveyStatus } from "@/types/survey";
+import { EMPTY_SURVEY } from "@/types/survey";
+import type { SignalStatus } from "@/types/signal-status";
+import {
+  DEFAULT_DIRECTION_ID,
+  businessDirectionFromSurvey,
+} from "@/data/business-directions";
 
 export type SignalType =
   | "Регистрация"
@@ -32,6 +39,9 @@ export type Signal = {
   createdAt: string;
   updatedAt: string;
   isCustom?: boolean;
+  // Owned by feature/signal-flow worktree (E). Defaults to "ready" when
+  // omitted — preserves behaviour of existing presets that don't set status.
+  status?: SignalStatus;
 };
 
 export type CampaignStatus =
@@ -96,6 +106,13 @@ export type AppState = {
   campaignFilter: CampaignStatus[];
   campaignSort: CampaignSort;
   clientDirection: string;
+  // ----- shared state slices added by data-foundations -----
+  // Owned by feature/anketa worktree (B):
+  survey: Survey;
+  surveyStatus: SurveyStatus;
+  // Owned by feature/signal-flow worktree (E):
+  balance: number;
+  notifications: { signalsBadge: boolean };
 };
 
 export type Action =
@@ -134,7 +151,19 @@ export type Action =
   | { type: "flyout_campaign_select" }
   | { type: "go_welcome" }
   | { type: "restore_address"; address: ViewAddress }
-  | { type: "client_direction_set"; direction: string };
+  | { type: "client_direction_set"; direction: string }
+  | { type: "survey_updated"; patch: Partial<Survey> }
+  | { type: "survey_completed"; survey: Survey }
+  | { type: "survey_skipped" }
+  | { type: "survey_reset" }
+  | { type: "dev_survey_force_complete" }
+  | { type: "balance_topup"; amount: number }
+  | { type: "signal_status_changed"; id: string; status: SignalStatus }
+  | { type: "signal_deleted"; id: string }
+  | { type: "signals_badge_set"; value: boolean };
+// PARALLEL-WORKTREE INSERTION POINT — survey actions (B), billing/signal-status actions (E).
+// Each worktree appends its own action variants to the union above; resolve merges by
+// keeping every appended line and adding the matching reducer case at the end of appReducer.
 
 export const initialState: AppState = {
   view: { kind: "welcome" },
@@ -150,6 +179,10 @@ export const initialState: AppState = {
   campaignFilter: [],
   campaignSort: "default",
   clientDirection: "finance",
+  survey: EMPTY_SURVEY,
+  surveyStatus: "not_started",
+  balance: 0,
+  notifications: { signalsBadge: false },
 };
 
 export function appReducer(state: AppState, action: Action): AppState {
@@ -513,6 +546,70 @@ export function appReducer(state: AppState, action: Action): AppState {
 
     case "client_direction_set":
       return { ...state, clientDirection: action.direction };
+
+    case "survey_updated":
+      return { ...state, survey: { ...state.survey, ...action.patch } };
+
+    case "survey_completed":
+      return {
+        ...state,
+        survey: action.survey,
+        surveyStatus: "completed",
+        // Анкета — единственный источник «направления клиента» для пользователя.
+        // Дев-панель просто отражает это значение и позволяет тестово переопределить.
+        clientDirection: businessDirectionFromSurvey(action.survey.directionId),
+      };
+
+    case "survey_skipped":
+      return { ...state, surveyStatus: "skipped" };
+
+    case "survey_reset":
+      return {
+        ...state,
+        survey: EMPTY_SURVEY,
+        surveyStatus: "not_started",
+        clientDirection: DEFAULT_DIRECTION_ID,
+      };
+
+    case "dev_survey_force_complete":
+      // Dev-panel-only override: lets a tester bypass the survey gate without
+      // filling the form. Keeps existing survey data and clientDirection so the
+      // dev can pick direction independently from the panel.
+      return { ...state, surveyStatus: "completed" };
+
+    case "balance_topup":
+      return { ...state, balance: state.balance + Math.max(0, action.amount) };
+
+    case "signal_status_changed": {
+      const exists = state.signals.some((s) => s.id === action.id);
+      if (!exists) return state;
+      return {
+        ...state,
+        signals: state.signals.map((s) =>
+          s.id === action.id
+            ? { ...s, status: action.status, updatedAt: new Date().toISOString() }
+            : s
+        ),
+        notifications:
+          action.status === "ready" || action.status === "error" || action.status === "expired"
+            ? { ...state.notifications, signalsBadge: true }
+            : state.notifications,
+      };
+    }
+
+    case "signal_deleted":
+      return {
+        ...state,
+        signals: state.signals.filter((s) => s.id !== action.id),
+      };
+
+    case "signals_badge_set":
+      return {
+        ...state,
+        notifications: { ...state.notifications, signalsBadge: action.value },
+      };
+    // PARALLEL-WORTREE INSERTION POINT — append survey/billing/signal-status cases
+    // immediately above this comment to keep merges trivial.
   }
 }
 

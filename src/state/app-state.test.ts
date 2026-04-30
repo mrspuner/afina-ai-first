@@ -664,6 +664,134 @@ describe("isCampaignDone", () => {
   });
 });
 
+describe("appReducer — survey actions", () => {
+  it("survey_updated patches fields without changing status", () => {
+    const next = appReducer(initialState, {
+      type: "survey_updated",
+      patch: { companyName: "Acme" },
+    });
+    expect(next.survey.companyName).toBe("Acme");
+    expect(next.survey.companyWebsite).toBe("");
+    expect(next.survey.directionId).toBeNull();
+    expect(next.surveyStatus).toBe("not_started");
+  });
+
+  it("survey_completed stamps the survey and flips status", () => {
+    const next = appReducer(initialState, {
+      type: "survey_completed",
+      survey: {
+        companyName: "Acme",
+        companyWebsite: "https://acme.com",
+        directionId: "banking",
+      },
+    });
+    expect(next.surveyStatus).toBe("completed");
+    expect(next.survey).toEqual({
+      companyName: "Acme",
+      companyWebsite: "https://acme.com",
+      directionId: "banking",
+    });
+  });
+
+  it("survey_completed maps survey direction → business direction (banking → finance)", () => {
+    const next = appReducer(initialState, {
+      type: "survey_completed",
+      survey: {
+        companyName: "Acme",
+        companyWebsite: "https://acme.com",
+        directionId: "banking",
+      },
+    });
+    expect(next.clientDirection).toBe("finance");
+  });
+
+  it("survey_completed maps auto-sales → auto", () => {
+    const next = appReducer(initialState, {
+      type: "survey_completed",
+      survey: {
+        companyName: "Drive",
+        companyWebsite: "https://drive.ru",
+        directionId: "auto-sales",
+      },
+    });
+    expect(next.clientDirection).toBe("auto");
+  });
+
+  it("survey_completed falls back to default when direction is unknown", () => {
+    const next = appReducer(initialState, {
+      type: "survey_completed",
+      survey: {
+        companyName: "X",
+        companyWebsite: "https://x.com",
+        directionId: "unknown-direction-id",
+      },
+    });
+    expect(next.clientDirection).toBe("finance");
+  });
+
+  it("survey_skipped flips status without writing data", () => {
+    const next = appReducer(initialState, { type: "survey_skipped" });
+    expect(next.surveyStatus).toBe("skipped");
+    expect(next.survey).toEqual({
+      companyName: "",
+      companyWebsite: "",
+      directionId: null,
+    });
+  });
+
+  it("does not mutate unrelated slices", () => {
+    const state: AppState = {
+      ...initialState,
+      signals: [makeSignal()],
+      campaigns: [makeCampaign()],
+    };
+    const next = appReducer(state, { type: "survey_skipped" });
+    expect(next.signals).toBe(state.signals);
+    expect(next.campaigns).toBe(state.campaigns);
+  });
+
+  it("dev_survey_force_complete flips status without touching survey data or direction", () => {
+    const state: AppState = {
+      ...initialState,
+      survey: {
+        companyName: "",
+        companyWebsite: "",
+        directionId: null,
+      },
+      surveyStatus: "not_started",
+      clientDirection: "auto",
+    };
+    const next = appReducer(state, { type: "dev_survey_force_complete" });
+    expect(next.surveyStatus).toBe("completed");
+    expect(next.survey).toBe(state.survey);
+    expect(next.clientDirection).toBe("auto");
+  });
+
+  it("survey_reset clears data, returns status to not_started, and restores default direction", () => {
+    const state: AppState = {
+      ...initialState,
+      survey: {
+        companyName: "Acme",
+        companyWebsite: "https://acme.com",
+        directionId: "banking",
+      },
+      surveyStatus: "completed",
+      clientDirection: "auto",
+      signals: [makeSignal()],
+    };
+    const next = appReducer(state, { type: "survey_reset" });
+    expect(next.surveyStatus).toBe("not_started");
+    expect(next.survey).toEqual({
+      companyName: "",
+      companyWebsite: "",
+      directionId: null,
+    });
+    expect(next.clientDirection).toBe("finance");
+    // unrelated slices preserved
+    expect(next.signals).toBe(state.signals);
+  });
+});
+
 describe("appReducer — workflow_structural_commands", () => {
   it("workflow_structural_commands_submit captures ops and deselects", () => {
     const state: AppState = {
@@ -690,5 +818,132 @@ describe("appReducer — workflow_structural_commands", () => {
       type: "workflow_structural_commands_handled",
     });
     expect(next.workflowStructuralCommands).toBeNull();
+  });
+});
+
+describe("appReducer — balance_topup", () => {
+  it("adds positive amounts to the balance", () => {
+    const state: AppState = { ...initialState, balance: 100 };
+    const next = appReducer(state, { type: "balance_topup", amount: 250 });
+    expect(next.balance).toBe(350);
+  });
+
+  it("clamps negative amounts to zero (no debit via this action)", () => {
+    const state: AppState = { ...initialState, balance: 100 };
+    const next = appReducer(state, { type: "balance_topup", amount: -50 });
+    expect(next.balance).toBe(100);
+  });
+
+  it("works from a zero starting balance", () => {
+    const next = appReducer(initialState, {
+      type: "balance_topup",
+      amount: 1500,
+    });
+    expect(next.balance).toBe(1500);
+  });
+});
+
+describe("appReducer — signal_status_changed", () => {
+  it("updates the matching signal's status", () => {
+    const state: AppState = {
+      ...initialState,
+      signals: [makeSignal({ id: "sig_1", status: "awaiting_payment" })],
+    };
+    const next = appReducer(state, {
+      type: "signal_status_changed",
+      id: "sig_1",
+      status: "processing",
+    });
+    expect(next.signals[0].status).toBe("processing");
+  });
+
+  it("sets signalsBadge=true when transitioning to ready", () => {
+    const state: AppState = {
+      ...initialState,
+      signals: [makeSignal({ id: "sig_1", status: "processing" })],
+    };
+    const next = appReducer(state, {
+      type: "signal_status_changed",
+      id: "sig_1",
+      status: "ready",
+    });
+    expect(next.notifications.signalsBadge).toBe(true);
+  });
+
+  it("does not set badge for processing transitions", () => {
+    const state: AppState = {
+      ...initialState,
+      signals: [makeSignal({ id: "sig_1", status: "awaiting_payment" })],
+    };
+    const next = appReducer(state, {
+      type: "signal_status_changed",
+      id: "sig_1",
+      status: "processing",
+    });
+    expect(next.notifications.signalsBadge).toBe(false);
+  });
+
+  it("does nothing for an unknown signal id", () => {
+    const state: AppState = {
+      ...initialState,
+      signals: [makeSignal({ id: "sig_1" })],
+    };
+    const next = appReducer(state, {
+      type: "signal_status_changed",
+      id: "missing",
+      status: "ready",
+    });
+    expect(next).toBe(state);
+  });
+
+  it("flips badge for error and expired transitions too", () => {
+    const stateError: AppState = {
+      ...initialState,
+      signals: [makeSignal({ id: "sig_1" })],
+    };
+    expect(
+      appReducer(stateError, {
+        type: "signal_status_changed",
+        id: "sig_1",
+        status: "error",
+      }).notifications.signalsBadge
+    ).toBe(true);
+    expect(
+      appReducer(stateError, {
+        type: "signal_status_changed",
+        id: "sig_1",
+        status: "expired",
+      }).notifications.signalsBadge
+    ).toBe(true);
+  });
+});
+
+describe("appReducer — signal_deleted", () => {
+  it("removes the matching signal", () => {
+    const state: AppState = {
+      ...initialState,
+      signals: [
+        makeSignal({ id: "sig_1" }),
+        makeSignal({ id: "sig_2", type: "Апсейл" }),
+      ],
+    };
+    const next = appReducer(state, { type: "signal_deleted", id: "sig_1" });
+    expect(next.signals.map((s) => s.id)).toEqual(["sig_2"]);
+  });
+});
+
+describe("appReducer — signals_badge_set", () => {
+  it("sets the badge value", () => {
+    const next = appReducer(initialState, {
+      type: "signals_badge_set",
+      value: true,
+    });
+    expect(next.notifications.signalsBadge).toBe(true);
+
+    const cleared = appReducer(next, {
+      type: "signals_badge_set",
+      value: false,
+    });
+    expect(cleared.notifications.signalsBadge).toBe(false);
   });
 });

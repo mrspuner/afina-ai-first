@@ -1,11 +1,13 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useAppDispatch, useAppState } from "@/state/app-state-context";
 import {
   isStep1Active,
   isStep2Active,
   isStep3Active,
 } from "@/state/app-state";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 type Step = {
@@ -35,61 +37,91 @@ const STEPS: readonly Step[] = [
   },
 ] as const;
 
+function StepBody({
+  step,
+  cta,
+}: {
+  step: Step;
+  cta?: ReactNode;
+}) {
+  return (
+    <>
+      <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+        Шаг {step.n}
+      </span>
+      <span className="mt-1.5 text-sm font-medium text-foreground">
+        {step.heading}
+      </span>
+      <span className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+        {step.description}
+      </span>
+      {cta}
+    </>
+  );
+}
+
+function cardClass(active: boolean, interactive: boolean) {
+  return cn(
+    "flex flex-col items-start rounded-lg border p-4 text-left",
+    "transition-[opacity,border-color,background-color,transform] duration-200 ease-out",
+    active
+      ? interactive
+        ? "cursor-pointer border-border bg-card hover:border-border hover:bg-accent active:scale-[0.98]"
+        : "cursor-default border-border bg-card"
+      : "cursor-not-allowed border-border/40 bg-card/40 opacity-35"
+  );
+}
+
 export function OnboardingStepCards() {
   const state = useAppState();
   const dispatch = useAppDispatch();
 
-  const stepState = {
-    1: {
-      active: isStep1Active(state),
-      onClick: isStep1Active(state)
-        ? () => dispatch({ type: "start_signal_flow" })
-        : undefined,
-    },
-    2: {
-      active: isStep2Active(state),
-      onClick: isStep2Active(state)
-        ? () => dispatch({ type: "step2_clicked" })
-        : undefined,
-    },
-    3: {
-      active: isStep3Active(state),
-      onClick: undefined as (() => void) | undefined,
-    },
-  } as const;
+  const [step1, step2, step3] = STEPS;
+  const step1Active = isStep1Active(state);
+  const step2Active = isStep2Active(state);
+  const step3Active = isStep3Active(state);
 
   return (
     <div className="grid w-full grid-cols-3 gap-3">
-      {STEPS.map((step) => {
-        const { active, onClick } = stepState[step.n];
-        return (
-          <button
-            key={step.n}
-            type="button"
-            disabled={!active}
-            onClick={onClick}
-            className={cn(
-              "flex flex-col items-start rounded-lg border p-4 text-left",
-              "transition-[opacity,border-color,background-color,transform] duration-200 ease-out",
-              active
-                ? onClick
-                  ? "cursor-pointer border-border bg-card hover:border-border hover:bg-accent active:scale-[0.98]"
-                  : "cursor-default border-border bg-card"
-                : "cursor-not-allowed border-border/40 bg-card/40 opacity-35"
-            )}
-          >
-            <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-              Шаг {step.n}
-            </span>
-            <span className="mt-1.5 text-sm font-medium text-foreground">
-              {step.heading}
-            </span>
-            <span className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
-              {step.description}
-            </span>
-          </button>
-        );
-      })}
+      {/* Step 1 — explicit CTA inside the card. The card itself is no longer
+          a button: the CTA is the single primary entry point on the start
+          screen, removing the implicit equivalence with the chat and the
+          prompt-bar (per docs/start-screen-konfiguratsiya.md). The wizard
+          gates on surveyStatus (Worktree B), so pressing the CTA routes a
+          first-time user through the anketa before the wizard. */}
+      <div className={cardClass(step1Active, false)}>
+        <StepBody
+          step={step1}
+          cta={
+            step1Active ? (
+              <Button
+                size="sm"
+                className="mt-4"
+                onClick={() => dispatch({ type: "start_signal_flow" })}
+              >
+                Создать сигнал
+              </Button>
+            ) : undefined
+          }
+        />
+      </div>
+
+      {/* Steps 2 and 3 keep the card-as-button affordance — only step 1
+          gets the explicit CTA per spec. */}
+      <button
+        type="button"
+        disabled={!step2Active}
+        onClick={
+          step2Active ? () => dispatch({ type: "step2_clicked" }) : undefined
+        }
+        className={cardClass(step2Active, step2Active)}
+      >
+        <StepBody step={step2} />
+      </button>
+
+      <button type="button" disabled className={cardClass(step3Active, false)}>
+        <StepBody step={step3} />
+      </button>
     </div>
   );
 }
