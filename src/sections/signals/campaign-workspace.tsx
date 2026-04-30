@@ -57,7 +57,13 @@ function WorkspaceInner({
       : initialStepData
   );
   const stepRefs = useRef<Record<number, HTMLDivElement | null>>({});
-  const pendingScroll = useRef<{ step: number; behavior: ScrollBehavior } | null>(null);
+  // Seed the scroll target on initial mount so resume entries (`initialStep`
+  // > 1) land directly on the latest available step instead of opening at
+  // the top and forcing the user to scroll. The post-commit effect below
+  // consumes the pending scroll on the very first render.
+  const pendingScroll = useRef<{ step: number; behavior: ScrollBehavior } | null>(
+    startStep > 1 ? { step: startStep, behavior: "instant" } : null
+  );
   const dispatch = useAppDispatch();
 
   // Publish the visible step into shared state so the prompt-bar can render

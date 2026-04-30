@@ -42,6 +42,13 @@ interface SignalCardProps {
    * launches the payment modal directly.
    */
   onResumeEdit?: (signalId: string) => void;
+  /**
+   * Click on the card body opens the wizard at the latest available step
+   * for this signal. Awaiting-payment → step 6, processing/error → step 7,
+   * ready/expired → step 8. Action buttons inside stop propagation so they
+   * keep their own behaviour.
+   */
+  onOpen?: (signalId: string) => void;
   onDelete?: (signalId: string) => void;
 }
 
@@ -51,6 +58,7 @@ export function SignalCard({
   onDownload,
   onResumeAwaiting,
   onResumeEdit,
+  onOpen,
   onDelete,
 }: SignalCardProps) {
   const { type, count, segments, updatedAt, id } = signal;
@@ -65,7 +73,25 @@ export function SignalCard({
 
   return (
     <>
-      <Card className="animate-in fade-in-0 slide-in-from-bottom-2 gap-2 px-5 py-4 [--tw-animation-duration:220ms] [--tw-ease:cubic-bezier(0.23,1,0.32,1)]">
+      <Card
+        onClick={onOpen ? () => onOpen(id) : undefined}
+        onKeyDown={
+          onOpen
+            ? (e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onOpen(id);
+                }
+              }
+            : undefined
+        }
+        role={onOpen ? "button" : undefined}
+        tabIndex={onOpen ? 0 : undefined}
+        className={cn(
+          "animate-in fade-in-0 slide-in-from-bottom-2 gap-2 px-5 py-4 [--tw-animation-duration:220ms] [--tw-ease:cubic-bezier(0.23,1,0.32,1)]",
+          onOpen && "cursor-pointer transition-colors hover:bg-accent/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+        )}
+      >
         <div className="flex items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-sm font-semibold text-foreground">
@@ -91,7 +117,10 @@ export function SignalCard({
           Макс {formatNumber(segments.max)} · Выс {formatNumber(segments.high)} · Ср{" "}
           {formatNumber(segments.mid)} · Низ {formatNumber(segments.low)}
         </p>
-        <div className="mt-2 flex items-center justify-between gap-2">
+        <div
+          className="mt-2 flex items-center justify-between gap-2"
+          onClick={(e) => e.stopPropagation()}
+        >
           {isAwaiting ? (
             <Button onClick={() => onResumeAwaiting?.(id)}>
               Пополнить и запустить

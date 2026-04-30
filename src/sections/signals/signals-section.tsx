@@ -52,6 +52,10 @@ export function SignalsSection() {
     dispatch({ type: "resume_signal_in_wizard", signalId });
   }
 
+  function handleOpen(signalId: string) {
+    dispatch({ type: "resume_signal_in_wizard", signalId });
+  }
+
   function handleDelete(signalId: string) {
     dispatch({ type: "signal_deleted", id: signalId });
   }
@@ -105,6 +109,7 @@ export function SignalsSection() {
                 onDownload={handleDownload}
                 onResumeAwaiting={handleResumeAwaiting}
                 onResumeEdit={handleResumeEdit}
+                onOpen={s.wizardData ? handleOpen : undefined}
                 onDelete={handleDelete}
               />
             ))}

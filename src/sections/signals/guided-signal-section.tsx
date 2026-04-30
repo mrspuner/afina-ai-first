@@ -4,12 +4,33 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { nanoid } from "nanoid";
 import { useAppState, useAppDispatch } from "@/state/app-state-context";
 import type { Signal } from "@/state/app-state";
+import type { SignalStatus } from "@/types/signal-status";
 import type { StepData } from "@/types/campaign";
 import { SCENARIO_TO_TYPE } from "@/state/scenario-map";
 import { SurveySection } from "@/sections/survey/survey-section";
 import { CampaignWorkspace } from "./campaign-workspace";
 import { TopUpModal, computeShortfall } from "./top-up-modal";
 import { getProcessingDuration } from "@/state/dev-config";
+
+/**
+ * Picks the wizard step to land on when resuming an existing signal — we
+ * want the user dropped at the latest meaningful screen for that signal's
+ * current state.
+ */
+function stepForSignalStatus(status: SignalStatus | undefined): number {
+  switch (status) {
+    case "ready":
+    case "expired":
+      return 8;
+    case "processing":
+    case "error":
+      return 7;
+    case "awaiting_payment":
+    case "draft":
+    default:
+      return 6;
+  }
+}
 
 /**
  * Lifts step-6 → step-8 control flow out of CampaignWorkspace into the
@@ -27,16 +48,21 @@ export function GuidedSignalSection() {
   // One-shot capture of the signal we're resuming. Reading the snapshot
   // straight from `signals` would let a status change (e.g. payment success)
   // re-render the section and confuse the wizard's mount-time-only inputs.
-  // Initialised lazily so the first render already renders step-6 — avoids
-  // a one-frame flash of step-1 before the effect below can promote state.
+  // Initialised lazily so the first render already renders the right step —
+  // avoids a one-frame flash of step-1 before the effect below promotes state.
   const [resumeSnapshot, setResumeSnapshot] = useState<{
     id: string;
     stepData: StepData;
+    initialStep: number;
   } | null>(() => {
     if (!resumingSignalId) return null;
     const sig = signals.find((s) => s.id === resumingSignalId);
     if (!sig || !sig.wizardData) return null;
-    return { id: sig.id, stepData: sig.wizardData };
+    return {
+      id: sig.id,
+      stepData: sig.wizardData,
+      initialStep: stepForSignalStatus(sig.status),
+    };
   });
 
   // Acknowledge the resume request once we have a snapshot in hand (or have
@@ -55,7 +81,11 @@ export function GuidedSignalSection() {
     const sig = signals.find((s) => s.id === resumingSignalId);
     if (!sig || !sig.wizardData) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setResumeSnapshot({ id: sig.id, stepData: sig.wizardData });
+    setResumeSnapshot({
+      id: sig.id,
+      stepData: sig.wizardData,
+      initialStep: stepForSignalStatus(sig.status),
+    });
   }, [resumingSignalId, resumeSnapshot, signals]);
 
   // Survey gate. Held locally so finishing the anketa lets us re-render this
@@ -158,9 +188,13 @@ export function GuidedSignalSection() {
   }, [dispatch]);
 
   // Pull the pending signal (if any) so the workspace can read its status
-  // for the processing step.
+  // for the processing step. When resuming an existing signal, the snapshot
+  // doubles as the pending signal so step-7/step-8 can render its current
+  // state without going through the launch flow first.
   const pendingSignal = pendingSignalId
     ? signals.find((s) => s.id === pendingSignalId) ?? null
+    : resumeSnapshot
+    ? signals.find((s) => s.id === resumeSnapshot.id) ?? null
     : null;
 
   // Survey gate must be after all hooks — React rule.
@@ -193,7 +227,7 @@ export function GuidedSignalSection() {
         onLaunchRequested={handleLaunchSignal}
         initialScenario={initial}
         initialStepDataOverride={resumeSnapshot?.stepData}
-        initialStep={resumeSnapshot ? 6 : undefined}
+        initialStep={resumeSnapshot?.initialStep}
         pendingSignal={pendingSignal}
       />
       <TopUpModal
