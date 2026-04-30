@@ -106,7 +106,7 @@ function ClearChipsOnViewChangeEffect({
 export function ShellBottomBar() {
   const state = useAppState();
   const dispatch = useAppDispatch();
-  const { view, selectedWorkflowNode } = state;
+  const { view, selectedWorkflowNode, campaigns } = state;
   const welcomeChat = useWelcomeChat();
   const triggerEdit = useTriggerEdit();
   const chipsApi = usePromptChips();
@@ -309,7 +309,7 @@ export function ShellBottomBar() {
               onChipClick={welcomeChat.submitChip}
             />
           )}
-          {view.kind === "section" && view.name === "Кампании" && (
+          {view.kind === "section" && view.name === "Кампании" && campaigns.length > 0 && (
             <CampaignsPromptChips
               onChipClick={(text) => {
                 const { statuses, sort } = parseCampaignQuery(text);
