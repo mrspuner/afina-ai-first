@@ -150,7 +150,18 @@ export const ChipEditableInput = forwardRef<
           }
         }
         const prefix = separator === "smart" && needsPad ? " " : "";
-        ed.appendChild(document.createTextNode(prefix + text));
+        const inserted = document.createTextNode(prefix + text);
+        ed.appendChild(inserted);
+        // Park the caret at the very end of the inserted text — without this
+        // the editor refocuses to its default position (beginning) so the
+        // user types in front of the template instead of after it.
+        const next = document.createRange();
+        next.setStart(inserted, inserted.length);
+        next.collapse(true);
+        const selAfter = window.getSelection();
+        selAfter?.removeAllRanges();
+        selAfter?.addRange(next);
+        lastRangeRef.current = next.cloneRange();
       }
 
       setInput(readText());

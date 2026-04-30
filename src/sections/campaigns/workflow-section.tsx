@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Sparkles, X } from "lucide-react";
+import { X } from "lucide-react";
+import Image from "next/image";
 import { useAppState, useAppDispatch } from "@/state/app-state-context";
 import { CanvasHeader, type CanvasHeaderToast } from "./canvas-header";
 import { WorkflowView } from "./workflow-view";
@@ -294,24 +295,24 @@ export function WorkflowSection() {
             <div
               role="status"
               aria-live="polite"
-              className="mx-auto flex w-full max-w-2xl items-start gap-3 rounded-xl border border-border bg-card/95 px-4 py-3 shadow-lg backdrop-blur-sm"
+              className="mx-auto flex w-full max-w-2xl items-start gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/80 backdrop-blur-sm"
             >
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
-                <Sparkles className="h-4 w-4" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground/80">
-                  AI
-                </p>
-                <p className="mt-0.5 text-sm text-foreground">{aiReply}</p>
-              </div>
+              <Image
+                src="/mascot-icon.svg"
+                alt=""
+                width={16}
+                height={16}
+                className="mt-0.5 shrink-0"
+                aria-hidden
+              />
+              <span className="min-w-0 flex-1 leading-snug">{aiReply}</span>
               <button
                 type="button"
                 aria-label="Закрыть ответ AI"
                 onClick={() => dispatch({ type: "ai_reply_dismissed" })}
-                className="rounded-md p-1 text-muted-foreground opacity-70 hover:bg-accent hover:text-foreground hover:opacity-100"
+                className="-mr-1 rounded-md p-1 text-white/50 transition-colors hover:bg-white/10 hover:text-white/80"
               >
-                <X className="h-3.5 w-3.5" />
+                <X className="h-3 w-3" />
               </button>
             </div>
           </motion.div>
