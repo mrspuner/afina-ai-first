@@ -67,6 +67,9 @@ function SelectedNodeChipEffect({
   const dispatch = useAppDispatch();
   const { pushChip, removeChip, chips } = usePromptChips();
   const chipIdRef = useRef<string | null>(null);
+  // See TriggerEditChipEffect.hasMaterialisedRef — same render-order race
+  // applies to node selection.
+  const hasMaterialisedRef = useRef(false);
 
   useEffect(() => {
     const targetChipId = selected ? `node_${selected.id}` : null;
@@ -83,19 +86,33 @@ function SelectedNodeChipEffect({
         payload: selected.id,
         removable: true,
       });
+      hasMaterialisedRef.current = false;
+    } else {
+      hasMaterialisedRef.current = false;
     }
     chipIdRef.current = targetChipId;
   }, [selected, pushChip, removeChip]);
 
+  useEffect(() => {
+    if (
+      chipIdRef.current &&
+      chips.some((c) => c.id === chipIdRef.current)
+    ) {
+      hasMaterialisedRef.current = true;
+    }
+  }, [chips]);
+
   // Backspace removed the chip — sync canvas selection back to "none".
   useEffect(() => {
     if (
+      hasMaterialisedRef.current &&
       selected &&
       chipIdRef.current &&
       !chips.some((c) => c.id === chipIdRef.current)
     ) {
       dispatch({ type: "workflow_node_deselected" });
       chipIdRef.current = null;
+      hasMaterialisedRef.current = false;
     }
   }, [chips, selected, dispatch]);
 
@@ -166,6 +183,13 @@ function TriggerEditChipEffect() {
   const host = useTriggerEditHost();
   const { pushChip, removeChip, chips } = usePromptChips();
   const chipIdRef = useRef<string | null>(null);
+  // Guards the deselect-on-removal effect against a render-order race: when
+  // we've just pushChip'd a chip, the dispatched update isn't visible in
+  // `chips` until the next render. Without this flag the deselect effect
+  // would fire immediately, see chips=[], assume "Backspace happened" and
+  // wipe the active trigger — the visible bug was: first click pushes the
+  // chip but the hint never shows because we already snapped active=null.
+  const hasMaterialisedRef = useRef(false);
 
   useEffect(() => {
     const targetChipId = triggerEdit?.active
@@ -185,19 +209,35 @@ function TriggerEditChipEffect() {
         payload: triggerEdit.active.id,
         removable: true,
       });
+      hasMaterialisedRef.current = false;
+    } else {
+      hasMaterialisedRef.current = false;
     }
     chipIdRef.current = targetChipId;
   }, [triggerEdit?.active, pushChip, removeChip]);
 
-  // Backspace removed the chip — sync step-2's selection back to "no edit".
+  // Latch "the chip we asked for is now in chips state". Only after this can
+  // the deselect-on-removal effect treat its absence as a real removal.
   useEffect(() => {
     if (
+      chipIdRef.current &&
+      chips.some((c) => c.id === chipIdRef.current)
+    ) {
+      hasMaterialisedRef.current = true;
+    }
+  }, [chips]);
+
+  // Backspace removed the chip → mirror that into step-2's selection.
+  useEffect(() => {
+    if (
+      hasMaterialisedRef.current &&
       triggerEdit?.active &&
       chipIdRef.current &&
       !chips.some((c) => c.id === chipIdRef.current)
     ) {
       host.setActive(null);
       chipIdRef.current = null;
+      hasMaterialisedRef.current = false;
     }
   }, [chips, triggerEdit?.active, host]);
 
@@ -366,8 +406,7 @@ function ShellBottomBarBody() {
                 />
               )}
               <span className="leading-snug">
-                Редактируем триггер «{triggerEdit.active.label}». Напишите,
-                какие сайты добавить или исключить.
+                Напишите, какие сайты добавить или исключить.
               </span>
             </div>
           )}
