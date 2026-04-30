@@ -693,6 +693,42 @@ describe("appReducer — survey actions", () => {
     });
   });
 
+  it("survey_completed maps survey direction → business direction (banking → finance)", () => {
+    const next = appReducer(initialState, {
+      type: "survey_completed",
+      survey: {
+        companyName: "Acme",
+        companyWebsite: "https://acme.com",
+        directionId: "banking",
+      },
+    });
+    expect(next.clientDirection).toBe("finance");
+  });
+
+  it("survey_completed maps auto-sales → auto", () => {
+    const next = appReducer(initialState, {
+      type: "survey_completed",
+      survey: {
+        companyName: "Drive",
+        companyWebsite: "https://drive.ru",
+        directionId: "auto-sales",
+      },
+    });
+    expect(next.clientDirection).toBe("auto");
+  });
+
+  it("survey_completed falls back to default when direction is unknown", () => {
+    const next = appReducer(initialState, {
+      type: "survey_completed",
+      survey: {
+        companyName: "X",
+        companyWebsite: "https://x.com",
+        directionId: "unknown-direction-id",
+      },
+    });
+    expect(next.clientDirection).toBe("finance");
+  });
+
   it("survey_skipped flips status without writing data", () => {
     const next = appReducer(initialState, { type: "survey_skipped" });
     expect(next.surveyStatus).toBe("skipped");
@@ -712,6 +748,47 @@ describe("appReducer — survey actions", () => {
     const next = appReducer(state, { type: "survey_skipped" });
     expect(next.signals).toBe(state.signals);
     expect(next.campaigns).toBe(state.campaigns);
+  });
+
+  it("dev_survey_force_complete flips status without touching survey data or direction", () => {
+    const state: AppState = {
+      ...initialState,
+      survey: {
+        companyName: "",
+        companyWebsite: "",
+        directionId: null,
+      },
+      surveyStatus: "not_started",
+      clientDirection: "auto",
+    };
+    const next = appReducer(state, { type: "dev_survey_force_complete" });
+    expect(next.surveyStatus).toBe("completed");
+    expect(next.survey).toBe(state.survey);
+    expect(next.clientDirection).toBe("auto");
+  });
+
+  it("survey_reset clears data, returns status to not_started, and restores default direction", () => {
+    const state: AppState = {
+      ...initialState,
+      survey: {
+        companyName: "Acme",
+        companyWebsite: "https://acme.com",
+        directionId: "banking",
+      },
+      surveyStatus: "completed",
+      clientDirection: "auto",
+      signals: [makeSignal()],
+    };
+    const next = appReducer(state, { type: "survey_reset" });
+    expect(next.surveyStatus).toBe("not_started");
+    expect(next.survey).toEqual({
+      companyName: "",
+      companyWebsite: "",
+      directionId: null,
+    });
+    expect(next.clientDirection).toBe("finance");
+    // unrelated slices preserved
+    expect(next.signals).toBe(state.signals);
   });
 });
 
