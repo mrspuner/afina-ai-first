@@ -1,5 +1,6 @@
 "use client";
 
+import { Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { StepContent } from "@/sections/signals/steps/step-content";
@@ -53,9 +54,17 @@ function SummaryRow({
       )}
     >
       <span className="shrink-0 text-sm text-muted-foreground">{label}</span>
-      <span className="text-right text-sm font-medium text-foreground">
-        {value}
-      </span>
+      <div className="flex items-center gap-2">
+        <span className="text-right text-sm font-medium text-foreground">
+          {value}
+        </span>
+        {onClick && (
+          <Settings
+            aria-hidden
+            className="h-3.5 w-3.5 text-muted-foreground/60 shrink-0"
+          />
+        )}
+      </div>
     </div>
   );
 }
