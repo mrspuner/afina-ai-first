@@ -61,7 +61,7 @@ export function StepContent({
 
   return (
     <div className={`w-full ${maxWidth}`}>
-      <div className="mb-8 text-center">
+      <div className="mb-8 text-left">
         <h1 className="min-h-[2rem] text-2xl font-semibold tracking-tight text-foreground">
           {displayedTitle}
           {phase === "title" && (
