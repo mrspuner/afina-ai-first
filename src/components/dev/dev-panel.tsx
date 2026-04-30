@@ -45,7 +45,6 @@ export function DevPanel() {
     ) {
       dispatch({ type: "client_direction_set", direction: savedDirection });
     }
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setProcessingMs(getProcessingDuration());
   }, [dispatch]);
 
