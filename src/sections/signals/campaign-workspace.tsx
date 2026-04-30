@@ -146,7 +146,6 @@ function WorkspaceInner({
       case 8:
         return (
           <Step8Result
-            data={stepData}
             signal={pendingSignal ?? null}
             onUseInCampaign={onSignalComplete ?? handleLaunchNew}
           />
