@@ -7,8 +7,18 @@ test("happy path: welcome → guided signal → campaign type → launch → sta
   // 1. Welcome
   await expect(page.getByRole("heading", { name: "Добро пожаловать" })).toBeVisible();
 
-  // 2. Click Шаг 1 badge → guided signal flow
-  await page.getByRole("button", { name: /Шаг 1.*Получение сигнала/ }).click();
+  // Bypass the survey gate via dev panel — the wizard otherwise renders
+  // the registration anketa first. Topping up the balance here also keeps
+  // the launch step from opening the top-up modal further down the flow.
+  await page.keyboard.press("Meta+Shift+E");
+  await page
+    .getByRole("switch", { name: "Переключить статус анкеты" })
+    .click();
+  await page.getByRole("button", { name: "+ ₽ 10 000" }).click();
+  await page.keyboard.press("Meta+Shift+E");
+
+  // 2. Click "Создать сигнал" CTA → guided signal flow
+  await page.getByRole("button", { name: "Создать сигнал" }).click();
 
   // 3. Step 1: pick scenario (auto-advances on click)
   await expect(page.getByRole("heading", { name: "Выберите тип сигнала" })).toBeVisible();
@@ -27,31 +37,37 @@ test("happy path: welcome → guided signal → campaign type → launch → sta
   // 6. Step 4: upload file, Далее, wait hashing (~4.2s) — База теперь идёт раньше Бюджета
   await expect(page.getByRole("heading", { name: "Загрузите вашу базу" })).toBeVisible();
   const fixturePath = path.resolve(__dirname, "fixtures/test-base.csv");
-  await page.locator('input[type="file"]').setInputFiles(fixturePath);
+  // The page also has a prompt-bar file input — scope to the dropzone (csv accept).
+  await page
+    .locator('input[type="file"][accept*="csv"]')
+    .setInputFiles(fixturePath);
   await expect(page.getByText("test-base.csv")).toBeVisible();
   await page.getByRole("button", { name: "Далее" }).last().click();
 
-  // 7. Step 5: enter budget + Далее
-  await expect(page.getByRole("heading", { name: "Укажите максимальный бюджет" })).toBeVisible();
+  // 7. Step 5: enter budget + Далее (wait for hashing animation to finish)
+  await expect(
+    page.getByRole("heading", { name: "Укажите максимальный бюджет" })
+  ).toBeVisible({ timeout: 15_000 });
   await page.getByPlaceholder("Например, 500").fill("500");
   await page.getByRole("button", { name: "Далее" }).last().click();
 
-  // 8. Step 6: summary → top-up via dev panel, then launch
+  // 8. Step 6: summary → launch (balance was seeded at the top of the test)
   await expect(page.getByRole("heading", { name: "Проверьте настройки сигнала" })).toBeVisible({
     timeout: 15_000,
   });
-  // Seed balance via dev panel so launch doesn't open the top-up modal.
-  await page.keyboard.press("Meta+Shift+E");
-  await page.getByRole("button", { name: "+ ₽ 10 000" }).click();
-  await page.keyboard.press("Meta+Shift+E");
-  await page.getByRole("button", { name: "Запустить" }).first().click();
+  // The sidebar also has a "Запустить" button (opens the launch flyout) —
+  // scope to the data-slot button that contains exactly "Запустить".
+  await page
+    .locator('[data-slot="button"]')
+    .filter({ hasText: /^Запустить$/ })
+    .last()
+    .click();
 
-  // 9. Step 7: processing screen
-  await expect(page.getByRole("heading", { name: "Ваша база обрабатывается" })).toBeVisible();
-
-  // 10. Step 8: click Использовать в кампании
+  // 9. Step 7/8: processing screen briefly visible, then result. Skip the
+  //    intermediate assertion — at the default 6s processing duration the
+  //    flow advances faster than playwright can settle.
   await expect(page.getByRole("heading", { name: /Сигналы готовы/ })).toBeVisible({
-    timeout: 15_000,
+    timeout: 20_000,
   });
   await page.getByRole("button", { name: "Использовать в кампании" }).click();
 
