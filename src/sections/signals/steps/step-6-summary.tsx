@@ -118,18 +118,18 @@ export function Step6Summary({ data, onNext, onGoToStep }: StepProps) {
             onClick={goto ? () => goto(3) : undefined}
           />
           <SummaryRow
+            label="Файл с базой"
+            value={data.file ? data.file.name : "—"}
+            onClick={goto ? () => goto(4) : undefined}
+          />
+          <SummaryRow
             label="Максимальный бюджет"
             value={budget ? formatRub(budget) : "—"}
-            onClick={goto ? () => goto(4) : undefined}
+            onClick={goto ? () => goto(5) : undefined}
           />
           <SummaryRow
             label="Максимум сигналов"
             value={budget && prices.length ? signalsStr : "—"}
-          />
-          <SummaryRow
-            label="Файл с базой"
-            value={data.file ? data.file.name : "—"}
-            onClick={goto ? () => goto(5) : undefined}
           />
         </div>
       </div>

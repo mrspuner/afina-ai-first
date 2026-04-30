@@ -7,8 +7,8 @@ import { StepData, initialStepData } from "@/types/campaign";
 import { Step1Scenario } from "@/sections/signals/steps/step-1-scenario";
 import { Step2Interests } from "@/sections/signals/steps/step-2-interests";
 import { Step3Segments } from "@/sections/signals/steps/step-3-segments";
-import { Step4Limit } from "@/sections/signals/steps/step-4-limit";
-import { Step5Upload } from "@/sections/signals/steps/step-5-upload";
+import { Step4Upload } from "@/sections/signals/steps/step-4-upload";
+import { Step5Limit } from "@/sections/signals/steps/step-5-limit";
 import { Step6Summary } from "@/sections/signals/steps/step-6-summary";
 import { Step7Processing } from "@/sections/signals/steps/step-7-processing";
 import { Step8Result } from "@/sections/signals/steps/step-8-result";
@@ -125,8 +125,8 @@ function WorkspaceInner({
       case 1: return <Step1Scenario {...props} />;
       case 2: return <Step2Interests {...props} />;
       case 3: return <Step3Segments {...props} />;
-      case 4: return <Step4Limit {...props} />;
-      case 5: return <Step5Upload {...props} />;
+      case 4: return <Step4Upload {...props} />;
+      case 5: return <Step5Limit {...props} />;
       case 6:
         return (
           <Step6Summary

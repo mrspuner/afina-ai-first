@@ -24,16 +24,16 @@ test("happy path: welcome → guided signal → campaign type → launch → sta
   await page.getByRole("button", { name: /Максимальный/ }).click();
   await page.getByRole("button", { name: "Продолжить" }).last().click();
 
-  // 6. Step 4: enter budget + Далее
-  await expect(page.getByRole("heading", { name: "Укажите максимальный бюджет" })).toBeVisible();
-  await page.getByPlaceholder("Например, 500").fill("500");
-  await page.getByRole("button", { name: "Далее" }).last().click();
-
-  // 7. Step 5: upload file, Далее, wait hashing (~4.2s)
+  // 6. Step 4: upload file, Далее, wait hashing (~4.2s) — База теперь идёт раньше Бюджета
   await expect(page.getByRole("heading", { name: "Загрузите вашу базу" })).toBeVisible();
   const fixturePath = path.resolve(__dirname, "fixtures/test-base.csv");
   await page.locator('input[type="file"]').setInputFiles(fixturePath);
   await expect(page.getByText("test-base.csv")).toBeVisible();
+  await page.getByRole("button", { name: "Далее" }).last().click();
+
+  // 7. Step 5: enter budget + Далее
+  await expect(page.getByRole("heading", { name: "Укажите максимальный бюджет" })).toBeVisible();
+  await page.getByPlaceholder("Например, 500").fill("500");
   await page.getByRole("button", { name: "Далее" }).last().click();
 
   // 8. Step 6: summary → top-up via dev panel, then launch

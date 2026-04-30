@@ -25,7 +25,7 @@ function calcSignals(segments: string[], budget: number): string {
   return `${minSignals.toLocaleString("ru")} – ${maxSignals.toLocaleString("ru")} сигналов`;
 }
 
-export function Step4Limit({ data, onNext }: StepProps) {
+export function Step5Limit({ data, onNext }: StepProps) {
   const [value, setValue] = useState<string>(
     data.budget ? String(data.budget) : ""
   );

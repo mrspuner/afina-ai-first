@@ -7,7 +7,7 @@ import { HashingLoader } from "@/components/ui/hashing-loader";
 import { StepContent } from "@/sections/signals/steps/step-content";
 import { StepProps } from "@/types/campaign";
 
-export function Step5Upload({ data, onNext }: StepProps) {
+export function Step4Upload({ data, onNext }: StepProps) {
   const [file, setFile] = useState<File | null>(data.file);
   const [isHashing, setIsHashing] = useState(false);
 
