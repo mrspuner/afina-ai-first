@@ -8,7 +8,7 @@ import {
   type KeyboardEventHandler,
 } from "react";
 import { motion } from "motion/react";
-import { Mic, Loader2 } from "lucide-react";
+import { Mic } from "lucide-react";
 import type { PromptInputMessage } from "@/components/ai-elements/prompt-input";
 import {
   PromptInput,
@@ -39,7 +39,10 @@ import { parseCampaignQuery } from "@/state/parse-campaign-filter";
 import { useWelcomeChat } from "@/sections/welcome/welcome-chat-context";
 import { OnboardingChatChips } from "@/sections/welcome/onboarding-chat-view";
 import { CampaignsPromptChips } from "@/sections/campaigns/campaigns-prompt-chips";
-import { useTriggerEdit } from "@/state/trigger-edit-context";
+import {
+  useTriggerEdit,
+  useTriggerEditHost,
+} from "@/state/trigger-edit-context";
 
 function AttachmentFileList() {
   const { files } = usePromptInputAttachments();
@@ -150,6 +153,54 @@ function TriggerEditDraftSwap() {
     prevId.current = currentId;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [triggerEdit?.active?.id]);
+
+  return null;
+}
+
+/**
+ * Mirrors the active trigger into a single chip in the prompt-bar. When the
+ * user removes the chip via Backspace, the trigger is deselected so step-2's
+ * card UI stays in sync.
+ */
+function TriggerEditChipEffect() {
+  const triggerEdit = useTriggerEdit();
+  const host = useTriggerEditHost();
+  const { pushChip, removeChip, chips } = usePromptChips();
+  const chipIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const targetChipId = triggerEdit?.active
+      ? `trigger_${triggerEdit.active.id}`
+      : null;
+
+    if (chipIdRef.current === targetChipId) return;
+
+    if (chipIdRef.current) {
+      removeChip(chipIdRef.current);
+    }
+    if (triggerEdit?.active && targetChipId) {
+      pushChip({
+        id: targetChipId,
+        kind: "trigger",
+        label: triggerEdit.active.label,
+        payload: triggerEdit.active.id,
+        removable: true,
+      });
+    }
+    chipIdRef.current = targetChipId;
+  }, [triggerEdit?.active, pushChip, removeChip]);
+
+  // Backspace removed the chip — sync step-2's selection back to "no edit".
+  useEffect(() => {
+    if (
+      triggerEdit?.active &&
+      chipIdRef.current &&
+      !chips.some((c) => c.id === chipIdRef.current)
+    ) {
+      host.setActive(null);
+      chipIdRef.current = null;
+    }
+  }, [chips, triggerEdit?.active, host]);
 
   return null;
 }
@@ -292,6 +343,7 @@ function ShellBottomBarBody() {
       <SelectedNodeEffect selected={selectedWorkflowNode} />
       <ClearOnLeaveWorkflowEffect viewKind={view.kind} />
       <TriggerEditDraftSwap />
+      <TriggerEditChipEffect />
       <motion.div
         ref={barRef}
         className="fixed left-[120px] right-0 z-30 flex justify-center px-6"
@@ -308,22 +360,9 @@ function ShellBottomBarBody() {
             "bg-[rgba(10,10,10,0.75)] backdrop-blur-[2px]"
           )}
         >
-          {triggerEdit?.active && (
-            <div
-              data-testid="trigger-edit-hint"
-              className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/80"
-            >
-              {triggerEdit.processing ? (
-                <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-primary" />
-              ) : (
-                <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
-              )}
-              <span className="leading-snug">
-                Редактируем триггер «{triggerEdit.active.label}». Напишите,
-                какие сайты добавить или исключить.
-              </span>
-            </div>
-          )}
+          {/* Active-trigger banner is replaced by an inline chip in the
+              prompt-bar — see TriggerEditChipEffect. The error banner below
+              still shows for parser-failure messages. */}
           {triggerEdit?.hintMessage && (
             <div
               data-testid="trigger-edit-error"
