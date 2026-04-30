@@ -67,17 +67,18 @@ export function SurveyForm({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
       onSubmit={handleSubmit}
-      className="w-full max-w-md"
+      className="w-full max-w-2xl"
       noValidate
     >
-      <div className="mb-8 text-center">
+      <header className="mb-8">
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">
           {title}
         </h1>
-        <p className="mt-1.5 text-sm text-muted-foreground">{subtitle}</p>
-      </div>
-
-      <div className="flex flex-col gap-4">
+        <p className="mt-1.5 max-w-md text-sm text-muted-foreground">
+          {subtitle}
+        </p>
+      </header>
+      <div className="grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2">
         <Field
           id="survey-company-name"
           label="Название компании"
@@ -93,7 +94,6 @@ export function SurveyForm({
             aria-invalid={showErrors && !nameOk ? true : undefined}
           />
         </Field>
-
         <Field
           id="survey-website"
           label="Сайт компании"
@@ -115,30 +115,30 @@ export function SurveyForm({
             aria-invalid={showErrors && !websiteOk ? true : undefined}
           />
         </Field>
-
-        <Field
-          id="survey-direction"
-          label="Чем занимается компания"
-          error={
-            showErrors && !directionOk ? "Выберите направление" : undefined
-          }
-        >
-          <DirectionCombobox
+        <div className="md:col-span-2">
+          <Field
             id="survey-direction"
-            value={directionId}
-            onChange={(next) => setDirectionId(next)}
-          />
-        </Field>
+            label="Чем занимается компания"
+            error={
+              showErrors && !directionOk
+                ? "Выберите направление"
+                : undefined
+            }
+          >
+            <DirectionCombobox
+              id="survey-direction"
+              value={directionId}
+              onChange={(next) => setDirectionId(next)}
+            />
+          </Field>
+        </div>
       </div>
-
-      <div className="mt-6 flex items-center justify-between gap-2">
+      <div className="mt-8 flex items-center justify-end gap-2">
         {skippable && onSkip ? (
           <Button type="button" variant="ghost" onClick={onSkip}>
             Пропустить
           </Button>
-        ) : (
-          <span />
-        )}
+        ) : null}
         <Button type="submit" variant="default" size="lg">
           Продолжить
         </Button>
