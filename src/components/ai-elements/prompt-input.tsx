@@ -198,6 +198,20 @@ export interface TextInputContext {
   __registerTextarea: (
     ref: React.RefObject<HTMLTextAreaElement | null>
   ) => void;
+  /**
+   * INTERNAL: ChipEditableInput registers an imperative inserter so external
+   * callers (e.g. NodeCardBody param rows) can append text into the
+   * contenteditable surface — the textarea path bypasses contenteditable.
+   * Pass `null` on unmount to clear the registration.
+   */
+  __registerEditorInserter: (
+    insert:
+      | ((
+          text: string,
+          options?: { separator?: "smart" | "none" }
+        ) => void)
+      | null
+  ) => void;
 }
 
 /**
@@ -290,6 +304,28 @@ export const PromptInputProvider = ({
     []
   );
 
+  // ----- editor inserter registration (contenteditable surface). When the
+  // active input is ChipEditableInput rather than a <textarea>, the textarea
+  // path can't reach the DOM — the editor registers an imperative inserter
+  // that handles caret-aware DOM insertion itself.
+  const editorInserterRef = useRef<
+    | ((text: string, options?: { separator?: "smart" | "none" }) => void)
+    | null
+  >(null);
+  const __registerEditorInserter = useCallback(
+    (
+      insert:
+        | ((
+            text: string,
+            options?: { separator?: "smart" | "none" }
+          ) => void)
+        | null
+    ) => {
+      editorInserterRef.current = insert;
+    },
+    []
+  );
+
   const insertAtCursor = useCallback(
     (
       text: string,
@@ -297,6 +333,14 @@ export const PromptInputProvider = ({
     ) => {
       const separator = options?.separator ?? "smart";
       const preserveTags = options?.preserveTags ?? false;
+      // Prefer the registered editor inserter (contenteditable). It owns the
+      // DOM and writes the controller value via its onInput, so we don't need
+      // to also setTextInput here — that would race with the DOM update.
+      const editorInsert = editorInserterRef.current;
+      if (editorInsert) {
+        editorInsert(text, { separator });
+        return;
+      }
       setTextInput((prev) => {
         // 1. Clean empty @-tags from current input — skipped when the caller
         //    (e.g. a chip button under a selected node) needs the pending tag
@@ -437,6 +481,7 @@ export const PromptInputProvider = ({
       attachments,
       textInput: {
         __registerTextarea,
+        __registerEditorInserter,
         clear: clearInput,
         insertAtCursor,
         setInput: setTextInput,
@@ -449,6 +494,7 @@ export const PromptInputProvider = ({
       attachments,
       __registerFileInput,
       __registerTextarea,
+      __registerEditorInserter,
       insertAtCursor,
     ]
   );

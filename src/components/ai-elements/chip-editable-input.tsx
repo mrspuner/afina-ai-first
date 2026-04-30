@@ -85,6 +85,90 @@ export const ChipEditableInput = forwardRef<
     setInput(readText());
   }, [readText, setInput]);
 
+  // Imperative text inserter registered with the prompt-input controller
+  // (see registration effect below) so external callers — NodeCardBody param
+  // rows in particular — can drop a template into the editor without
+  // holding our ref. Inserts at the saved caret position when one exists,
+  // otherwise appends to the end. Smart separator adds a single space when
+  // needed so new content doesn't visually fuse with surrounding text/chips.
+  const insertTextImperative = useCallback(
+    (text: string, options?: { separator?: "smart" | "none" }) => {
+      const ed = editorRef.current;
+      if (!ed) return;
+      const separator = options?.separator ?? "smart";
+
+      const prependSpace = (range: Range): boolean => {
+        if (separator === "none") return false;
+        const node = range.startContainer;
+        const offset = range.startOffset;
+        if (node.nodeType === Node.TEXT_NODE) {
+          const t = (node.textContent ?? "").slice(0, offset);
+          if (t.length === 0) return false;
+          return !t.endsWith(" ");
+        }
+        const prev = node.childNodes[offset - 1];
+        if (!prev) return false;
+        if (prev instanceof HTMLElement && prev.dataset.chipId) return true;
+        if (prev.nodeType === Node.TEXT_NODE) {
+          const t = prev.textContent ?? "";
+          return t.length > 0 && !t.endsWith(" ");
+        }
+        return false;
+      };
+
+      const sel = window.getSelection();
+      let range: Range | null = null;
+      if (sel && sel.rangeCount > 0 && ed.contains(sel.anchorNode)) {
+        range = sel.getRangeAt(0);
+      } else if (
+        lastRangeRef.current &&
+        ed.contains(lastRangeRef.current.startContainer)
+      ) {
+        range = lastRangeRef.current;
+      }
+
+      if (range) {
+        range.deleteContents();
+        const prefix = prependSpace(range) ? " " : "";
+        const node = document.createTextNode(prefix + text);
+        range.insertNode(node);
+        const next = document.createRange();
+        next.setStartAfter(node);
+        next.collapse(true);
+        sel?.removeAllRanges();
+        sel?.addRange(next);
+        lastRangeRef.current = next.cloneRange();
+      } else {
+        const last = ed.lastChild;
+        let needsPad = false;
+        if (last) {
+          if (last instanceof HTMLElement && last.dataset.chipId) {
+            needsPad = true;
+          } else if (last.nodeType === Node.TEXT_NODE) {
+            const t = last.textContent ?? "";
+            needsPad = t.length > 0 && !t.endsWith(" ");
+          }
+        }
+        const prefix = separator === "smart" && needsPad ? " " : "";
+        ed.appendChild(document.createTextNode(prefix + text));
+      }
+
+      setInput(readText());
+      ed.focus();
+    },
+    [readText, setInput]
+  );
+
+  // Register the imperative inserter with the prompt-input controller so
+  // `controller.textInput.insertAtCursor()` calls actually reach this
+  // contenteditable surface (the textarea path can't write to it).
+  useEffect(() => {
+    controller.textInput.__registerEditorInserter(insertTextImperative);
+    return () => {
+      controller.textInput.__registerEditorInserter(null);
+    };
+  }, [controller.textInput, insertTextImperative]);
+
   // Save the last in-editor range so chip insertion can target the user's
   // typing position even after focus moved to a button.
   useEffect(() => {
