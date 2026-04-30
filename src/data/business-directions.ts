@@ -300,3 +300,39 @@ export function getDirection(id: string): BusinessDirection {
     BUSINESS_DIRECTIONS[0]
   );
 }
+
+// Survey-form has 22 granular industry options (см. src/sections/survey/direction-combobox.tsx
+// + DIRECTIONS), but the signal-flow interests/triggers are bucketed into the 8 broader
+// BUSINESS_DIRECTIONS above. This map collapses survey choice → signal-flow bucket so
+// completing the анкета seeds the correct interests/triggers in the wizard.
+const SURVEY_TO_BUSINESS_DIRECTION: Record<string, string> = {
+  banking: "finance",
+  mfo: "finance",
+  insurance: "finance",
+  investments: "finance",
+  "auto-sales": "auto",
+  "auto-service-aftermarket": "auto",
+  "telecom-isp": "telecom",
+  "real-estate-residential": "real-estate",
+  "real-estate-commercial": "real-estate",
+  marketplaces: "retail",
+  "electronics-retail": "retail",
+  "fashion-retail": "retail",
+  "home-diy-retail": "retail",
+  "food-delivery": "retail",
+  travel: "retail",
+  "edu-academic": "education",
+  "edu-courses": "education",
+  medicine: "medicine",
+  pharma: "medicine",
+  fitness: "medicine",
+  hr: "b2b",
+  "b2b-saas-software": "b2b",
+};
+
+export function businessDirectionFromSurvey(
+  surveyDirectionId: string | null
+): string {
+  if (!surveyDirectionId) return DEFAULT_DIRECTION_ID;
+  return SURVEY_TO_BUSINESS_DIRECTION[surveyDirectionId] ?? DEFAULT_DIRECTION_ID;
+}

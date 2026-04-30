@@ -4,6 +4,10 @@ import type { CampaignSort } from "./parse-campaign-filter";
 import type { Survey, SurveyStatus } from "@/types/survey";
 import { EMPTY_SURVEY } from "@/types/survey";
 import type { SignalStatus } from "@/types/signal-status";
+import {
+  DEFAULT_DIRECTION_ID,
+  businessDirectionFromSurvey,
+} from "@/data/business-directions";
 
 export type SignalType =
   | "Регистрация"
@@ -151,6 +155,8 @@ export type Action =
   | { type: "survey_updated"; patch: Partial<Survey> }
   | { type: "survey_completed"; survey: Survey }
   | { type: "survey_skipped" }
+  | { type: "survey_reset" }
+  | { type: "dev_survey_force_complete" }
   | { type: "balance_topup"; amount: number }
   | { type: "signal_status_changed"; id: string; status: SignalStatus }
   | { type: "signal_deleted"; id: string }
@@ -549,10 +555,27 @@ export function appReducer(state: AppState, action: Action): AppState {
         ...state,
         survey: action.survey,
         surveyStatus: "completed",
+        // Анкета — единственный источник «направления клиента» для пользователя.
+        // Дев-панель просто отражает это значение и позволяет тестово переопределить.
+        clientDirection: businessDirectionFromSurvey(action.survey.directionId),
       };
 
     case "survey_skipped":
       return { ...state, surveyStatus: "skipped" };
+
+    case "survey_reset":
+      return {
+        ...state,
+        survey: EMPTY_SURVEY,
+        surveyStatus: "not_started",
+        clientDirection: DEFAULT_DIRECTION_ID,
+      };
+
+    case "dev_survey_force_complete":
+      // Dev-panel-only override: lets a tester bypass the survey gate without
+      // filling the form. Keeps existing survey data and clientDirection so the
+      // dev can pick direction independently from the panel.
+      return { ...state, surveyStatus: "completed" };
 
     case "balance_topup":
       return { ...state, balance: state.balance + Math.max(0, action.amount) };
