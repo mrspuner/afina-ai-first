@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  type KeyboardEventHandler,
+} from "react";
 import { motion } from "motion/react";
 import { Mic, Loader2 } from "lucide-react";
 import type { PromptInputMessage } from "@/components/ai-elements/prompt-input";
@@ -16,6 +22,11 @@ import {
   usePromptInputAttachments,
   usePromptInputController,
 } from "@/components/ai-elements/prompt-input";
+import { PromptChipsRow } from "@/components/ai-elements/prompt-chips-row";
+import {
+  PromptChipsProvider,
+  usePromptChips,
+} from "@/state/prompt-chips-context";
 import { cn } from "@/lib/utils";
 import { useAppState, useAppDispatch } from "@/state/app-state-context";
 import {
@@ -144,11 +155,47 @@ function TriggerEditDraftSwap() {
 }
 
 export function ShellBottomBar() {
+  // The chip provider must wrap everything that calls usePromptChips —
+  // the bar body, its child effects (SelectedNodeChipEffect, the trigger
+  // chip mirror) and the chip-row inside the input. Splitting the body
+  // out keeps the hook order stable on remount.
+  return (
+    <PromptChipsProvider>
+      <ShellBottomBarBody />
+    </PromptChipsProvider>
+  );
+}
+
+function ShellBottomBarBody() {
   const state = useAppState();
   const dispatch = useAppDispatch();
   const { view, selectedWorkflowNode } = state;
   const welcomeChat = useWelcomeChat();
   const triggerEdit = useTriggerEdit();
+  const chipsApi = usePromptChips();
+
+  const handleChipsBackspace = useCallback<
+    KeyboardEventHandler<HTMLTextAreaElement>
+  >(
+    (e) => {
+      if (
+        e.key === "Backspace" &&
+        e.currentTarget.value === "" &&
+        e.currentTarget.selectionStart === 0 &&
+        e.currentTarget.selectionEnd === 0 &&
+        chipsApi.chips.length > 0
+      ) {
+        const lastRemovable = [...chipsApi.chips]
+          .reverse()
+          .find((c) => c.removable);
+        if (lastRemovable) {
+          e.preventDefault();
+          chipsApi.removeChip(lastRemovable.id);
+        }
+      }
+    },
+    [chipsApi]
+  );
 
   function handlePromptSubmit(message: PromptInputMessage) {
     const rawText = message.text ?? "";
@@ -304,10 +351,19 @@ export function ShellBottomBar() {
             )}
           >
             <AttachmentFileList />
-            <PromptInputBody>
+            <PromptInputBody className="flex flex-wrap items-start gap-2 px-3 py-2">
+              <PromptChipsRow />
               <PromptInputTextarea
-                className="min-h-[52px] max-h-[120px] bg-transparent text-[#fafafa] placeholder:text-muted-foreground"
+                className={cn(
+                  "min-h-[52px] max-h-[120px] bg-transparent text-[#fafafa] placeholder:text-muted-foreground",
+                  // Inline layout: textarea fills remaining space alongside
+                  // chips on the same row, wraps onto a new line when chips
+                  // overflow. Neutralise the InputGroupTextarea defaults so
+                  // chips and the textarea share one visual surface.
+                  "flex-1 min-w-[12rem] !p-0 !border-0"
+                )}
                 placeholder={chatPlaceholder}
+                onKeyDown={handleChipsBackspace}
               />
             </PromptInputBody>
             <PromptInputFooter>
