@@ -1,28 +1,20 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  type KeyboardEventHandler,
-} from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { motion } from "motion/react";
 import { Mic } from "lucide-react";
 import type { PromptInputMessage } from "@/components/ai-elements/prompt-input";
 import {
   PromptInput,
-  PromptInputBody,
   PromptInputButton,
   PromptInputFooter,
   PromptInputHeader,
   PromptInputSubmit,
-  PromptInputTextarea,
   PromptInputTools,
   usePromptInputAttachments,
   usePromptInputController,
 } from "@/components/ai-elements/prompt-input";
-import { PromptChipsRow } from "@/components/ai-elements/prompt-chips-row";
+import { ChipEditableInput } from "@/components/ai-elements/chip-editable-input";
 import {
   PromptChipsProvider,
   usePromptChips,
@@ -231,29 +223,6 @@ function ShellBottomBarBody() {
   const triggerEdit = useTriggerEdit();
   const chipsApi = usePromptChips();
 
-  const handleChipsBackspace = useCallback<
-    KeyboardEventHandler<HTMLTextAreaElement>
-  >(
-    (e) => {
-      if (
-        e.key === "Backspace" &&
-        e.currentTarget.value === "" &&
-        e.currentTarget.selectionStart === 0 &&
-        e.currentTarget.selectionEnd === 0 &&
-        chipsApi.chips.length > 0
-      ) {
-        const lastRemovable = [...chipsApi.chips]
-          .reverse()
-          .find((c) => c.removable);
-        if (lastRemovable) {
-          e.preventDefault();
-          chipsApi.removeChip(lastRemovable.id);
-        }
-      }
-    },
-    [chipsApi]
-  );
-
   function handlePromptSubmit(message: PromptInputMessage) {
     const rawText = message.text ?? "";
 
@@ -404,21 +373,10 @@ function ShellBottomBarBody() {
             )}
           >
             <AttachmentFileList />
-            <PromptInputBody className="flex flex-wrap items-start gap-2 px-3 py-2">
-              <PromptChipsRow />
-              <PromptInputTextarea
-                className={cn(
-                  "min-h-[52px] max-h-[120px] bg-transparent text-[#fafafa] placeholder:text-muted-foreground",
-                  // Inline layout: textarea fills remaining space alongside
-                  // chips on the same row, wraps onto a new line when chips
-                  // overflow. Neutralise the InputGroupTextarea defaults so
-                  // chips and the textarea share one visual surface.
-                  "flex-1 min-w-[12rem] !p-0 !border-0"
-                )}
-                placeholder={chatPlaceholder}
-                onKeyDown={handleChipsBackspace}
-              />
-            </PromptInputBody>
+            <ChipEditableInput
+              className="px-3 py-2"
+              placeholder={chatPlaceholder}
+            />
             <PromptInputFooter>
               <PromptInputTools>
                 <PromptInputButton tooltip="Голосовой ввод">
