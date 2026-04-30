@@ -27,6 +27,8 @@ export interface TriggerEditTarget {
   label: string;
 }
 
+import type { ChipSegment } from "@/state/prompt-chips-context";
+
 export type TriggerEditSubmitResult =
   | { ok: true }
   | { ok: false; message: string };
@@ -39,11 +41,12 @@ export interface TriggerEditContextValue {
   /** Hint message shown above the prompt-bar (fallback / errors). */
   hintMessage: string | null;
   /**
-   * Submit a prompt; returns the result so the caller (PromptBar) can decide
-   * whether to clear its input. `ok=true` clears, `ok=false` keeps the text
-   * so the user can edit & retry.
+   * Submit one or more (chip, text) segments. Each segment carries a trigger
+   * chip plus the free text the user typed after it; the parser is run per
+   * segment so different triggers can receive different commands. The result
+   * tells the PromptBar whether to clear its input.
    */
-  submit: (text: string) => Promise<TriggerEditSubmitResult>;
+  submit: (segments: ChipSegment[]) => Promise<TriggerEditSubmitResult>;
   /** Pull the saved draft for a trigger, if any. */
   getDraft: (triggerId: string) => string;
   /** Save the current prompt-bar text against the active trigger. */
@@ -84,15 +87,16 @@ export function TriggerEditProvider({ children }: { children: ReactNode }) {
   const [processing, setProcessing] = useState(false);
   const [hintMessage, setHintMessage] = useState<string | null>(null);
 
-  const submitRef = useRef<((text: string) => Promise<TriggerEditSubmitResult>) | null>(
-    null
-  );
+  const submitRef = useRef<
+    | ((segments: ChipSegment[]) => Promise<TriggerEditSubmitResult>)
+    | null
+  >(null);
   const drafts = useRef<Map<string, string>>(new Map());
 
-  const submit = useCallback(async (text: string) => {
+  const submit = useCallback(async (segments: ChipSegment[]) => {
     const fn = submitRef.current;
     if (!fn) return { ok: false, message: "Редактирование триггера не активно." };
-    return fn(text);
+    return fn(segments);
   }, []);
 
   const getDraft = useCallback((triggerId: string) => {
@@ -152,7 +156,9 @@ export function TriggerEditProvider({ children }: { children: ReactNode }) {
 const TriggerEditHostContext = createContext<
   | (TriggerEditHostHandle & {
       registerSubmit: (
-        fn: ((text: string) => Promise<TriggerEditSubmitResult>) | null
+        fn:
+          | ((segments: ChipSegment[]) => Promise<TriggerEditSubmitResult>)
+          | null
       ) => void;
     })
   | null

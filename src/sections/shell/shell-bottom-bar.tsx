@@ -14,7 +14,10 @@ import {
   PromptInputTools,
   usePromptInputAttachments,
 } from "@/components/ai-elements/prompt-input";
-import { ChipEditableInput } from "@/components/ai-elements/chip-editable-input";
+import {
+  ChipEditableInput,
+  type ChipEditableInputHandle,
+} from "@/components/ai-elements/chip-editable-input";
 import { usePromptChips } from "@/state/prompt-chips-context";
 import { cn } from "@/lib/utils";
 import { useAppState, useAppDispatch } from "@/state/app-state-context";
@@ -109,17 +112,22 @@ export function ShellBottomBar() {
   const chipsApi = usePromptChips();
 
   const hasTriggerChips = chipsApi.chips.some((c) => c.kind === "trigger");
+  const editorRef = useRef<ChipEditableInputHandle>(null);
 
   function handlePromptSubmit(message: PromptInputMessage) {
     const rawText = message.text ?? "";
+    const segments = editorRef.current?.getSegments() ?? [];
 
     // Trigger-edit mode: any trigger chip in the prompt-bar means the user
-    // is directing edits at those triggers. Submissions go through the
-    // trigger-edit pipeline (regex parser → step-2 deltas).
+    // is directing edits at those triggers. Pass per-chip segments through
+    // so each chip's command text is parsed independently.
     if (hasTriggerChips && triggerEdit) {
-      // Fire-and-forget — the host clears its own UI state. The PromptInput
-      // textarea is cleared by the form's submit handler regardless.
-      void triggerEdit.submit(rawText);
+      void triggerEdit.submit(segments).then((result) => {
+        if (result.ok) {
+          chipsApi.clearChips();
+          editorRef.current?.clear();
+        }
+      });
       return;
     }
 
@@ -139,14 +147,12 @@ export function ShellBottomBar() {
     if (view.kind !== "workflow" || view.launched) return;
 
     const structural = parseStructuralCommands(rawText);
-    // Node-targeted commands now come from chips: each `node` chip pairs with
-    // the user's free text. Multiple node chips share the same instruction.
-    const nodeChips = chipsApi.chips.filter((c) => c.kind === "node");
-    const trimmedText = rawText.trim();
-    const nodeCommands =
-      nodeChips.length > 0 && trimmedText.length > 0
-        ? nodeChips.map((c) => ({ nodeLabel: c.label, text: trimmedText }))
-        : [];
+    // Node commands now come from per-chip segments: each `node` chip pairs
+    // with the free text typed *between* it and the next chip. Empty-text
+    // segments are skipped so a chip without a command doesn't fire a noop.
+    const nodeCommands = segments
+      .filter((s) => s.chip.kind === "node" && s.text.length > 0)
+      .map((s) => ({ nodeLabel: s.chip.label, text: s.text }));
 
     if (structural.ops.length > 0) {
       dispatch({
@@ -160,11 +166,12 @@ export function ShellBottomBar() {
         commands: nodeCommands,
       });
       chipsApi.clearChips();
+      editorRef.current?.clear();
     }
     if (
       structural.ops.length === 0 &&
       nodeCommands.length === 0 &&
-      trimmedText
+      rawText.trim()
     ) {
       dispatch({ type: "workflow_command_submit", text: rawText });
     }
@@ -283,6 +290,7 @@ export function ShellBottomBar() {
           >
             <AttachmentFileList />
             <ChipEditableInput
+              ref={editorRef}
               className="px-3 py-2"
               placeholder={chatPlaceholder}
             />

@@ -25,6 +25,16 @@ export interface PromptChipsState {
   chips: PromptChip[];
 }
 
+/**
+ * One segment per chip — the chip plus the free text typed *after* it (until
+ * the next chip or end of editor). The editor produces these on submit so
+ * downstream consumers can apply a different command to each chip.
+ */
+export interface ChipSegment {
+  chip: PromptChip;
+  text: string;
+}
+
 export type PromptChipsAction =
   | { type: "push"; chip: Omit<PromptChip, "id"> & { id?: string } }
   | { type: "remove"; id: string }

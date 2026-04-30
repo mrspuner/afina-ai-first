@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Check, Plus, Minus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StepContent } from "@/sections/signals/steps/step-content";
@@ -16,13 +16,17 @@ import {
   isDeltaEmpty,
   parseTriggerCommand,
   removeFromDelta,
+  type ParsedTriggerCommand,
   type TriggerDelta,
 } from "@/lib/trigger-edit-parser";
 import {
   useTriggerEditHost,
   type TriggerEditSubmitResult,
 } from "@/state/trigger-edit-context";
-import { usePromptChips } from "@/state/prompt-chips-context";
+import {
+  usePromptChips,
+  type ChipSegment,
+} from "@/state/prompt-chips-context";
 import { cn } from "@/lib/utils";
 
 /** Return a copy of `obj` without the given key. Avoids the
@@ -365,35 +369,57 @@ export function Step2Interests({ data, onNext }: StepProps) {
     });
   }
 
-  // Submit pipeline — runs when the user hits return in the prompt-bar while
-  // any trigger is in the edit context. The parsed command applies to every
-  // chipped trigger; the highlight flashes them all so the user sees what
-  // moved.
-  const editTargetsRef = useRef(editTargetIds);
-  useEffect(() => {
-    editTargetsRef.current = editTargetIds;
-  }, [editTargetIds]);
-
+  // Submit pipeline — receives one segment per chip (chip + its trailing
+  // text). Each segment runs the parser independently so user can write
+  //   "<chip A> добавь x.ru, <chip B> исключи y.ru"
+  // and have x.ru land on A's delta, y.ru on B's.
   const submit = useCallback(
-    async (rawText: string): Promise<TriggerEditSubmitResult> => {
-      const targetIds = [...editTargetsRef.current];
-      if (targetIds.length === 0) {
+    async (segments: ChipSegment[]): Promise<TriggerEditSubmitResult> => {
+      const triggerSegments = segments.filter(
+        (s) => s.chip.kind === "trigger"
+      );
+      if (triggerSegments.length === 0) {
         return { ok: false, message: "Нет активных триггеров для правки." };
       }
-      const parsed = parseTriggerCommand(rawText);
-      if (parsed.kind === "fallback") {
-        host.setHint(parsed.message);
-        return { ok: false, message: parsed.message };
+
+      // Validate every segment up-front. If any segment fails the parser we
+      // surface the first fallback message and abort the whole submit so the
+      // user can fix their input — matches the prior single-target behavior.
+      const parsedPerSegment: Array<{
+        triggerId: string;
+        parsed: Exclude<ParsedTriggerCommand, { kind: "fallback" }>;
+      }> = [];
+      for (const seg of triggerSegments) {
+        const triggerId = seg.chip.payload as string;
+        if (!triggerId) continue;
+        // Empty text means the user dropped a chip without a command —
+        // skip it silently.
+        if (seg.text.length === 0) continue;
+        const parsed = parseTriggerCommand(seg.text);
+        if (parsed.kind === "fallback") {
+          host.setHint(parsed.message);
+          return { ok: false, message: parsed.message };
+        }
+        parsedPerSegment.push({ triggerId, parsed });
+      }
+      if (parsedPerSegment.length === 0) {
+        return {
+          ok: false,
+          message:
+            "Напишите команду после чипсы — например, «добавь auto1.ru».",
+        };
       }
 
       host.setHint(null);
       host.setProcessing(true);
-      setHighlightedTriggerIds(new Set(targetIds));
+      setHighlightedTriggerIds(
+        new Set(parsedPerSegment.map((s) => s.triggerId))
+      );
       await new Promise((r) => setTimeout(r, 350));
 
       setDeltas((prev) => {
         const next = { ...prev };
-        for (const triggerId of targetIds) {
+        for (const { triggerId, parsed } of parsedPerSegment) {
           const current = next[triggerId] ?? EMPTY_DELTA;
           if (parsed.kind === "clear-added") {
             const updated: TriggerDelta = { ...current, added: [] };
