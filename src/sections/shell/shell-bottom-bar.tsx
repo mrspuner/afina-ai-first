@@ -2,7 +2,8 @@
 
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { motion } from "motion/react";
-import { Mic } from "lucide-react";
+import Image from "next/image";
+import { Mic, Loader2 } from "lucide-react";
 import type { PromptInputMessage } from "@/components/ai-elements/prompt-input";
 import {
   PromptInput,
@@ -343,9 +344,33 @@ function ShellBottomBarBody() {
             "bg-[rgba(10,10,10,0.75)] backdrop-blur-[2px]"
           )}
         >
-          {/* Active-trigger banner is replaced by an inline chip in the
-              prompt-bar — see TriggerEditChipEffect. The error banner below
-              still shows for parser-failure messages. */}
+          {/* Active-trigger banner: explains what the chip in the prompt-bar
+              represents and what commands the user can run. The mascot icon
+              lives here (not on the chip itself) so the chip stays a clean,
+              text-only inline pill that doesn't confuse contenteditable. */}
+          {triggerEdit?.active && (
+            <div
+              data-testid="trigger-edit-hint"
+              className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/80"
+            >
+              {triggerEdit.processing ? (
+                <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-primary" />
+              ) : (
+                <Image
+                  src="/mascot-icon.svg"
+                  alt=""
+                  width={16}
+                  height={16}
+                  className="shrink-0"
+                  aria-hidden
+                />
+              )}
+              <span className="leading-snug">
+                Редактируем триггер «{triggerEdit.active.label}». Напишите,
+                какие сайты добавить или исключить.
+              </span>
+            </div>
+          )}
           {triggerEdit?.hintMessage && (
             <div
               data-testid="trigger-edit-error"

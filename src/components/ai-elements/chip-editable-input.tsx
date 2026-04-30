@@ -1,7 +1,5 @@
 "use client";
 
-import Image from "next/image";
-import { Plus, Minus } from "lucide-react";
 import {
   forwardRef,
   useCallback,
@@ -133,10 +131,8 @@ export const ChipEditableInput = forwardRef<
   const onKeyDown = useCallback(
     (e: KeyboardEvent<HTMLDivElement>) => {
       if (e.key === "Enter" && !e.shiftKey) {
-        // Submit via form.requestSubmit() — matches the textarea behavior.
         const form = (e.currentTarget as HTMLElement).closest("form");
         if (form) {
-          // Respect a disabled submit button — same as the original textarea.
           const submitBtn = form.querySelector<HTMLButtonElement>(
             'button[type="submit"]'
           );
@@ -147,29 +143,36 @@ export const ChipEditableInput = forwardRef<
         return;
       }
       if (e.key === "Backspace") {
-        // Case 1: caret is right after a chip element → remove that chip.
-        const sel = window.getSelection();
-        if (sel && sel.isCollapsed && sel.rangeCount > 0) {
-          const range = sel.getRangeAt(0);
-          const adjacentChip = chipBeforeCaret(range, editorRef.current);
-          if (adjacentChip) {
-            e.preventDefault();
-            removeChip(adjacentChip.dataset.chipId!);
-            return;
-          }
-        }
-        // Case 2: empty editor with chips → remove the last removable chip
-        // (matches the prior textarea Backspace-at-zero behavior).
-        if (readText() === "" && chips.length > 0) {
+        // The text portion is "empty" if it contains only whitespace, br, or
+        // zero-width characters that browsers sometimes inject as caret
+        // markers inside an otherwise empty contenteditable. In that case
+        // Backspace removes the last removable chip — anything else is
+        // handed back to the browser for standard char-deletion.
+        const meaningful = readText().replace(/[\s​ ]/g, "");
+        if (meaningful.length === 0 && chips.length > 0) {
           const lastRemovable = [...chips].reverse().find((c) => c.removable);
           if (lastRemovable) {
             e.preventDefault();
             removeChip(lastRemovable.id);
+            // Scrub any caret markers the browser left around the chip so the
+            // editor returns to a known-clean state and is ready to receive
+            // the next chip. Without this Chrome can leave a <br> or empty
+            // text node that confuses future insertions.
+            const ed = editorRef.current;
+            if (ed) {
+              const toRemove: ChildNode[] = [];
+              ed.childNodes.forEach((node) => {
+                if (node === chipsHostRef.current) return;
+                toRemove.push(node);
+              });
+              toRemove.forEach((n) => n.remove());
+            }
+            setInput("");
           }
         }
       }
     },
-    [chips, readText, removeChip]
+    [chips, readText, removeChip, setInput]
   );
 
   // Strip rich formatting from pasted content — only plain text in the editor.
@@ -224,47 +227,20 @@ function ChipNode({ chip }: { chip: PromptChip }) {
       contentEditable={false}
       data-chip-id={chip.id}
       data-chip-kind={chip.kind}
-      // Inline-block so the chip flows with surrounding text and follows the
-      // same line-wrapping rules as words. The trailing space below keeps
-      // typing right after a chip from gluing onto its label.
+      // Inline-flex so the chip flows with surrounding text and follows the
+      // same line-wrapping rules as words. We deliberately keep the chip
+      // free of <img> children — Chrome treats inline images as separately
+      // selectable objects in contenteditable, which led to a "delete the
+      // label first, then the icon" Backspace artefact. Glyphs/icons that
+      // describe the chip's role belong in the floating hint above the bar.
       className={cn(
-        "mx-0.5 inline-flex select-none items-center gap-1.5 rounded-md border px-2 py-0.5 align-baseline text-xs font-medium",
+        "mx-0.5 inline-flex select-none items-center rounded-md border px-2 py-0.5 align-baseline text-xs font-medium",
         "border-white/15 bg-white/10 text-white"
       )}
     >
-      <ChipGlyph chip={chip} />
       <span className="leading-none">{chip.label}</span>
     </span>
   );
-}
-
-function ChipGlyph({ chip }: { chip: PromptChip }) {
-  switch (chip.kind) {
-    case "trigger":
-      return (
-        <Image
-          src="/mascot-icon.svg"
-          alt=""
-          width={14}
-          height={14}
-          className="shrink-0"
-          aria-hidden
-        />
-      );
-    case "mode":
-      return chip.payload === "exclude" ? (
-        <Minus className="h-3 w-3 shrink-0" />
-      ) : (
-        <Plus className="h-3 w-3 shrink-0" />
-      );
-    case "node":
-      return (
-        <span
-          aria-hidden
-          className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-primary"
-        />
-      );
-  }
 }
 
 function placeCaretAtEnd(el: HTMLElement) {
@@ -274,41 +250,4 @@ function placeCaretAtEnd(el: HTMLElement) {
   const sel = window.getSelection();
   sel?.removeAllRanges();
   sel?.addRange(range);
-}
-
-/**
- * If the caret is immediately preceded by a chip element (no text node in
- * between), return that chip element. Used to make Backspace remove the
- * preceding chip atomically.
- */
-function chipBeforeCaret(
-  range: Range,
-  editor: HTMLElement | null
-): HTMLElement | null {
-  if (!editor) return null;
-  const { startContainer, startOffset } = range;
-
-  // Caret inside a text node: only matches when offset is 0 and the previous
-  // sibling is a chip span.
-  if (startContainer.nodeType === Node.TEXT_NODE) {
-    if (startOffset !== 0) return null;
-    const prev = startContainer.previousSibling;
-    return isChip(prev) ? (prev as HTMLElement) : null;
-  }
-
-  // Caret at element level (between/around children): the node before the
-  // caret is the child at index startOffset - 1.
-  if (startContainer === editor) {
-    const node = editor.childNodes[startOffset - 1] ?? null;
-    return isChip(node) ? (node as HTMLElement) : null;
-  }
-  return null;
-}
-
-function isChip(node: Node | null): boolean {
-  return (
-    !!node &&
-    node.nodeType === Node.ELEMENT_NODE &&
-    (node as HTMLElement).hasAttribute?.("data-chip-id")
-  );
 }
