@@ -19,10 +19,10 @@ import {
   type TriggerDelta,
 } from "@/lib/trigger-edit-parser";
 import {
-  useTriggerEdit,
   useTriggerEditHost,
   type TriggerEditSubmitResult,
 } from "@/state/trigger-edit-context";
+import { usePromptChips } from "@/state/prompt-chips-context";
 import { cn } from "@/lib/utils";
 
 /** Return a copy of `obj` without the given key. Avoids the
@@ -273,15 +273,25 @@ export function Step2Interests({ data, onNext }: StepProps) {
     data.triggers
   );
   const [deltas, setDeltas] = useState<Record<string, TriggerDelta>>({});
-  const [editingTriggerId, setEditingTriggerId] = useState<string | null>(
-    null
-  );
-  const [highlightedTriggerId, setHighlightedTriggerId] = useState<
-    string | null
-  >(null);
+  const [highlightedTriggerIds, setHighlightedTriggerIds] = useState<
+    Set<string>
+  >(() => new Set());
 
-  const triggerEdit = useTriggerEdit();
   const host = useTriggerEditHost();
+  const chipsApi = usePromptChips();
+
+  // Triggers currently in edit context = trigger ids of chips in the prompt
+  // bar. Multiple triggers can be edited simultaneously; the next text submit
+  // applies the parsed command to each.
+  const editTargetIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const c of chipsApi.chips) {
+      if (c.kind === "trigger" && typeof c.payload === "string") {
+        set.add(c.payload);
+      }
+    }
+    return set;
+  }, [chipsApi.chips]);
 
   // The list of trigger objects available — flattened from all interests
   // selected (so user can mix triggers across multiple interests).
@@ -315,16 +325,31 @@ export function Step2Interests({ data, onNext }: StepProps) {
       const next = prev.includes(triggerId)
         ? prev.filter((t) => t !== triggerId)
         : [...prev, triggerId];
-      // Deselecting the trigger that's being edited cancels the edit.
-      if (!next.includes(triggerId) && editingTriggerId === triggerId) {
-        setEditingTriggerId(null);
+      // Unchecking a trigger also drops its edit chip from the prompt-bar
+      // — you can't edit a trigger you're no longer selecting.
+      if (!next.includes(triggerId) && editTargetIds.has(triggerId)) {
+        chipsApi.removeChip(`trigger_${triggerId}`);
       }
       return next;
     });
   }
 
   function handleConfigureClick(triggerId: string) {
-    setEditingTriggerId((prev) => (prev === triggerId ? null : triggerId));
+    const chipId = `trigger_${triggerId}`;
+    if (editTargetIds.has(triggerId)) {
+      // Toggle off — remove this trigger from the edit context.
+      chipsApi.removeChip(chipId);
+      return;
+    }
+    const trigger = triggerById.get(triggerId);
+    if (!trigger) return;
+    chipsApi.pushChip({
+      id: chipId,
+      kind: "trigger",
+      label: trigger.label,
+      payload: triggerId,
+      removable: true,
+    });
   }
 
   function handleRemoveDelta(
@@ -340,19 +365,20 @@ export function Step2Interests({ data, onNext }: StepProps) {
     });
   }
 
-  // Submit pipeline — runs whenever the user hits return in the prompt-bar
-  // while a trigger is being edited. Captures `editingTriggerId` from a ref
-  // to avoid stale-closure issues across renders.
-  const editingRef = useRef<string | null>(editingTriggerId);
+  // Submit pipeline — runs when the user hits return in the prompt-bar while
+  // any trigger is in the edit context. The parsed command applies to every
+  // chipped trigger; the highlight flashes them all so the user sees what
+  // moved.
+  const editTargetsRef = useRef(editTargetIds);
   useEffect(() => {
-    editingRef.current = editingTriggerId;
-  }, [editingTriggerId]);
+    editTargetsRef.current = editTargetIds;
+  }, [editTargetIds]);
 
   const submit = useCallback(
     async (rawText: string): Promise<TriggerEditSubmitResult> => {
-      const triggerId = editingRef.current;
-      if (!triggerId) {
-        return { ok: false, message: "Нет активного триггера для правки." };
+      const targetIds = [...editTargetsRef.current];
+      if (targetIds.length === 0) {
+        return { ok: false, message: "Нет активных триггеров для правки." };
       }
       const parsed = parseTriggerCommand(rawText);
       if (parsed.kind === "fallback") {
@@ -360,70 +386,51 @@ export function Step2Interests({ data, onNext }: StepProps) {
         return { ok: false, message: parsed.message };
       }
 
-      // Brief processing tick — both for the prompt-bar spinner AND the
-      // card highlight that draws the eye toward the affected trigger.
       host.setHint(null);
       host.setProcessing(true);
-      setHighlightedTriggerId(triggerId);
+      setHighlightedTriggerIds(new Set(targetIds));
       await new Promise((r) => setTimeout(r, 350));
 
       setDeltas((prev) => {
-        const current = prev[triggerId] ?? EMPTY_DELTA;
-        if (parsed.kind === "clear-added") {
-          const next: TriggerDelta = { ...current, added: [] };
-          if (isDeltaEmpty(next)) return omitKey(prev, triggerId);
-          return { ...prev, [triggerId]: next };
+        const next = { ...prev };
+        for (const triggerId of targetIds) {
+          const current = next[triggerId] ?? EMPTY_DELTA;
+          if (parsed.kind === "clear-added") {
+            const updated: TriggerDelta = { ...current, added: [] };
+            if (isDeltaEmpty(updated)) delete next[triggerId];
+            else next[triggerId] = updated;
+          } else if (parsed.kind === "clear-excluded") {
+            const updated: TriggerDelta = { ...current, excluded: [] };
+            if (isDeltaEmpty(updated)) delete next[triggerId];
+            else next[triggerId] = updated;
+          } else {
+            next[triggerId] = applyEditToDelta(
+              current,
+              parsed.add,
+              parsed.exclude
+            );
+          }
         }
-        if (parsed.kind === "clear-excluded") {
-          const next: TriggerDelta = { ...current, excluded: [] };
-          if (isDeltaEmpty(next)) return omitKey(prev, triggerId);
-          return { ...prev, [triggerId]: next };
-        }
-        const next = applyEditToDelta(current, parsed.add, parsed.exclude);
-        return { ...prev, [triggerId]: next };
+        return next;
       });
 
       host.setProcessing(false);
-      // Hold the highlight a moment longer than the processing spinner so it
-      // reads as "look — this card just changed".
-      window.setTimeout(() => setHighlightedTriggerId(null), 600);
+      window.setTimeout(() => setHighlightedTriggerIds(new Set()), 600);
       return { ok: true };
     },
     [host]
   );
 
-  // Register submit + active target with the global trigger-edit context.
+  // Register submit with the trigger-edit pipeline. The prompt-bar routes
+  // submissions here whenever it sees trigger chips. Cleared on step unmount.
   useEffect(() => {
-    if (!editingTriggerId) {
-      host.setActive(null);
-      host.setHint(null);
-      host.registerSubmit(null);
-      return;
-    }
-    const trigger = triggerById.get(editingTriggerId);
-    if (!trigger) {
-      host.setActive(null);
-      host.registerSubmit(null);
-      return;
-    }
-    host.setActive({ id: trigger.id, label: trigger.label });
-    host.setHint(null);
     host.registerSubmit(submit);
     return () => {
-      host.registerSubmit(null);
-    };
-  }, [editingTriggerId, triggerById, host, submit]);
-
-  // On unmount (step navigation away), tear down the edit context so the
-  // prompt-bar doesn't keep showing the hint.
-  useEffect(() => {
-    return () => {
-      host.setActive(null);
       host.setHint(null);
       host.setProcessing(false);
       host.registerSubmit(null);
     };
-  }, [host]);
+  }, [host, submit]);
 
   const hasInterest = selectedInterests.length > 0;
   const canContinue = hasInterest || selectedTriggers.length > 0;
@@ -498,8 +505,8 @@ export function Step2Interests({ data, onNext }: StepProps) {
                 trigger={trigger}
                 selected={selectedTriggers.includes(trigger.id)}
                 delta={deltas[trigger.id] ?? EMPTY_DELTA}
-                isEditing={editingTriggerId === trigger.id}
-                highlight={highlightedTriggerId === trigger.id}
+                isEditing={editTargetIds.has(trigger.id)}
+                highlight={highlightedTriggerIds.has(trigger.id)}
                 onToggle={() => toggleTrigger(trigger.id)}
                 onConfigureClick={() => handleConfigureClick(trigger.id)}
                 onRemoveDelta={(bucket, domain) =>
@@ -513,9 +520,12 @@ export function Step2Interests({ data, onNext }: StepProps) {
               Сначала выберите хотя бы один интерес — триггеры подстроятся под него
             </p>
           )}
-          {hasInterest && triggerEdit?.active && (
+          {hasInterest && editTargetIds.size > 0 && (
             <p className="mt-2 text-xs text-muted-foreground">
-              Подсказка над промпт-баром обновится — пишите команды туда.
+              Команды из промпт-бара применятся к {editTargetIds.size === 1
+                ? "выбранному триггеру"
+                : `${editTargetIds.size} выбранным триггерам`}
+              .
             </p>
           )}
         </div>

@@ -13,13 +13,9 @@ import {
   PromptInputSubmit,
   PromptInputTools,
   usePromptInputAttachments,
-  usePromptInputController,
 } from "@/components/ai-elements/prompt-input";
 import { ChipEditableInput } from "@/components/ai-elements/chip-editable-input";
-import {
-  PromptChipsProvider,
-  usePromptChips,
-} from "@/state/prompt-chips-context";
+import { usePromptChips } from "@/state/prompt-chips-context";
 import { cn } from "@/lib/utils";
 import { useAppState, useAppDispatch } from "@/state/app-state-context";
 import {
@@ -32,10 +28,7 @@ import { parseCampaignQuery } from "@/state/parse-campaign-filter";
 import { useWelcomeChat } from "@/sections/welcome/welcome-chat-context";
 import { OnboardingChatChips } from "@/sections/welcome/onboarding-chat-view";
 import { CampaignsPromptChips } from "@/sections/campaigns/campaigns-prompt-chips";
-import {
-  useTriggerEdit,
-  useTriggerEditHost,
-} from "@/state/trigger-edit-context";
+import { useTriggerEdit } from "@/state/trigger-edit-context";
 
 function AttachmentFileList() {
   const { files } = usePromptInputAttachments();
@@ -64,57 +57,23 @@ function SelectedNodeChipEffect({
 }: {
   selected: { id: string; label: string } | null;
 }) {
-  const dispatch = useAppDispatch();
-  const { pushChip, removeChip, chips } = usePromptChips();
-  const chipIdRef = useRef<string | null>(null);
-  // See TriggerEditChipEffect.hasMaterialisedRef — same render-order race
-  // applies to node selection.
-  const hasMaterialisedRef = useRef(false);
+  const { pushChip } = usePromptChips();
 
+  // Each canvas selection adds a new chip to the prompt-bar. Existing chips
+  // for previously-selected nodes stay — multiple node chips can coexist so a
+  // single command applies to all of them. Chips clear via ClearChipsOnView-
+  // ChangeEffect when the user navigates away, or via Backspace.
+  // Re-clicking the same node is a no-op because pushChip dedups by id.
   useEffect(() => {
-    const targetChipId = selected ? `node_${selected.id}` : null;
-    if (chipIdRef.current === targetChipId) return;
-
-    if (chipIdRef.current) {
-      removeChip(chipIdRef.current);
-    }
-    if (selected && targetChipId) {
-      pushChip({
-        id: targetChipId,
-        kind: "node",
-        label: selected.label,
-        payload: selected.id,
-        removable: true,
-      });
-      hasMaterialisedRef.current = false;
-    } else {
-      hasMaterialisedRef.current = false;
-    }
-    chipIdRef.current = targetChipId;
-  }, [selected, pushChip, removeChip]);
-
-  useEffect(() => {
-    if (
-      chipIdRef.current &&
-      chips.some((c) => c.id === chipIdRef.current)
-    ) {
-      hasMaterialisedRef.current = true;
-    }
-  }, [chips]);
-
-  // Backspace removed the chip — sync canvas selection back to "none".
-  useEffect(() => {
-    if (
-      hasMaterialisedRef.current &&
-      selected &&
-      chipIdRef.current &&
-      !chips.some((c) => c.id === chipIdRef.current)
-    ) {
-      dispatch({ type: "workflow_node_deselected" });
-      chipIdRef.current = null;
-      hasMaterialisedRef.current = false;
-    }
-  }, [chips, selected, dispatch]);
+    if (!selected) return;
+    pushChip({
+      id: `node_${selected.id}`,
+      kind: "node",
+      label: selected.label,
+      payload: selected.id,
+      removable: true,
+    });
+  }, [selected, pushChip]);
 
   return null;
 }
@@ -141,122 +100,7 @@ function ClearChipsOnViewChangeEffect({
   return null;
 }
 
-/**
- * Swaps the prompt-bar text whenever the user switches between selected
- * triggers in Step 2. Saves the current draft against the previously active
- * trigger before loading the new one. No-op when no edit is active.
- */
-function TriggerEditDraftSwap() {
-  const triggerEdit = useTriggerEdit();
-  const { textInput } = usePromptInputController();
-  const prevId = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (!triggerEdit) return;
-    const currentId = triggerEdit.active?.id ?? null;
-    if (currentId === prevId.current) return;
-    // Save outgoing draft.
-    if (prevId.current) {
-      triggerEdit.saveDraft(prevId.current, textInput.value);
-    }
-    // Load incoming draft (or clear if leaving edit mode).
-    if (currentId) {
-      const next = triggerEdit.getDraft(currentId);
-      textInput.setInput(next);
-    } else if (prevId.current) {
-      textInput.setInput("");
-    }
-    prevId.current = currentId;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [triggerEdit?.active?.id]);
-
-  return null;
-}
-
-/**
- * Mirrors the active trigger into a single chip in the prompt-bar. When the
- * user removes the chip via Backspace, the trigger is deselected so step-2's
- * card UI stays in sync.
- */
-function TriggerEditChipEffect() {
-  const triggerEdit = useTriggerEdit();
-  const host = useTriggerEditHost();
-  const { pushChip, removeChip, chips } = usePromptChips();
-  const chipIdRef = useRef<string | null>(null);
-  // Guards the deselect-on-removal effect against a render-order race: when
-  // we've just pushChip'd a chip, the dispatched update isn't visible in
-  // `chips` until the next render. Without this flag the deselect effect
-  // would fire immediately, see chips=[], assume "Backspace happened" and
-  // wipe the active trigger — the visible bug was: first click pushes the
-  // chip but the hint never shows because we already snapped active=null.
-  const hasMaterialisedRef = useRef(false);
-
-  useEffect(() => {
-    const targetChipId = triggerEdit?.active
-      ? `trigger_${triggerEdit.active.id}`
-      : null;
-
-    if (chipIdRef.current === targetChipId) return;
-
-    if (chipIdRef.current) {
-      removeChip(chipIdRef.current);
-    }
-    if (triggerEdit?.active && targetChipId) {
-      pushChip({
-        id: targetChipId,
-        kind: "trigger",
-        label: triggerEdit.active.label,
-        payload: triggerEdit.active.id,
-        removable: true,
-      });
-      hasMaterialisedRef.current = false;
-    } else {
-      hasMaterialisedRef.current = false;
-    }
-    chipIdRef.current = targetChipId;
-  }, [triggerEdit?.active, pushChip, removeChip]);
-
-  // Latch "the chip we asked for is now in chips state". Only after this can
-  // the deselect-on-removal effect treat its absence as a real removal.
-  useEffect(() => {
-    if (
-      chipIdRef.current &&
-      chips.some((c) => c.id === chipIdRef.current)
-    ) {
-      hasMaterialisedRef.current = true;
-    }
-  }, [chips]);
-
-  // Backspace removed the chip → mirror that into step-2's selection.
-  useEffect(() => {
-    if (
-      hasMaterialisedRef.current &&
-      triggerEdit?.active &&
-      chipIdRef.current &&
-      !chips.some((c) => c.id === chipIdRef.current)
-    ) {
-      host.setActive(null);
-      chipIdRef.current = null;
-      hasMaterialisedRef.current = false;
-    }
-  }, [chips, triggerEdit?.active, host]);
-
-  return null;
-}
-
 export function ShellBottomBar() {
-  // The chip provider must wrap everything that calls usePromptChips —
-  // the bar body, its child effects (SelectedNodeChipEffect, the trigger
-  // chip mirror) and the chip-row inside the input. Splitting the body
-  // out keeps the hook order stable on remount.
-  return (
-    <PromptChipsProvider>
-      <ShellBottomBarBody />
-    </PromptChipsProvider>
-  );
-}
-
-function ShellBottomBarBody() {
   const state = useAppState();
   const dispatch = useAppDispatch();
   const { view, selectedWorkflowNode } = state;
@@ -264,12 +108,15 @@ function ShellBottomBarBody() {
   const triggerEdit = useTriggerEdit();
   const chipsApi = usePromptChips();
 
+  const hasTriggerChips = chipsApi.chips.some((c) => c.kind === "trigger");
+
   function handlePromptSubmit(message: PromptInputMessage) {
     const rawText = message.text ?? "";
 
-    // Trigger-edit mode: when Step 2 has an active trigger, all prompt-bar
-    // submissions go through the trigger-edit pipeline (regex parser).
-    if (triggerEdit?.active) {
+    // Trigger-edit mode: any trigger chip in the prompt-bar means the user
+    // is directing edits at those triggers. Submissions go through the
+    // trigger-edit pipeline (regex parser → step-2 deltas).
+    if (hasTriggerChips && triggerEdit) {
       // Fire-and-forget — the host clears its own UI state. The PromptInput
       // textarea is cleared by the form's submit handler regardless.
       void triggerEdit.submit(rawText);
@@ -328,7 +175,7 @@ function ShellBottomBarBody() {
   }
 
   const chatPlaceholder =
-    triggerEdit?.active ? "добавь d1.ru, d2.ru   или   исключи d3.ru" :
+    hasTriggerChips ? "добавь d1.ru, d2.ru   или   исключи d3.ru" :
     isOnWelcome(state) ? "Задайте вопрос…" :
     isWorkflowView(state) ? "Опишите изменение сценария..." :
     view.kind === "campaign-select" ? "Опишите вашу кампанию..." :
@@ -366,8 +213,6 @@ function ShellBottomBarBody() {
     <>
       <SelectedNodeChipEffect selected={selectedWorkflowNode} />
       <ClearChipsOnViewChangeEffect viewKind={view.kind} />
-      <TriggerEditDraftSwap />
-      <TriggerEditChipEffect />
       <motion.div
         ref={barRef}
         className="fixed left-[120px] right-0 z-30 flex justify-center px-6"
@@ -384,16 +229,16 @@ function ShellBottomBarBody() {
             "bg-[rgba(10,10,10,0.75)] backdrop-blur-[2px]"
           )}
         >
-          {/* Active-trigger banner: explains what the chip in the prompt-bar
-              represents and what commands the user can run. The mascot icon
+          {/* Trigger-edit hint: explains what the chips in the prompt-bar
+              represent and what commands the user can run. The mascot icon
               lives here (not on the chip itself) so the chip stays a clean,
               text-only inline pill that doesn't confuse contenteditable. */}
-          {triggerEdit?.active && (
+          {hasTriggerChips && (
             <div
               data-testid="trigger-edit-hint"
               className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/80"
             >
-              {triggerEdit.processing ? (
+              {triggerEdit?.processing ? (
                 <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-primary" />
               ) : (
                 <Image
