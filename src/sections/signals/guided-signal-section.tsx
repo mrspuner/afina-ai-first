@@ -8,8 +8,7 @@ import { SCENARIO_TO_TYPE } from "@/state/scenario-map";
 import { SurveySection } from "@/sections/survey/survey-section";
 import { CampaignWorkspace } from "./campaign-workspace";
 import { TopUpModal, computeShortfall } from "./top-up-modal";
-
-const PROCESSING_DURATION_MS = 6000;
+import { getProcessingDuration } from "@/state/dev-config";
 
 /**
  * Lifts step-6 → step-8 control flow out of CampaignWorkspace into the
@@ -42,10 +41,14 @@ export function GuidedSignalSection() {
   const startProcessing = useCallback(
     (signalId: string) => {
       dispatch({ type: "signal_status_changed", id: signalId, status: "processing" });
-      // Simulate provider work; flip to "ready" after a short delay.
+      const duration = getProcessingDuration();
+      // `Infinity` (dev override) means "leave the signal in processing
+      // forever" — useful for inspecting the in-flight UI without racing the
+      // simulated provider.
+      if (!Number.isFinite(duration)) return;
       window.setTimeout(() => {
         dispatch({ type: "signal_status_changed", id: signalId, status: "ready" });
-      }, PROCESSING_DURATION_MS);
+      }, duration);
     },
     [dispatch]
   );

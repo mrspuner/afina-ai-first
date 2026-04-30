@@ -8,8 +8,7 @@ import { NewSignalMenu } from "./new-signal-menu";
 import { SignalCard } from "./signal-card";
 import { SignalsEmptyState } from "./signals-empty-state";
 import { UploadSignalDialog } from "./upload-signal-dialog";
-
-const PROCESSING_DURATION_MS = 6000;
+import { getProcessingDuration } from "@/state/dev-config";
 
 export function SignalsSection() {
   const { signals, balance, notifications } = useAppState();
@@ -62,9 +61,12 @@ export function SignalsSection() {
       status: "processing",
     });
     const id = resumeSignal.id;
-    window.setTimeout(() => {
-      dispatch({ type: "signal_status_changed", id, status: "ready" });
-    }, PROCESSING_DURATION_MS);
+    const duration = getProcessingDuration();
+    if (Number.isFinite(duration)) {
+      window.setTimeout(() => {
+        dispatch({ type: "signal_status_changed", id, status: "ready" });
+      }, duration);
+    }
     setResumeSignal(null);
   }
 
