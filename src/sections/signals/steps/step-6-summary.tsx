@@ -152,7 +152,7 @@ export function Step6Summary({ data, onNext, onGoToStep }: StepProps) {
 
       <Separator className="my-4" />
 
-      <div className="flex justify-end">
+      <div className="flex justify-start">
         <Button onClick={() => onNext({})}>
           {enoughBalance ? "Запустить" : "Пополнить и запустить"}
         </Button>

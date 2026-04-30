@@ -68,7 +68,7 @@ export function Step4Limit({ data, onNext }: StepProps) {
           </p>
         </div>
 
-        <div className="flex justify-end">
+        <div className="flex justify-start">
           <Button
             disabled={!isValid}
             onClick={() => onNext({ budget: parsed })}

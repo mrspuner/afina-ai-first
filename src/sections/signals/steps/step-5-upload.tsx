@@ -48,7 +48,7 @@ export function Step5Upload({ data, onNext }: StepProps) {
           строк · Один номер на строку
         </p>
 
-        <div className="flex justify-end">
+        <div className="flex justify-start">
           <Button disabled={!file || isHashing} onClick={handleNext}>
             Далее
           </Button>

@@ -101,7 +101,7 @@ export function Step3Segments({ data, onNext }: StepProps) {
           );
         })}
 
-        <div className="mt-2 flex justify-end">
+        <div className="mt-2 flex justify-start">
           <Button disabled={!canContinue} onClick={() => onNext({ segments: selected })}>
             Продолжить
           </Button>
