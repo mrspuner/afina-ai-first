@@ -542,7 +542,7 @@ export function Step2Interests({ data, onNext }: StepProps) {
   return (
     <StepContent
       title="Какие интересы и триггеры вы ищете?"
-      subtitle={`Направление: ${vertical.label}. Мы уже сгенерили настройки под вас — выберите интересы и триггеры в любом порядке.`}
+      subtitle="Мы уже сгенерили настройки под вас — выберите интересы и триггеры в любом порядке."
     >
       <div className="flex flex-col gap-6">
         {/* Interests */}

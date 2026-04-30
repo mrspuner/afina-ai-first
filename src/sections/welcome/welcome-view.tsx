@@ -55,8 +55,7 @@ export function WelcomeView({ chat }: { chat: OnboardingChatState }) {
                     Добро пожаловать в афина
                   </h1>
                   <p className="text-[18px] leading-[22px] text-muted-foreground">
-                    Платформа превращает поведенческие сигналы ваших клиентов
-                    в автоматические кампании — в нужный момент, по нужному каналу
+                    Превратите вашу базу в клиентов за три шага:
                   </p>
                 </div>
                 <OnboardingStepCards />
