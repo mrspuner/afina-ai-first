@@ -102,13 +102,17 @@ function buildCsv(
 
 export function StatisticsView({ campaignId }: { campaignId?: string } = {}) {
   const filterByCampaign = Boolean(campaignId);
-  const { signals, campaigns } = useAppState();
+  const { campaigns } = useAppState();
 
-  // Empty preset: no signals and no campaigns yet — there is nothing to
-  // report on, so we render a soft empty state instead of a table populated
-  // with mock-generated rows. We keep the unconditional hook calls below so
-  // the early return doesn't break React's rules of hooks.
-  const noData = signals.length === 0 && campaigns.length === 0;
+  // Stats only become meaningful once a campaign has actually been
+  // launched — having signals or draft/scheduled campaigns isn't enough to
+  // produce numbers. We render a soft empty state until at least one
+  // campaign has reached active/paused/completed. The unconditional hook
+  // calls below stay so the early return doesn't break rules of hooks.
+  const hasLaunchedCampaign = campaigns.some(
+    (c) => c.status === "active" || c.status === "paused" || c.status === "completed"
+  );
+  const noData = !hasLaunchedCampaign;
 
   const [templates, setTemplates] = useState<ReportTemplate[]>(
     () => BUILTIN_TEMPLATES,
