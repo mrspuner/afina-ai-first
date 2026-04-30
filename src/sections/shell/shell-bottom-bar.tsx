@@ -2,20 +2,23 @@
 
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { motion } from "motion/react";
+import Image from "next/image";
 import { Mic, Loader2 } from "lucide-react";
 import type { PromptInputMessage } from "@/components/ai-elements/prompt-input";
 import {
   PromptInput,
-  PromptInputBody,
   PromptInputButton,
   PromptInputFooter,
   PromptInputHeader,
   PromptInputSubmit,
-  PromptInputTextarea,
   PromptInputTools,
   usePromptInputAttachments,
-  usePromptInputController,
 } from "@/components/ai-elements/prompt-input";
+import {
+  ChipEditableInput,
+  type ChipEditableInputHandle,
+} from "@/components/ai-elements/chip-editable-input";
+import { usePromptChips } from "@/state/prompt-chips-context";
 import { cn } from "@/lib/utils";
 import { useAppState, useAppDispatch } from "@/state/app-state-context";
 import {
@@ -48,98 +51,55 @@ function AttachmentFileList() {
 }
 
 /**
- * Multi-word labels (e.g. "Email 2") need bracket-quoting so the parser can
- * recover the full label from a prompt like "@[Email 2] ...". Single-word
- * labels stay as bare "@Email" for readability.
+ * Mirrors the currently selected workflow node into a chip in the prompt-bar.
+ * Backspace-removal of the chip dispatches `workflow_node_deselected` so the
+ * canvas selection state stays in sync.
  */
-function formatTag(label: string): string {
-  return label.includes(" ") ? `@[${label}] ` : `@${label} `;
-}
-
-function SelectedNodeEffect({
+function SelectedNodeChipEffect({
   selected,
 }: {
   selected: { id: string; label: string } | null;
 }) {
-  const { textInput } = usePromptInputController();
+  const { pushChip } = usePromptChips();
+
+  // Each canvas selection adds a new chip to the prompt-bar. Existing chips
+  // for previously-selected nodes stay — multiple node chips can coexist so a
+  // single command applies to all of them. Chips clear via ClearChipsOnView-
+  // ChangeEffect when the user navigates away, or via Backspace.
+  // Re-clicking the same node is a no-op because pushChip dedups by id.
   useEffect(() => {
-    if (selected) {
-      textInput.insertAtCursor(formatTag(selected.label), { separator: "smart" });
-    }
-    // NB: on deselect we intentionally do NOT clear the input — any stale
-    // empty tag will be stripped on the next insertAtCursor call.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected?.id]);
+    if (!selected) return;
+    pushChip({
+      id: `node_${selected.id}`,
+      kind: "node",
+      label: selected.label,
+      payload: selected.id,
+      removable: true,
+    });
+  }, [selected, pushChip]);
+
   return null;
 }
 
-function ClearOnLeaveWorkflowEffect({ viewKind }: { viewKind: View["kind"] }) {
-  const { textInput } = usePromptInputController();
+/**
+ * Generic chip cleanup: clears all chips when the top-level view kind changes.
+ * Replaces the previous ClearOnLeaveWorkflowEffect (which scrubbed @-text out
+ * of the textarea on workflow exit) — chips are now the structured carrier of
+ * cross-view context, so per-view text scrubbing is no longer needed.
+ */
+function ClearChipsOnViewChangeEffect({
+  viewKind,
+}: {
+  viewKind: View["kind"];
+}) {
+  const { clearChips } = usePromptChips();
   const prevKind = useRef<View["kind"] | null>(null);
   useEffect(() => {
-    if (prevKind.current === "workflow" && viewKind !== "workflow") {
-      textInput.clear();
+    if (prevKind.current && prevKind.current !== viewKind) {
+      clearChips();
     }
     prevKind.current = viewKind;
-  }, [viewKind, textInput]);
-  return null;
-}
-
-/**
- * Разбирает текст промпта на сегменты по @-тегам.
- * Поддерживает:
- *   "@A foo"            → label "A"
- *   "@[Multi word] foo" → label "Multi word"  (для нод с пробелом в label)
- *
- * Примеры:
- *   "@A foo @B bar"      → [{ label: "A", text: "foo" }, { label: "B", text: "bar" }]
- *   "@[Email 2] текст"   → [{ label: "Email 2", text: "текст" }]
- *   "hello @A foo"       → [{ label: "A", text: "foo" }]  (прологовый текст игнорируется)
- *   "hello"              → []
- */
-function parseTagSegments(
-  input: string
-): Array<{ label: string; text: string }> {
-  const out: Array<{ label: string; text: string }> = [];
-  const re = /@(?:\[([^\]]+)\]|(\S+))\s*([^@]*)/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(input)) !== null) {
-    const label = (m[1] ?? m[2] ?? "").trim();
-    const text = (m[3] ?? "").trim();
-    if (label) out.push({ label, text });
-  }
-  return out;
-}
-
-/**
- * Swaps the prompt-bar text whenever the user switches between selected
- * triggers in Step 2. Saves the current draft against the previously active
- * trigger before loading the new one. No-op when no edit is active.
- */
-function TriggerEditDraftSwap() {
-  const triggerEdit = useTriggerEdit();
-  const { textInput } = usePromptInputController();
-  const prevId = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (!triggerEdit) return;
-    const currentId = triggerEdit.active?.id ?? null;
-    if (currentId === prevId.current) return;
-    // Save outgoing draft.
-    if (prevId.current) {
-      triggerEdit.saveDraft(prevId.current, textInput.value);
-    }
-    // Load incoming draft (or clear if leaving edit mode).
-    if (currentId) {
-      const next = triggerEdit.getDraft(currentId);
-      textInput.setInput(next);
-    } else if (prevId.current) {
-      textInput.setInput("");
-    }
-    prevId.current = currentId;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [triggerEdit?.active?.id]);
-
+  }, [viewKind, clearChips]);
   return null;
 }
 
@@ -149,16 +109,25 @@ export function ShellBottomBar() {
   const { view, selectedWorkflowNode } = state;
   const welcomeChat = useWelcomeChat();
   const triggerEdit = useTriggerEdit();
+  const chipsApi = usePromptChips();
+
+  const hasTriggerChips = chipsApi.chips.some((c) => c.kind === "trigger");
+  const editorRef = useRef<ChipEditableInputHandle>(null);
 
   function handlePromptSubmit(message: PromptInputMessage) {
     const rawText = message.text ?? "";
+    const segments = editorRef.current?.getSegments() ?? [];
 
-    // Trigger-edit mode: when Step 2 has an active trigger, all prompt-bar
-    // submissions go through the trigger-edit pipeline (regex parser).
-    if (triggerEdit?.active) {
-      // Fire-and-forget — the host clears its own UI state. The PromptInput
-      // textarea is cleared by the form's submit handler regardless.
-      void triggerEdit.submit(rawText);
+    // Trigger-edit mode: any trigger chip in the prompt-bar means the user
+    // is directing edits at those triggers. Pass per-chip segments through
+    // so each chip's command text is parsed independently.
+    if (hasTriggerChips && triggerEdit) {
+      void triggerEdit.submit(segments).then((result) => {
+        if (result.ok) {
+          chipsApi.clearChips();
+          editorRef.current?.clear();
+        }
+      });
       return;
     }
 
@@ -178,7 +147,12 @@ export function ShellBottomBar() {
     if (view.kind !== "workflow" || view.launched) return;
 
     const structural = parseStructuralCommands(rawText);
-    const tagSegments = parseTagSegments(rawText);
+    // Node commands now come from per-chip segments: each `node` chip pairs
+    // with the free text typed *between* it and the next chip. Empty-text
+    // segments are skipped so a chip without a command doesn't fire a noop.
+    const nodeCommands = segments
+      .filter((s) => s.chip.kind === "node" && s.text.length > 0)
+      .map((s) => ({ nodeLabel: s.chip.label, text: s.text }));
 
     if (structural.ops.length > 0) {
       dispatch({
@@ -186,15 +160,17 @@ export function ShellBottomBar() {
         ops: structural.ops,
       });
     }
-    if (tagSegments.length > 0) {
+    if (nodeCommands.length > 0) {
       dispatch({
         type: "workflow_node_command_submit",
-        commands: tagSegments.map((s) => ({ nodeLabel: s.label, text: s.text })),
+        commands: nodeCommands,
       });
+      chipsApi.clearChips();
+      editorRef.current?.clear();
     }
     if (
       structural.ops.length === 0 &&
-      tagSegments.length === 0 &&
+      nodeCommands.length === 0 &&
       rawText.trim()
     ) {
       dispatch({ type: "workflow_command_submit", text: rawText });
@@ -206,7 +182,7 @@ export function ShellBottomBar() {
   }
 
   const chatPlaceholder =
-    triggerEdit?.active ? "добавь d1.ru, d2.ru   или   исключи d3.ru" :
+    hasTriggerChips ? "добавь d1.ru, d2.ru   или   исключи d3.ru" :
     isOnWelcome(state) ? "Задайте вопрос…" :
     isWorkflowView(state) ? "Опишите изменение сценария..." :
     view.kind === "campaign-select" ? "Опишите вашу кампанию..." :
@@ -242,9 +218,8 @@ export function ShellBottomBar() {
 
   return (
     <>
-      <SelectedNodeEffect selected={selectedWorkflowNode} />
-      <ClearOnLeaveWorkflowEffect viewKind={view.kind} />
-      <TriggerEditDraftSwap />
+      <SelectedNodeChipEffect selected={selectedWorkflowNode} />
+      <ClearChipsOnViewChangeEffect viewKind={view.kind} />
       <motion.div
         ref={barRef}
         className="fixed left-[120px] right-0 z-30 flex justify-center px-6"
@@ -261,19 +236,29 @@ export function ShellBottomBar() {
             "bg-[rgba(10,10,10,0.75)] backdrop-blur-[2px]"
           )}
         >
-          {triggerEdit?.active && (
+          {/* Trigger-edit hint: explains what the chips in the prompt-bar
+              represent and what commands the user can run. The mascot icon
+              lives here (not on the chip itself) so the chip stays a clean,
+              text-only inline pill that doesn't confuse contenteditable. */}
+          {hasTriggerChips && (
             <div
               data-testid="trigger-edit-hint"
               className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/80"
             >
-              {triggerEdit.processing ? (
+              {triggerEdit?.processing ? (
                 <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-primary" />
               ) : (
-                <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+                <Image
+                  src="/mascot-icon.svg"
+                  alt=""
+                  width={16}
+                  height={16}
+                  className="shrink-0"
+                  aria-hidden
+                />
               )}
               <span className="leading-snug">
-                Редактируем триггер «{triggerEdit.active.label}». Напишите,
-                какие сайты добавить или исключить.
+                Напишите, какие сайты добавить или исключить.
               </span>
             </div>
           )}
@@ -304,12 +289,11 @@ export function ShellBottomBar() {
             )}
           >
             <AttachmentFileList />
-            <PromptInputBody>
-              <PromptInputTextarea
-                className="min-h-[52px] max-h-[120px] bg-transparent text-[#fafafa] placeholder:text-muted-foreground"
-                placeholder={chatPlaceholder}
-              />
-            </PromptInputBody>
+            <ChipEditableInput
+              ref={editorRef}
+              className="px-3 py-2"
+              placeholder={chatPlaceholder}
+            />
             <PromptInputFooter>
               <PromptInputTools>
                 <PromptInputButton tooltip="Голосовой ввод">
