@@ -70,20 +70,51 @@ function formatTag(label: string): string {
   return label.includes(" ") ? `@[${label}] ` : `@${label} `;
 }
 
-function SelectedNodeEffect({
+/**
+ * Mirrors the currently selected workflow node into a chip in the prompt-bar.
+ * Backspace-removal of the chip dispatches `workflow_node_deselected` so the
+ * canvas selection state stays in sync.
+ */
+function SelectedNodeChipEffect({
   selected,
 }: {
   selected: { id: string; label: string } | null;
 }) {
-  const { textInput } = usePromptInputController();
+  const dispatch = useAppDispatch();
+  const { pushChip, removeChip, chips } = usePromptChips();
+  const chipIdRef = useRef<string | null>(null);
+
   useEffect(() => {
-    if (selected) {
-      textInput.insertAtCursor(formatTag(selected.label), { separator: "smart" });
+    const targetChipId = selected ? `node_${selected.id}` : null;
+    if (chipIdRef.current === targetChipId) return;
+
+    if (chipIdRef.current) {
+      removeChip(chipIdRef.current);
     }
-    // NB: on deselect we intentionally do NOT clear the input — any stale
-    // empty tag will be stripped on the next insertAtCursor call.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected?.id]);
+    if (selected && targetChipId) {
+      pushChip({
+        id: targetChipId,
+        kind: "node",
+        label: selected.label,
+        payload: selected.id,
+        removable: true,
+      });
+    }
+    chipIdRef.current = targetChipId;
+  }, [selected, pushChip, removeChip]);
+
+  // Backspace removed the chip — sync canvas selection back to "none".
+  useEffect(() => {
+    if (
+      selected &&
+      chipIdRef.current &&
+      !chips.some((c) => c.id === chipIdRef.current)
+    ) {
+      dispatch({ type: "workflow_node_deselected" });
+      chipIdRef.current = null;
+    }
+  }, [chips, selected, dispatch]);
+
   return null;
 }
 
@@ -276,7 +307,14 @@ function ShellBottomBarBody() {
     if (view.kind !== "workflow" || view.launched) return;
 
     const structural = parseStructuralCommands(rawText);
-    const tagSegments = parseTagSegments(rawText);
+    // Node-targeted commands now come from chips: each `node` chip pairs with
+    // the user's free text. Multiple node chips share the same instruction.
+    const nodeChips = chipsApi.chips.filter((c) => c.kind === "node");
+    const trimmedText = rawText.trim();
+    const nodeCommands =
+      nodeChips.length > 0 && trimmedText.length > 0
+        ? nodeChips.map((c) => ({ nodeLabel: c.label, text: trimmedText }))
+        : [];
 
     if (structural.ops.length > 0) {
       dispatch({
@@ -284,16 +322,17 @@ function ShellBottomBarBody() {
         ops: structural.ops,
       });
     }
-    if (tagSegments.length > 0) {
+    if (nodeCommands.length > 0) {
       dispatch({
         type: "workflow_node_command_submit",
-        commands: tagSegments.map((s) => ({ nodeLabel: s.label, text: s.text })),
+        commands: nodeCommands,
       });
+      chipsApi.clearChips();
     }
     if (
       structural.ops.length === 0 &&
-      tagSegments.length === 0 &&
-      rawText.trim()
+      nodeCommands.length === 0 &&
+      trimmedText
     ) {
       dispatch({ type: "workflow_command_submit", text: rawText });
     }
@@ -340,7 +379,7 @@ function ShellBottomBarBody() {
 
   return (
     <>
-      <SelectedNodeEffect selected={selectedWorkflowNode} />
+      <SelectedNodeChipEffect selected={selectedWorkflowNode} />
       <ClearOnLeaveWorkflowEffect viewKind={view.kind} />
       <TriggerEditDraftSwap />
       <TriggerEditChipEffect />
