@@ -11,6 +11,12 @@ export interface StepData {
   segments: string[];
   budget: number | null;
   file: File | null;
+  /**
+   * Approximate number of rows in the uploaded base file. Populated on
+   * step-4 (база) when a file is selected; downstream steps (budget) read
+   * it to suggest a sensible default.
+   */
+  fileRowCount?: number;
 }
 
 export const initialStepData: StepData = {

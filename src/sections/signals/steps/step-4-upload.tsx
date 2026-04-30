@@ -11,6 +11,13 @@ export function Step4Upload({ data, onNext }: StepProps) {
   const [file, setFile] = useState<File | null>(data.file);
   const [isHashing, setIsHashing] = useState(false);
 
+  /** Simulate parsing the file by attaching a plausible row count. The real
+   *  product would parse server-side; for the prototype a stable random in
+   *  the 1k-100k range is enough to drive downstream UI (budget recommend). */
+  function simulateRowCount(): number {
+    return 1000 + Math.floor(Math.random() * 99_000);
+  }
+
   function handleNext() {
     // Already-hashed file on revisit — skip re-hashing, just proceed.
     if (file && file === data.file) {
@@ -22,7 +29,14 @@ export function Step4Upload({ data, onNext }: StepProps) {
 
   function handleHashingComplete() {
     setIsHashing(false);
-    onNext({ file });
+    // Carry a freshly simulated row count if we don't already have one for
+    // this exact file — repeat visits to the step keep the prior value so
+    // the budget recommendation stays stable.
+    const rowCount =
+      data.file === file && typeof data.fileRowCount === "number"
+        ? data.fileRowCount
+        : simulateRowCount();
+    onNext({ file, fileRowCount: rowCount });
   }
 
   return (
