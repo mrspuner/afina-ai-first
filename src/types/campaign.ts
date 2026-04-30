@@ -17,6 +17,12 @@ export interface StepData {
    * it to suggest a sensible default.
    */
   fileRowCount?: number;
+  /**
+   * Which budget option the user picked on step-5 — "recommended" reuses
+   * the auto-suggested amount derived from base size, "custom" stores the
+   * user's manual entry. Lets us restore the correct active card on revisit.
+   */
+  budgetMode?: "recommended" | "custom";
 }
 
 export const initialStepData: StepData = {

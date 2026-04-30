@@ -44,11 +44,12 @@ test("happy path: welcome → guided signal → campaign type → launch → sta
   await expect(page.getByText("test-base.csv")).toBeVisible();
   await page.getByRole("button", { name: "Далее" }).last().click();
 
-  // 7. Step 5: enter budget + Далее (wait for hashing animation to finish)
+  // 7. Step 5: pick "Своя сумма", enter 500, Далее
   await expect(
     page.getByRole("heading", { name: "Укажите максимальный бюджет" })
   ).toBeVisible({ timeout: 15_000 });
-  await page.getByPlaceholder("Например, 500").fill("500");
+  await page.getByRole("button", { name: /Своя сумма/ }).click();
+  await page.getByLabel("Своя сумма").fill("500");
   await page.getByRole("button", { name: "Далее" }).last().click();
 
   // 8. Step 6: summary → launch (balance was seeded at the top of the test)
