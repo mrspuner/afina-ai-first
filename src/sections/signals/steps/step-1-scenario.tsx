@@ -38,6 +38,16 @@ const SCENARIOS = [
 ];
 
 export function Step1Scenario({ data, onNext }: StepProps) {
+  // Safety net: a sidebar-driven entry to the wizard must NOT visually
+  // pre-select a scenario — `data.scenario` is `null` for that path. If a
+  // future regression sets `data.scenario` to a non-empty string here without
+  // user interaction, this guard keeps step-1 visually pristine until the
+  // user picks one themselves.
+  const visualScenario =
+    typeof data.scenario === "string" && data.scenario.length > 0
+      ? data.scenario
+      : null;
+
   function handleSelect(id: string) {
     onNext({ scenario: id });
   }
@@ -55,7 +65,7 @@ export function Step1Scenario({ data, onNext }: StepProps) {
             onClick={() => handleSelect(s.id)}
             className={cn(
               "flex flex-col items-start rounded-lg border p-4 text-left transition-all",
-              data.scenario === s.id
+              visualScenario === s.id
                 ? "border-primary bg-accent ring-1 ring-primary"
                 : "border-border bg-card hover:bg-accent hover:border-border"
             )}
