@@ -48,12 +48,15 @@ export function GuidedSignalSection() {
   // One-shot capture of the signal we're resuming. Reading the snapshot
   // straight from `signals` would let a status change (e.g. payment success)
   // re-render the section and confuse the wizard's mount-time-only inputs.
-  // Initialised lazily so the first render already renders the right step —
-  // avoids a one-frame flash of step-1 before the effect below promotes state.
+  // The snapshot is tagged with the wizard session it was taken in — when a
+  // fresh `start_signal_flow` bumps the session, the stale snapshot is
+  // ignored so the user lands on a clean step-1 instead of the previous
+  // resume target.
   const [resumeSnapshot, setResumeSnapshot] = useState<{
     id: string;
     stepData: StepData;
     initialStep: number;
+    sessionId: number;
   } | null>(() => {
     if (!resumingSignalId) return null;
     const sig = signals.find((s) => s.id === resumingSignalId);
@@ -62,8 +65,16 @@ export function GuidedSignalSection() {
       id: sig.id,
       stepData: sig.wizardData,
       initialStep: stepForSignalStatus(sig.status),
+      sessionId: wizardSessionId,
     };
   });
+
+  // Stale snapshots (from a prior resume) are dropped here so the wizard
+  // mounts fresh after a new `start_signal_flow`.
+  const activeResume =
+    resumeSnapshot && resumeSnapshot.sessionId === wizardSessionId
+      ? resumeSnapshot
+      : null;
 
   // Acknowledge the resume request once we have a snapshot in hand (or have
   // determined there's nothing to resume) so the reducer flag doesn't stick.
@@ -77,7 +88,13 @@ export function GuidedSignalSection() {
   // the snapshot.
   useEffect(() => {
     if (!resumingSignalId) return;
-    if (resumeSnapshot && resumeSnapshot.id === resumingSignalId) return;
+    if (
+      resumeSnapshot &&
+      resumeSnapshot.id === resumingSignalId &&
+      resumeSnapshot.sessionId === wizardSessionId
+    ) {
+      return;
+    }
     const sig = signals.find((s) => s.id === resumingSignalId);
     if (!sig || !sig.wizardData) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -85,8 +102,9 @@ export function GuidedSignalSection() {
       id: sig.id,
       stepData: sig.wizardData,
       initialStep: stepForSignalStatus(sig.status),
+      sessionId: wizardSessionId,
     });
-  }, [resumingSignalId, resumeSnapshot, signals]);
+  }, [resumingSignalId, resumeSnapshot, signals, wizardSessionId]);
 
   // Survey gate. Held locally so finishing the anketa lets us re-render this
   // same view as the wizard without bouncing through the start screen.
@@ -131,8 +149,8 @@ export function GuidedSignalSection() {
       const now = new Date().toISOString();
       // When resuming an awaiting-payment signal, drop the previous draft so
       // we don't end up with two cabinet entries for the same wizard run.
-      if (resumeSnapshot) {
-        dispatch({ type: "signal_deleted", id: resumeSnapshot.id });
+      if (activeResume) {
+        dispatch({ type: "signal_deleted", id: activeResume.id });
       }
       const id = `sig_${nanoid(8)}`;
       const type = SCENARIO_TO_TYPE[params.scenarioId] ?? "Регистрация";
@@ -166,7 +184,7 @@ export function GuidedSignalSection() {
         setTopUpOpen(true);
       }
     },
-    [balance, dispatch, resumeSnapshot, startProcessing]
+    [activeResume, balance, dispatch, startProcessing]
   );
 
   const handlePaymentSuccess = useCallback(
@@ -193,8 +211,8 @@ export function GuidedSignalSection() {
   // state without going through the launch flow first.
   const pendingSignal = pendingSignalId
     ? signals.find((s) => s.id === pendingSignalId) ?? null
-    : resumeSnapshot
-    ? signals.find((s) => s.id === resumeSnapshot.id) ?? null
+    : activeResume
+    ? signals.find((s) => s.id === activeResume.id) ?? null
     : null;
 
   // Survey gate must be after all hooks — React rule.
@@ -219,15 +237,15 @@ export function GuidedSignalSection() {
         // `currentStep`/`maxStep`, which causes step-1 to skip downstream
         // steps because `currentStep < maxStep` jumps to the cached max.
         key={
-          resumeSnapshot
-            ? `resume-${resumeSnapshot.id}`
+          activeResume
+            ? `resume-${activeResume.id}-${activeResume.sessionId}`
             : `session-${wizardSessionId}`
         }
         onSignalComplete={handleSignalComplete}
         onLaunchRequested={handleLaunchSignal}
         initialScenario={initial}
-        initialStepDataOverride={resumeSnapshot?.stepData}
-        initialStep={resumeSnapshot?.initialStep}
+        initialStepDataOverride={activeResume?.stepData}
+        initialStep={activeResume?.initialStep}
         pendingSignal={pendingSignal}
       />
       <TopUpModal
