@@ -19,7 +19,7 @@ import { getProcessingDuration } from "@/state/dev-config";
  * the wizard is rendered (smooth handoff, no return to start screen).
  */
 export function GuidedSignalSection() {
-  const { view, surveyStatus, balance, signals, resumingSignalId } =
+  const { view, surveyStatus, balance, signals, resumingSignalId, wizardSessionId } =
     useAppState();
   const dispatch = useAppDispatch();
   const initial = view.kind === "guided-signal" ? view.initialScenario : undefined;
@@ -178,10 +178,17 @@ export function GuidedSignalSection() {
   return (
     <>
       <CampaignWorkspace
-        // Force a fresh wizard mount whenever we switch between "fresh"
-        // and "resume" modes so useState seeds (currentStep, stepData) are
-        // recomputed from the new initial values.
-        key={resumeSnapshot ? `resume-${resumeSnapshot.id}` : "fresh"}
+        // Force a fresh wizard mount whenever a new signal session begins —
+        // either via "Создать сигнал" (`wizardSessionId` bump) or "Открыть и
+        // редактировать" (`resume-<id>` key). Without this, hopping out of the
+        // wizard mid-flight and re-entering reuses the previous session's
+        // `currentStep`/`maxStep`, which causes step-1 to skip downstream
+        // steps because `currentStep < maxStep` jumps to the cached max.
+        key={
+          resumeSnapshot
+            ? `resume-${resumeSnapshot.id}`
+            : `session-${wizardSessionId}`
+        }
         onSignalComplete={handleSignalComplete}
         onLaunchRequested={handleLaunchSignal}
         initialScenario={initial}

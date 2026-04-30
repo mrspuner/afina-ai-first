@@ -128,6 +128,15 @@ export type AppState = {
    * "resumed" at a time — entering the wizard from any other path clears it.
    */
   resumingSignalId?: string;
+  /**
+   * Bumped on every `start_signal_flow` so consumers (the wizard) can use it
+   * as a React `key` to force a fresh mount. Without it, hopping out of the
+   * wizard mid-flight (e.g. to a section) and re-entering via "Создать
+   * сигнал" would resume the previous session — `currentStep` and `maxStep`
+   * stick around in the wizard's internal state and downstream steps get
+   * skipped on the second pass.
+   */
+  wizardSessionId: number;
 };
 
 export type Action =
@@ -200,6 +209,7 @@ export const initialState: AppState = {
   surveyStatus: "not_started",
   balance: 0,
   notifications: { signalsBadge: false },
+  wizardSessionId: 0,
 };
 
 export function appReducer(state: AppState, action: Action): AppState {
@@ -211,6 +221,7 @@ export function appReducer(state: AppState, action: Action): AppState {
         launchFlyoutOpen: false,
         activeSection: null,
         resumingSignalId: undefined,
+        wizardSessionId: state.wizardSessionId + 1,
       };
 
     case "signal_added":
@@ -635,6 +646,7 @@ export function appReducer(state: AppState, action: Action): AppState {
         resumingSignalId: action.signalId,
         launchFlyoutOpen: false,
         activeSection: null,
+        wizardSessionId: state.wizardSessionId + 1,
       };
 
     case "resume_signal_in_wizard_handled":

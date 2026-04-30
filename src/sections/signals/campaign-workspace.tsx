@@ -79,9 +79,29 @@ function WorkspaceInner({
 
   const handleNext = useCallback(
     (partial: Partial<StepData>) => {
+      const scenarioChanged =
+        partial.scenario !== undefined &&
+        partial.scenario !== stepData.scenario;
+
+      // Changing scenario invalidates everything downstream (interests,
+      // triggers, segments, file, budget) — reset those fields and rewind
+      // progress so the user re-walks the wizard linearly. Without this, the
+      // `currentStep < maxStep` branch below would jump straight to step-6
+      // and skip the interests/triggers screen that probably needs new
+      // choices for the new scenario.
+      if (scenarioChanged) {
+        setStepData({ ...initialStepData, ...partial });
+        const next = currentStep + 1;
+        setMaxStep(next);
+        setAnimatingStep(next);
+        setCurrentStep(next);
+        pendingScroll.current = { step: next, behavior: "smooth" };
+        return;
+      }
+
       setStepData((prev) => ({ ...prev, ...partial }));
-      // Revisited earlier step: keep filled progress, jump back to the
-      // furthest reached step instead of advancing linearly.
+      // Revisited earlier step (other than scenario): keep filled progress,
+      // jump back to the furthest reached step instead of advancing linearly.
       if (currentStep < maxStep) {
         setAnimatingStep(null);
         setCurrentStep(maxStep);
@@ -91,7 +111,7 @@ function WorkspaceInner({
       const next = currentStep + 1;
       advanceTo(next);
     },
-    [advanceTo, currentStep, maxStep]
+    [advanceTo, currentStep, maxStep, stepData.scenario]
   );
 
   const handleStepperClick = useCallback((step: number) => {
