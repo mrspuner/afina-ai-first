@@ -7,8 +7,8 @@ import { StepData, initialStepData } from "@/types/campaign";
 import { Step1Scenario } from "@/sections/signals/steps/step-1-scenario";
 import { Step2Interests } from "@/sections/signals/steps/step-2-interests";
 import { Step3Segments } from "@/sections/signals/steps/step-3-segments";
-import { Step4Limit } from "@/sections/signals/steps/step-4-limit";
-import { Step5Upload } from "@/sections/signals/steps/step-5-upload";
+import { Step4Upload } from "@/sections/signals/steps/step-4-upload";
+import { Step5Limit } from "@/sections/signals/steps/step-5-limit";
 import { Step6Summary } from "@/sections/signals/steps/step-6-summary";
 import { Step7Processing } from "@/sections/signals/steps/step-7-processing";
 import { Step8Result } from "@/sections/signals/steps/step-8-result";
@@ -18,6 +18,9 @@ export interface LaunchRequest {
   scenarioId: string;
   cost: number;
   count: number;
+  /** Snapshot of the wizard's StepData at launch — used by `Открыть и
+   *  редактировать` to re-hydrate the wizard later. */
+  stepData: StepData;
   proceed: () => void;
 }
 
@@ -25,19 +28,30 @@ function WorkspaceInner({
   onSignalComplete,
   onLaunchRequested,
   initialScenario,
+  initialStepDataOverride,
+  initialStep,
   pendingSignal,
 }: {
   onSignalComplete?: () => void;
   onLaunchRequested?: (req: LaunchRequest) => void;
   initialScenario?: { id: string; name: string };
+  /** Hydrate the wizard with a previously captured StepData snapshot —
+   *  used by the "Открыть и редактировать" path on awaiting-payment signals. */
+  initialStepDataOverride?: StepData;
+  /** Override the starting step. Defaults to 2 when `initialScenario` is
+   *  set, 1 otherwise. The resume-edit path passes 6 to land on the summary. */
+  initialStep?: number;
   pendingSignal?: Signal | null;
 }) {
-  const startStep = initialScenario ? 2 : 1;
+  const defaultStartStep = initialScenario ? 2 : 1;
+  const startStep = initialStep ?? defaultStartStep;
   const [currentStep, setCurrentStep] = useState(startStep);
   const [maxStep, setMaxStep] = useState(startStep);
   const [animatingStep, setAnimatingStep] = useState<number | null>(startStep);
   const [stepData, setStepData] = useState<StepData>(
-    initialScenario
+    initialStepDataOverride
+      ? initialStepDataOverride
+      : initialScenario
       ? { ...initialStepData, scenario: initialScenario.id }
       : initialStepData
   );
@@ -115,6 +129,7 @@ function WorkspaceInner({
       cost: stepData.budget ?? 0,
       // Estimated count — derived in step-6 from budget + cheapest segment.
       count: estimateSignalCount(stepData),
+      stepData,
       proceed: () => advanceTo(7),
     });
   }, [advanceTo, handleNext, onLaunchRequested, stepData]);
@@ -125,8 +140,8 @@ function WorkspaceInner({
       case 1: return <Step1Scenario {...props} />;
       case 2: return <Step2Interests {...props} />;
       case 3: return <Step3Segments {...props} />;
-      case 4: return <Step4Limit {...props} />;
-      case 5: return <Step5Upload {...props} />;
+      case 4: return <Step4Upload {...props} />;
+      case 5: return <Step5Limit {...props} />;
       case 6:
         return (
           <Step6Summary
@@ -210,11 +225,15 @@ export function CampaignWorkspace({
   onSignalComplete,
   onLaunchRequested,
   initialScenario,
+  initialStepDataOverride,
+  initialStep,
   pendingSignal,
 }: {
   onSignalComplete?: () => void;
   onLaunchRequested?: (req: LaunchRequest) => void;
   initialScenario?: { id: string; name: string };
+  initialStepDataOverride?: StepData;
+  initialStep?: number;
   pendingSignal?: Signal | null;
 } = {}) {
   return (
@@ -222,6 +241,8 @@ export function CampaignWorkspace({
       onSignalComplete={onSignalComplete}
       onLaunchRequested={onLaunchRequested}
       initialScenario={initialScenario}
+      initialStepDataOverride={initialStepDataOverride}
+      initialStep={initialStep}
       pendingSignal={pendingSignal}
     />
   );

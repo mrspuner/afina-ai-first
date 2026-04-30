@@ -1,5 +1,6 @@
 "use client";
 
+import { Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { StepContent } from "@/sections/signals/steps/step-content";
@@ -53,9 +54,17 @@ function SummaryRow({
       )}
     >
       <span className="shrink-0 text-sm text-muted-foreground">{label}</span>
-      <span className="text-right text-sm font-medium text-foreground">
-        {value}
-      </span>
+      <div className="flex items-center gap-2">
+        <span className="text-right text-sm font-medium text-foreground">
+          {value}
+        </span>
+        {onClick && (
+          <Settings
+            aria-hidden
+            className="h-3.5 w-3.5 text-muted-foreground/60 shrink-0"
+          />
+        )}
+      </div>
     </div>
   );
 }
@@ -109,18 +118,18 @@ export function Step6Summary({ data, onNext, onGoToStep }: StepProps) {
             onClick={goto ? () => goto(3) : undefined}
           />
           <SummaryRow
+            label="Файл с базой"
+            value={data.file ? data.file.name : "—"}
+            onClick={goto ? () => goto(4) : undefined}
+          />
+          <SummaryRow
             label="Максимальный бюджет"
             value={budget ? formatRub(budget) : "—"}
-            onClick={goto ? () => goto(4) : undefined}
+            onClick={goto ? () => goto(5) : undefined}
           />
           <SummaryRow
             label="Максимум сигналов"
             value={budget && prices.length ? signalsStr : "—"}
-          />
-          <SummaryRow
-            label="Файл с базой"
-            value={data.file ? data.file.name : "—"}
-            onClick={goto ? () => goto(5) : undefined}
           />
         </div>
       </div>
@@ -152,7 +161,7 @@ export function Step6Summary({ data, onNext, onGoToStep }: StepProps) {
 
       <Separator className="my-4" />
 
-      <div className="flex justify-end">
+      <div className="flex justify-start">
         <Button onClick={() => onNext({})}>
           {enoughBalance ? "Запустить" : "Пополнить и запустить"}
         </Button>

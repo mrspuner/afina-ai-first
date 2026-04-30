@@ -1,15 +1,15 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { nanoid } from "nanoid";
 import { useAppState, useAppDispatch } from "@/state/app-state-context";
 import type { Signal } from "@/state/app-state";
+import type { StepData } from "@/types/campaign";
 import { SCENARIO_TO_TYPE } from "@/state/scenario-map";
 import { SurveySection } from "@/sections/survey/survey-section";
 import { CampaignWorkspace } from "./campaign-workspace";
 import { TopUpModal, computeShortfall } from "./top-up-modal";
-
-const PROCESSING_DURATION_MS = 6000;
+import { getProcessingDuration } from "@/state/dev-config";
 
 /**
  * Lifts step-6 → step-8 control flow out of CampaignWorkspace into the
@@ -19,9 +19,44 @@ const PROCESSING_DURATION_MS = 6000;
  * the wizard is rendered (smooth handoff, no return to start screen).
  */
 export function GuidedSignalSection() {
-  const { view, surveyStatus, balance, signals } = useAppState();
+  const { view, surveyStatus, balance, signals, resumingSignalId } =
+    useAppState();
   const dispatch = useAppDispatch();
   const initial = view.kind === "guided-signal" ? view.initialScenario : undefined;
+
+  // One-shot capture of the signal we're resuming. Reading the snapshot
+  // straight from `signals` would let a status change (e.g. payment success)
+  // re-render the section and confuse the wizard's mount-time-only inputs.
+  // Initialised lazily so the first render already renders step-6 — avoids
+  // a one-frame flash of step-1 before the effect below can promote state.
+  const [resumeSnapshot, setResumeSnapshot] = useState<{
+    id: string;
+    stepData: StepData;
+  } | null>(() => {
+    if (!resumingSignalId) return null;
+    const sig = signals.find((s) => s.id === resumingSignalId);
+    if (!sig || !sig.wizardData) return null;
+    return { id: sig.id, stepData: sig.wizardData };
+  });
+
+  // Acknowledge the resume request once we have a snapshot in hand (or have
+  // determined there's nothing to resume) so the reducer flag doesn't stick.
+  useEffect(() => {
+    if (!resumingSignalId) return;
+    dispatch({ type: "resume_signal_in_wizard_handled" });
+  }, [resumingSignalId, dispatch]);
+
+  // If `resumingSignalId` arrives AFTER mount (rare — section already
+  // mounted via another route, then user clicked the menu item), capture
+  // the snapshot.
+  useEffect(() => {
+    if (!resumingSignalId) return;
+    if (resumeSnapshot && resumeSnapshot.id === resumingSignalId) return;
+    const sig = signals.find((s) => s.id === resumingSignalId);
+    if (!sig || !sig.wizardData) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setResumeSnapshot({ id: sig.id, stepData: sig.wizardData });
+  }, [resumingSignalId, resumeSnapshot, signals]);
 
   // Survey gate. Held locally so finishing the anketa lets us re-render this
   // same view as the wizard without bouncing through the start screen.
@@ -42,10 +77,14 @@ export function GuidedSignalSection() {
   const startProcessing = useCallback(
     (signalId: string) => {
       dispatch({ type: "signal_status_changed", id: signalId, status: "processing" });
-      // Simulate provider work; flip to "ready" after a short delay.
+      const duration = getProcessingDuration();
+      // `Infinity` (dev override) means "leave the signal in processing
+      // forever" — useful for inspecting the in-flight UI without racing the
+      // simulated provider.
+      if (!Number.isFinite(duration)) return;
       window.setTimeout(() => {
         dispatch({ type: "signal_status_changed", id: signalId, status: "ready" });
-      }, PROCESSING_DURATION_MS);
+      }, duration);
     },
     [dispatch]
   );
@@ -56,9 +95,15 @@ export function GuidedSignalSection() {
       scenarioId: string;
       cost: number;
       count: number;
+      stepData: StepData;
       proceed: () => void;
     }) => {
       const now = new Date().toISOString();
+      // When resuming an awaiting-payment signal, drop the previous draft so
+      // we don't end up with two cabinet entries for the same wizard run.
+      if (resumeSnapshot) {
+        dispatch({ type: "signal_deleted", id: resumeSnapshot.id });
+      }
       const id = `sig_${nanoid(8)}`;
       const type = SCENARIO_TO_TYPE[params.scenarioId] ?? "Регистрация";
       const enoughBalance = computeShortfall(balance, params.cost) <= 0;
@@ -71,6 +116,7 @@ export function GuidedSignalSection() {
         createdAt: now,
         updatedAt: now,
         status: enoughBalance ? "processing" : "awaiting_payment",
+        wizardData: params.stepData,
       };
       dispatch({ type: "signal_added", signal });
       // signal_added moves view → awaiting-campaign, but page.tsx routes that
@@ -90,7 +136,7 @@ export function GuidedSignalSection() {
         setTopUpOpen(true);
       }
     },
-    [balance, dispatch, startProcessing]
+    [balance, dispatch, resumeSnapshot, startProcessing]
   );
 
   const handlePaymentSuccess = useCallback(
@@ -132,9 +178,15 @@ export function GuidedSignalSection() {
   return (
     <>
       <CampaignWorkspace
+        // Force a fresh wizard mount whenever we switch between "fresh"
+        // and "resume" modes so useState seeds (currentStep, stepData) are
+        // recomputed from the new initial values.
+        key={resumeSnapshot ? `resume-${resumeSnapshot.id}` : "fresh"}
         onSignalComplete={handleSignalComplete}
         onLaunchRequested={handleLaunchSignal}
         initialScenario={initial}
+        initialStepDataOverride={resumeSnapshot?.stepData}
+        initialStep={resumeSnapshot ? 6 : undefined}
         pendingSignal={pendingSignal}
       />
       <TopUpModal

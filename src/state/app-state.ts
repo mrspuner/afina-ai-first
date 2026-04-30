@@ -4,6 +4,7 @@ import type { CampaignSort } from "./parse-campaign-filter";
 import type { Survey, SurveyStatus } from "@/types/survey";
 import { EMPTY_SURVEY } from "@/types/survey";
 import type { SignalStatus } from "@/types/signal-status";
+import type { StepData } from "@/types/campaign";
 import {
   DEFAULT_DIRECTION_ID,
   businessDirectionFromSurvey,
@@ -42,6 +43,13 @@ export type Signal = {
   // Owned by feature/signal-flow worktree (E). Defaults to "ready" when
   // omitted — preserves behaviour of existing presets that don't set status.
   status?: SignalStatus;
+  /**
+   * Snapshot of the wizard form at the moment this signal was launched.
+   * Lets `Открыть и редактировать` re-hydrate the wizard at step-6 with
+   * every field intact. Optional — older signals or seeded presets won't
+   * carry it.
+   */
+  wizardData?: StepData;
 };
 
 export type CampaignStatus =
@@ -113,6 +121,13 @@ export type AppState = {
   // Owned by feature/signal-flow worktree (E):
   balance: number;
   notifications: { signalsBadge: boolean };
+  /**
+   * Set when the user picks "Открыть и редактировать" on an awaiting-payment
+   * signal. The wizard reads this on mount, hydrates step-6 from the
+   * signal's `wizardData`, and clears the field. Only one signal can be
+   * "resumed" at a time — entering the wizard from any other path clears it.
+   */
+  resumingSignalId?: string;
 };
 
 export type Action =
@@ -160,7 +175,9 @@ export type Action =
   | { type: "balance_topup"; amount: number }
   | { type: "signal_status_changed"; id: string; status: SignalStatus }
   | { type: "signal_deleted"; id: string }
-  | { type: "signals_badge_set"; value: boolean };
+  | { type: "signals_badge_set"; value: boolean }
+  | { type: "resume_signal_in_wizard"; signalId: string }
+  | { type: "resume_signal_in_wizard_handled" };
 // PARALLEL-WORKTREE INSERTION POINT — survey actions (B), billing/signal-status actions (E).
 // Each worktree appends its own action variants to the union above; resolve merges by
 // keeping every appended line and adding the matching reducer case at the end of appReducer.
@@ -193,6 +210,7 @@ export function appReducer(state: AppState, action: Action): AppState {
         view: { kind: "guided-signal", initialScenario: action.initialScenario },
         launchFlyoutOpen: false,
         activeSection: null,
+        resumingSignalId: undefined,
       };
 
     case "signal_added":
@@ -499,6 +517,7 @@ export function appReducer(state: AppState, action: Action): AppState {
         },
         launchFlyoutOpen: false,
         activeSection: null,
+        resumingSignalId: undefined,
       };
 
     case "flyout_campaign_select": {
@@ -607,6 +626,21 @@ export function appReducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         notifications: { ...state.notifications, signalsBadge: action.value },
+      };
+
+    case "resume_signal_in_wizard":
+      return {
+        ...state,
+        view: { kind: "guided-signal" },
+        resumingSignalId: action.signalId,
+        launchFlyoutOpen: false,
+        activeSection: null,
+      };
+
+    case "resume_signal_in_wizard_handled":
+      return {
+        ...state,
+        resumingSignalId: undefined,
       };
     // PARALLEL-WORTREE INSERTION POINT — append survey/billing/signal-status cases
     // immediately above this comment to keep merges trivial.

@@ -6,8 +6,8 @@ import { cn } from "@/lib/utils";
 const STEPPER_ITEMS = [
   { label: "Интересы", step: 2 },
   { label: "Сегменты", step: 3 },
-  { label: "Бюджет", step: 4 },
-  { label: "База", step: 5 },
+  { label: "База", step: 4 },
+  { label: "Бюджет", step: 5 },
   { label: "Сводка", step: 6 },
   { label: "Обработка", step: 7 },
   { label: "Результат", step: 8 },

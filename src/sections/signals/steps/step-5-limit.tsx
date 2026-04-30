@@ -25,14 +25,37 @@ function calcSignals(segments: string[], budget: number): string {
   return `${minSignals.toLocaleString("ru")} – ${maxSignals.toLocaleString("ru")} сигналов`;
 }
 
-export function Step4Limit({ data, onNext }: StepProps) {
-  const [value, setValue] = useState<string>(
-    data.budget ? String(data.budget) : ""
-  );
+/** Derive a recommended budget from the imported base size. The constants
+ *  here are eyeball-picked: 5%–45% of the row count yields a number that
+ *  fits the existing 0.07–0.45 ₽/signal price range without leaving the
+ *  user with a degenerate estimate. We use Math.random for this prototype
+ *  — stability across the same step revisit comes from caching the value
+ *  in the wizard's stepData on first compute, not the rng. */
+function recommendBudget(rowCount: number): number {
+  return Math.max(50, Math.round(rowCount * (0.05 + Math.random() * 0.4)));
+}
+
+export function Step5Limit({ data, onNext }: StepProps) {
+  // Initial budget priority:
+  //  1. user-entered value carried over from a prior visit
+  //  2. recommendation derived from the uploaded base size
+  //  3. blank input (legacy behaviour when wizard is launched without база)
+  const [value, setValue] = useState<string>(() => {
+    if (data.budget) return String(data.budget);
+    if (typeof data.fileRowCount === "number") {
+      return String(recommendBudget(data.fileRowCount));
+    }
+    return "";
+  });
 
   const parsed = parseFloat(value);
   const isValid = !isNaN(parsed) && parsed > 0;
   const estimatedSignals = calcSignals(data.segments, isValid ? parsed : 0);
+
+  const baseSizeLabel =
+    typeof data.fileRowCount === "number"
+      ? `${(data.fileRowCount / 1000).toFixed(1)} тыс. контактов`
+      : null;
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const raw = e.target.value.replace(/[^0-9.,]/g, "").replace(",", ".");
@@ -66,9 +89,14 @@ export function Step4Limit({ data, onNext }: StepProps) {
               {isValid ? estimatedSignals : "—"}
             </span>
           </p>
+          {baseSizeLabel && (
+            <p className="text-xs text-muted-foreground">
+              Рекомендуемая сумма для базы {baseSizeLabel}
+            </p>
+          )}
         </div>
 
-        <div className="flex justify-end">
+        <div className="flex justify-start">
           <Button
             disabled={!isValid}
             onClick={() => onNext({ budget: parsed })}
