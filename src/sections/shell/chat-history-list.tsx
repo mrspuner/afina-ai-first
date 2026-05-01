@@ -53,9 +53,19 @@ function MessageRow({ message }: { message: ChatMessage }) {
 
 interface ChatHistoryListProps {
   messages: ChatMessage[];
-  /** Vertical layout fills the parent's height; bar layout uses a max-height. */
-  variant: "bar" | "sidebar";
+  /**
+   * `collapsed` — short peek window inside the bar (latest messages with
+   * fade-mask). `bar` — taller scrollable window in expanded bar mode.
+   * `sidebar` — fills the parent's height.
+   */
+  variant: "collapsed" | "bar" | "sidebar";
 }
+
+const VARIANT_HEIGHT: Record<ChatHistoryListProps["variant"], string> = {
+  collapsed: "max-h-[100px]",
+  bar: "max-h-[360px]",
+  sidebar: "h-full",
+};
 
 export function ChatHistoryList({ messages, variant }: ChatHistoryListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -81,14 +91,14 @@ export function ChatHistoryList({ messages, variant }: ChatHistoryListProps) {
   return (
     <div className="relative flex-1 overflow-hidden">
       {showTopFade && (
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-6 bg-gradient-to-b from-[rgba(10,10,10,0.95)] to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-6 bg-gradient-to-b from-[rgba(10,10,10,0.95)] to-transparent" />
       )}
       <div
         ref={scrollRef}
         onScroll={updateFades}
         className={cn(
           "h-full overflow-y-auto px-3",
-          variant === "bar" && "max-h-[360px]"
+          VARIANT_HEIGHT[variant]
         )}
       >
         {messages.map((m) => (
@@ -96,7 +106,7 @@ export function ChatHistoryList({ messages, variant }: ChatHistoryListProps) {
         ))}
       </div>
       {showBottomFade && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-[rgba(10,10,10,0.95)] to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-6 bg-gradient-to-t from-[rgba(10,10,10,0.95)] to-transparent" />
       )}
     </div>
   );
