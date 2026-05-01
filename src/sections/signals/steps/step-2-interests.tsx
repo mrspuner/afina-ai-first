@@ -274,11 +274,9 @@ function TriggerCard({
       {(showDomainList || hasDelta || showConfigureButton) && (
         <div className="animate-in fade-in-0 slide-in-from-top-1 flex flex-col gap-3 border-t border-primary/20 bg-background/40 px-3 py-3">
           {showDomainList && (
-            <ul className="flex flex-col gap-1 text-xs text-muted-foreground">
+            <ul className="flex flex-wrap gap-x-3 gap-y-1 font-mono text-sm tracking-tight text-foreground/85">
               {domains.map((d) => (
-                <li key={d} className="font-mono tracking-tight">
-                  {d}
-                </li>
+                <li key={d}>{d}</li>
               ))}
             </ul>
           )}
