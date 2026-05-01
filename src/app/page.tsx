@@ -1,7 +1,6 @@
 "use client";
 
 import { PromptInputProvider } from "@/components/ai-elements/prompt-input";
-import { TriggerEditProvider } from "@/state/trigger-edit-context";
 import { PromptChipsProvider } from "@/state/prompt-chips-context";
 import { ChatProvider } from "@/state/chat-context";
 import { ChatPanel } from "@/sections/shell/chat-panel";
@@ -48,7 +47,6 @@ export default function Home() {
 
   return (
     <PromptInputProvider>
-      <TriggerEditProvider>
       <PromptChipsProvider>
       <WelcomeChatProvider value={welcomeChat}>
         <ChatProvider>
@@ -77,7 +75,6 @@ export default function Home() {
         </ChatProvider>
       </WelcomeChatProvider>
       </PromptChipsProvider>
-      </TriggerEditProvider>
     </PromptInputProvider>
   );
 }
