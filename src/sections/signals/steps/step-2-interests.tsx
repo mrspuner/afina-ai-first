@@ -2,13 +2,14 @@
 
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Check, Plus, Minus, X } from "lucide-react";
+import { Check, ChevronDown, Plus, Minus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StepContent } from "@/sections/signals/steps/step-content";
 import { StepProps } from "@/types/campaign";
 import { useAppState } from "@/state/app-state-context";
 import { VERTICALS, getInterestById } from "@/data/triggers-by-vertical";
 import { getInterestsForDirection } from "@/data/interests-by-direction";
+import { getTriggerDomains } from "@/data/trigger-domains";
 import type { Interest, Trigger, Vertical } from "@/types/directions";
 import {
   applyEditToDelta,
@@ -141,26 +142,81 @@ function DeltaChip({
 
 interface TriggerCardProps {
   trigger: Trigger;
+  domains: string[];
   selected: boolean;
   delta: TriggerDelta;
   isEditing: boolean;
   highlight: boolean;
+  expanded: boolean;
   onToggle: () => void;
+  onToggleExpanded: () => void;
   onConfigureClick: () => void;
   onRemoveDelta: (bucket: "added" | "excluded", domain: string) => void;
 }
 
+function DeltaBlock({
+  delta,
+  onRemoveDelta,
+}: {
+  delta: TriggerDelta;
+  onRemoveDelta: (bucket: "added" | "excluded", domain: string) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      {delta.added.length > 0 && (
+        <div className="flex items-start gap-2 text-xs">
+          <span className="mt-0.5 inline-flex items-center gap-1 font-medium text-muted-foreground">
+            <Plus className="h-3 w-3" /> Добавлено
+          </span>
+          <div className="flex flex-wrap gap-1.5">
+            {delta.added.map((d) => (
+              <DeltaChip
+                key={`add-${d}`}
+                domain={d}
+                variant="added"
+                onRemove={() => onRemoveDelta("added", d)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+      {delta.excluded.length > 0 && (
+        <div className="flex items-start gap-2 text-xs">
+          <span className="mt-0.5 inline-flex items-center gap-1 font-medium text-muted-foreground">
+            <Minus className="h-3 w-3" /> Исключено
+          </span>
+          <div className="flex flex-wrap gap-1.5">
+            {delta.excluded.map((d) => (
+              <DeltaChip
+                key={`exc-${d}`}
+                domain={d}
+                variant="excluded"
+                onRemove={() => onRemoveDelta("excluded", d)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function TriggerCard({
   trigger,
+  domains,
   selected,
   delta,
   isEditing,
   highlight,
+  expanded,
   onToggle,
+  onToggleExpanded,
   onConfigureClick,
   onRemoveDelta,
 }: TriggerCardProps) {
-  const showDelta = selected && !isDeltaEmpty(delta);
+  const hasDelta = selected && !isDeltaEmpty(delta);
+  const showDomainList = expanded && domains.length > 0;
+  const showConfigureButton = expanded && selected;
 
   return (
     <div
@@ -199,58 +255,52 @@ function TriggerCard({
           </span>
         </button>
 
-        {selected && (
-          <button
-            type="button"
-            onClick={onConfigureClick}
-            aria-pressed={isEditing}
+        <button
+          type="button"
+          onClick={onToggleExpanded}
+          aria-expanded={expanded}
+          aria-label={expanded ? "Свернуть домены" : "Показать домены"}
+          className="shrink-0 inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        >
+          <ChevronDown
             className={cn(
-              "shrink-0 inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
-              isEditing
-                ? "border-primary bg-primary/10 text-foreground"
-                : "border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground"
+              "h-4 w-4 transition-transform duration-200",
+              expanded && "rotate-180"
             )}
-          >
-            <MascotIcon className="h-4 w-4" />
-            Настроить
-          </button>
-        )}
+          />
+        </button>
       </div>
 
-      {showDelta && (
-        <div className="animate-in fade-in-0 slide-in-from-top-1 flex flex-col gap-2 border-t border-primary/20 bg-background/40 px-3 py-3">
-          {delta.added.length > 0 && (
-            <div className="flex items-start gap-2 text-xs">
-              <span className="mt-0.5 inline-flex items-center gap-1 font-medium text-muted-foreground">
-                <Plus className="h-3 w-3" /> Добавлено
-              </span>
-              <div className="flex flex-wrap gap-1.5">
-                {delta.added.map((d) => (
-                  <DeltaChip
-                    key={`add-${d}`}
-                    domain={d}
-                    variant="added"
-                    onRemove={() => onRemoveDelta("added", d)}
-                  />
-                ))}
-              </div>
-            </div>
+      {(showDomainList || hasDelta || showConfigureButton) && (
+        <div className="animate-in fade-in-0 slide-in-from-top-1 flex flex-col gap-3 border-t border-primary/20 bg-background/40 px-3 py-3">
+          {showDomainList && (
+            <ul className="flex flex-col gap-1 text-xs text-muted-foreground">
+              {domains.map((d) => (
+                <li key={d} className="font-mono tracking-tight">
+                  {d}
+                </li>
+              ))}
+            </ul>
           )}
-          {delta.excluded.length > 0 && (
-            <div className="flex items-start gap-2 text-xs">
-              <span className="mt-0.5 inline-flex items-center gap-1 font-medium text-muted-foreground">
-                <Minus className="h-3 w-3" /> Исключено
-              </span>
-              <div className="flex flex-wrap gap-1.5">
-                {delta.excluded.map((d) => (
-                  <DeltaChip
-                    key={`exc-${d}`}
-                    domain={d}
-                    variant="excluded"
-                    onRemove={() => onRemoveDelta("excluded", d)}
-                  />
-                ))}
-              </div>
+
+          {hasDelta && <DeltaBlock delta={delta} onRemoveDelta={onRemoveDelta} />}
+
+          {showConfigureButton && (
+            <div className="flex">
+              <button
+                type="button"
+                onClick={onConfigureClick}
+                aria-pressed={isEditing}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
+                  isEditing
+                    ? "border-primary bg-primary/10 text-foreground"
+                    : "border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground"
+                )}
+              >
+                <MascotIcon className="h-4 w-4" />
+                Настроить
+              </button>
             </div>
           )}
         </div>
@@ -325,6 +375,9 @@ export function Step2Interests({ data, onNext }: StepProps) {
     initialPrefill.triggerIds
   );
   const [deltas, setDeltas] = useState<Record<string, TriggerDelta>>({});
+  const [expandedTriggerIds, setExpandedTriggerIds] = useState<Set<string>>(
+    () => new Set()
+  );
   const [highlightedTriggerIds, setHighlightedTriggerIds] = useState<
     Set<string>
   >(() => new Set());
@@ -382,6 +435,15 @@ export function Step2Interests({ data, onNext }: StepProps) {
       if (!next.includes(triggerId) && editTargetIds.has(triggerId)) {
         chipsApi.removeChip(`trigger_${triggerId}`);
       }
+      return next;
+    });
+  }
+
+  function toggleExpanded(triggerId: string) {
+    setExpandedTriggerIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(triggerId)) next.delete(triggerId);
+      else next.add(triggerId);
       return next;
     });
   }
@@ -577,11 +639,14 @@ export function Step2Interests({ data, onNext }: StepProps) {
               <TriggerCard
                 key={trigger.id}
                 trigger={trigger}
+                domains={getTriggerDomains(trigger.id)}
                 selected={selectedTriggers.includes(trigger.id)}
                 delta={deltas[trigger.id] ?? EMPTY_DELTA}
                 isEditing={editTargetIds.has(trigger.id)}
                 highlight={highlightedTriggerIds.has(trigger.id)}
+                expanded={expandedTriggerIds.has(trigger.id)}
                 onToggle={() => toggleTrigger(trigger.id)}
+                onToggleExpanded={() => toggleExpanded(trigger.id)}
                 onConfigureClick={() => handleConfigureClick(trigger.id)}
                 onRemoveDelta={(bucket, domain) =>
                   handleRemoveDelta(trigger.id, bucket, domain)
