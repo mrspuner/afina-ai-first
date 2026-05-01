@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { motion } from "motion/react";
 import Image from "next/image";
-import { Mic, Loader2 } from "lucide-react";
+import { Mic } from "lucide-react";
 import type { PromptInputMessage } from "@/components/ai-elements/prompt-input";
 import {
   PromptInput,
@@ -31,7 +31,6 @@ import { parseCampaignQuery } from "@/state/parse-campaign-filter";
 import { useWelcomeChat } from "@/sections/welcome/welcome-chat-context";
 import { OnboardingChatChips } from "@/sections/welcome/onboarding-chat-view";
 import { CampaignsPromptChips } from "@/sections/campaigns/campaigns-prompt-chips";
-import { useTriggerEdit } from "@/state/trigger-edit-context";
 
 function AttachmentFileList() {
   const { files } = usePromptInputAttachments();
@@ -114,28 +113,13 @@ export function ShellBottomBar() {
     budgetHelpShown,
   } = state;
   const welcomeChat = useWelcomeChat();
-  const triggerEdit = useTriggerEdit();
   const chipsApi = usePromptChips();
 
-  const hasTriggerChips = chipsApi.chips.some((c) => c.kind === "trigger");
   const editorRef = useRef<ChipEditableInputHandle>(null);
 
   function handlePromptSubmit(message: PromptInputMessage) {
     const rawText = message.text ?? "";
     const segments = editorRef.current?.getSegments() ?? [];
-
-    // Trigger-edit mode: any trigger chip in the prompt-bar means the user
-    // is directing edits at those triggers. Pass per-chip segments through
-    // so each chip's command text is parsed independently.
-    if (hasTriggerChips && triggerEdit) {
-      void triggerEdit.submit(segments).then((result) => {
-        if (result.ok) {
-          chipsApi.clearChips();
-          editorRef.current?.clear();
-        }
-      });
-      return;
-    }
 
     if (isOnWelcome(state)) {
       welcomeChat?.submitFreeText(rawText);
@@ -188,7 +172,6 @@ export function ShellBottomBar() {
   }
 
   const chatPlaceholder =
-    hasTriggerChips ? "добавь d1.ru, d2.ru   или   исключи d3.ru" :
     isOnWelcome(state) ? "Задайте вопрос…" :
     isWorkflowView(state) ? "Опишите изменение сценария..." :
     view.kind === "campaign-select" ? "Опишите вашу кампанию..." :
@@ -242,40 +225,6 @@ export function ShellBottomBar() {
             "bg-[rgba(10,10,10,0.75)] backdrop-blur-[2px]"
           )}
         >
-          {/* Trigger-edit hint: explains what the chips in the prompt-bar
-              represent and what commands the user can run. The mascot icon
-              lives here (not on the chip itself) so the chip stays a clean,
-              text-only inline pill that doesn't confuse contenteditable. */}
-          {hasTriggerChips && (
-            <div
-              data-testid="trigger-edit-hint"
-              className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/80"
-            >
-              {triggerEdit?.processing ? (
-                <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-primary" />
-              ) : (
-                <Image
-                  src="/mascot-icon.svg"
-                  alt=""
-                  width={16}
-                  height={16}
-                  className="shrink-0"
-                  aria-hidden
-                />
-              )}
-              <span className="leading-snug">
-                Напишите, какие сайты добавить или исключить.
-              </span>
-            </div>
-          )}
-          {triggerEdit?.hintMessage && (
-            <div
-              data-testid="trigger-edit-error"
-              className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-100"
-            >
-              {triggerEdit.hintMessage}
-            </div>
-          )}
           {/* Budget-step help: clicking the chip below the prompt-bar swaps
               it for a mascot-styled answer block here, mirroring how the
               trigger-edit hint surfaces on the interests step. */}
