@@ -77,45 +77,57 @@ export function ChatPanel({ placeholder }: { placeholder: string }) {
     );
   }
 
-  // Bar modes: outer wrapper stays translucent + blurred (page-like), the
-  // brand-yellow tint lives on the header strip only. The composer inside
-  // owns its own opaque dark surface so the yellow doesn't bleed through.
+  // Bar modes:
+  // - Underlay (outer): translucent dark + blur, no border. Hosts both the
+  //   history container and the composer as same-width siblings.
+  // - History container: a self-contained card. Collapsed → only the
+  //   yellow header strip is visible (container itself transparent).
+  //   Expanded → container takes an opaque #171717 surface + border, the
+  //   header loses its yellow tint, and the message list reveals below.
   return (
     <motion.div
       className="fixed left-[120px] right-0 bottom-[20px] z-30 flex justify-center px-6"
       initial={false}
     >
-      <div
-        className={cn(
-          "flex w-full max-w-[720px] flex-col overflow-hidden rounded-[10px] border border-white/15 bg-[rgba(10,10,10,0.75)] shadow-[0_0_17px_9px_rgba(0,0,0,0.19)] backdrop-blur-[2px]"
-        )}
-      >
-        <div className="bg-[rgba(255,236,0,0.17)] px-4 py-2">
-          <ChatPanelHeader
-            mode={chat.mode}
-            onToggleBar={() => chat.setMode(expanded ? "collapsed" : "expanded")}
-            onOpenSidebar={chat.openSidebar}
-            onCloseSidebar={chat.closeSidebar}
-          />
-        </div>
-        {expanded && (
-          <motion.div
-            initial={{ opacity: 0, scaleY: 0.94 }}
-            animate={{ opacity: 1, scaleY: 1 }}
-            transition={{ duration: 0.22, ease: [0.32, 0.72, 0, 1] }}
-            style={{ transformOrigin: "bottom" }}
-            className="flex flex-col px-3 pt-2"
-          >
-            {isEmpty ? (
-              <EmptyHistory />
-            ) : (
-              <ChatHistoryList messages={chat.messages} variant="bar" />
+      <div className="flex w-full max-w-[720px] flex-col gap-2 rounded-[16px] bg-[rgba(10,10,10,0.75)] p-3 shadow-[0_0_17px_9px_rgba(0,0,0,0.19)] backdrop-blur-[2px]">
+        <div
+          className={cn(
+            "flex flex-col overflow-hidden rounded-[10px] border transition-colors duration-200",
+            expanded
+              ? "border-white/10 bg-[#171717]"
+              : "border-transparent"
+          )}
+        >
+          <div
+            className={cn(
+              "px-3 py-2 transition-colors duration-200",
+              expanded ? "bg-transparent" : "bg-[rgba(255,236,0,0.17)]"
             )}
-          </motion.div>
-        )}
-        <div className="p-3">
-          <ChatComposer placeholder={placeholder} onSubmit={handleFreeTextSubmit} />
+          >
+            <ChatPanelHeader
+              mode={chat.mode}
+              onToggleBar={() => chat.setMode(expanded ? "collapsed" : "expanded")}
+              onOpenSidebar={chat.openSidebar}
+              onCloseSidebar={chat.closeSidebar}
+            />
+          </div>
+          {expanded && (
+            <motion.div
+              initial={{ opacity: 0, scaleY: 0.94 }}
+              animate={{ opacity: 1, scaleY: 1 }}
+              transition={{ duration: 0.22, ease: [0.32, 0.72, 0, 1] }}
+              style={{ transformOrigin: "top" }}
+              className="flex flex-col px-3 pt-1 pb-3"
+            >
+              {isEmpty ? (
+                <EmptyHistory />
+              ) : (
+                <ChatHistoryList messages={chat.messages} variant="bar" />
+              )}
+            </motion.div>
+          )}
         </div>
+        <ChatComposer placeholder={placeholder} onSubmit={handleFreeTextSubmit} />
       </div>
     </motion.div>
   );
