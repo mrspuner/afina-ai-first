@@ -97,7 +97,7 @@ export function ChatPanel({ placeholder }: { placeholder: string }) {
         <div
           className={cn(
             "flex flex-col overflow-hidden rounded-[10px] border border-white/15 pb-5 transition-colors duration-200",
-            expanded ? "bg-[#171717]" : "bg-[#333008]"
+            expanded ? "bg-[#111111]" : "bg-[#333008]"
           )}
         >
           <div className="px-3 py-2">
