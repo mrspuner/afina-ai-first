@@ -170,7 +170,7 @@ function TriggerCard({
           ? "border-primary bg-accent/40 ring-1 ring-primary"
           : "border-border bg-card hover:border-primary/50",
         isEditing && "ring-2 ring-primary/60",
-        highlight && "ring-2 ring-amber-400/70 transition-shadow"
+        highlight && "ring-2 ring-[var(--color-brand)]/70 transition-shadow"
       )}
     >
       <div className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm">

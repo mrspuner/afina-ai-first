@@ -18,12 +18,12 @@ function ThinkingDots() {
         <motion.span
           key={i}
           className="block h-2 w-2 rounded-full bg-muted-foreground"
-          animate={{ y: [0, -3, 0], opacity: [0.3, 1, 0.3] }}
+          animate={{ opacity: [0.25, 1, 0.25] }}
           transition={{
-            duration: 0.72,
+            duration: 0.9,
             repeat: Infinity,
             ease: "easeInOut",
-            delay: i * 0.12,
+            delay: i * 0.14,
           }}
         />
       ))}

@@ -59,6 +59,27 @@
   --ease-out-strong: cubic-bezier(0.32, 0.72, 0, 1);
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
   --default-transition-timing-function: var(--ease-out);
+
+  /* Brand accent — used as a rare, precise signal (active wizard step,
+     primary CTA, active trigger, mascot/AI indication). Bound here so
+     ring/border utilities can reference `var(--brand)` instead of hardcoding
+     amber-400 in the wrong slots. */
+  --color-brand: #FFEC00;
+}
+
+/* Reduced-motion baseline. Crushes any animation/transition we forgot to
+   gate, including infinite keyframes (workflow-node pulses) which would
+   otherwise keep cycling. Specific motion components can re-introduce a
+   safe opacity-only fallback via `useReducedMotion()`. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 :root {

@@ -64,12 +64,19 @@ function cardClass(active: boolean, interactive: boolean) {
   return cn(
     "flex flex-col items-start rounded-lg border p-4 text-left",
     "transition-[opacity,border-color,background-color,transform] duration-200 ease-out",
+    // Page-entrance: each card cascades in with a 60 ms stagger between
+    // siblings. Per-card delay is set via inline style at the call site.
+    "animate-in fade-in-0 slide-in-from-bottom-2 [--tw-animation-duration:280ms] [--tw-ease:var(--ease-out)]",
     active
       ? interactive
         ? "cursor-pointer border-border bg-card hover:border-border hover:bg-accent active:scale-[0.98]"
         : "cursor-default border-border bg-card"
       : "cursor-not-allowed border-border/40 bg-card/40 opacity-35"
   );
+}
+
+function staggerStyle(i: number): React.CSSProperties | undefined {
+  return i > 0 ? { animationDelay: `${i * 60}ms` } : undefined;
 }
 
 export function OnboardingStepCards() {
@@ -89,7 +96,7 @@ export function OnboardingStepCards() {
           prompt-bar (per docs/start-screen-konfiguratsiya.md). The wizard
           gates on surveyStatus (Worktree B), so pressing the CTA routes a
           first-time user through the anketa before the wizard. */}
-      <div className={cardClass(step1Active, false)}>
+      <div className={cardClass(step1Active, false)} style={staggerStyle(0)}>
         <StepBody
           step={step1}
           cta={
@@ -115,11 +122,17 @@ export function OnboardingStepCards() {
           step2Active ? () => dispatch({ type: "step2_clicked" }) : undefined
         }
         className={cardClass(step2Active, step2Active)}
+        style={staggerStyle(1)}
       >
         <StepBody step={step2} />
       </button>
 
-      <button type="button" disabled className={cardClass(step3Active, false)}>
+      <button
+        type="button"
+        disabled
+        className={cardClass(step3Active, false)}
+        style={staggerStyle(2)}
+      >
         <StepBody step={step3} />
       </button>
     </div>

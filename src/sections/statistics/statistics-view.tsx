@@ -254,7 +254,7 @@ export function StatisticsView({ campaignId }: { campaignId?: string } = {}) {
                 <h1 className="text-[38px] font-semibold leading-[46px] tracking-tight">
                   {titleText}
                 </h1>
-                <ChevronDown className="h-5 w-5 text-muted-foreground mt-1 shrink-0 transition-transform group-data-[popup-open]/title:rotate-180" />
+                <ChevronDown className="h-5 w-5 text-muted-foreground mt-1 shrink-0 transition-transform duration-200 ease-out group-data-[popup-open]/title:rotate-180" />
               </PopoverTrigger>
               <PopoverContent align="start" className="w-80 p-1">
                 <div className="px-2 py-1.5 text-xs text-muted-foreground">

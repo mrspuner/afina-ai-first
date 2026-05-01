@@ -24,7 +24,7 @@ export function WelcomeView({ chat }: { chat: OnboardingChatState }) {
     >
       <motion.div
         layout
-        transition={{ duration: 0.52, ease: HERO_EASE }}
+        transition={{ duration: 0.42, ease: HERO_EASE }}
         className="flex w-full max-w-2xl flex-col items-center gap-8"
       >
         {done ? (
@@ -47,7 +47,7 @@ export function WelcomeView({ chat }: { chat: OnboardingChatState }) {
                 key="hero"
                 initial={false}
                 exit={{ opacity: 0, y: -20, filter: "blur(10px)" }}
-                transition={{ duration: 0.52, ease: HERO_EASE }}
+                transition={{ duration: 0.42, ease: HERO_EASE }}
                 className="flex w-full flex-col items-center gap-8"
               >
                 <div className="flex w-full flex-col items-center gap-2 text-center">
@@ -69,7 +69,7 @@ export function WelcomeView({ chat }: { chat: OnboardingChatState }) {
             finished, then snap to its new position. */}
         <motion.div
           layout
-          transition={{ duration: 0.52, ease: HERO_EASE }}
+          transition={{ duration: 0.42, ease: HERO_EASE }}
           className="w-full"
         >
           <OnboardingChatHistory history={chat.history} />
