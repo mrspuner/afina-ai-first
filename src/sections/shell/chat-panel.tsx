@@ -78,24 +78,26 @@ export function ChatPanel({ placeholder }: { placeholder: string }) {
   }
 
   // Bar modes:
-  // - Underlay (outer): translucent dark + blur, no border. Hosts both the
-  //   history container and the composer as same-width siblings.
-  // - History container: a self-contained card. Collapsed → only the
-  //   yellow header strip is visible (container itself transparent).
-  //   Expanded → container takes an opaque #171717 surface + border, the
-  //   header loses its yellow tint, and the message list reveals below.
+  // - Underlay (outer): translucent dark + blur, no border, soft halo.
+  // - History container: rounded card with a white/15 border in both
+  //   states. Bottom edge tucks BEHIND the composer (composer is pulled
+  //   up via negative margin + z-index) so the container's bottom border
+  //   and rounded-bottom corners stay hidden.
+  //     · Collapsed → container bg transparent; only the yellow header
+  //       strip paints inside.
+  //     · Expanded → container bg becomes opaque #171717; header loses
+  //       its yellow tint; message list reveals between header and the
+  //       hidden bottom edge.
   return (
     <motion.div
       className="fixed left-[120px] right-0 bottom-[20px] z-30 flex justify-center px-6"
       initial={false}
     >
-      <div className="flex w-full max-w-[720px] flex-col gap-2 rounded-[16px] bg-[rgba(10,10,10,0.75)] p-3 shadow-[0_0_17px_9px_rgba(0,0,0,0.19)] backdrop-blur-[2px]">
+      <div className="flex w-full max-w-[720px] flex-col rounded-[16px] bg-[rgba(10,10,10,0.75)] p-3 shadow-[0_0_17px_9px_rgba(0,0,0,0.19)] backdrop-blur-[2px]">
         <div
           className={cn(
-            "flex flex-col overflow-hidden rounded-[10px] border transition-colors duration-200",
-            expanded
-              ? "border-white/10 bg-[#171717]"
-              : "border-transparent"
+            "flex flex-col overflow-hidden rounded-[10px] border border-white/15 pb-5 transition-colors duration-200",
+            expanded ? "bg-[#171717]" : "bg-transparent"
           )}
         >
           <div
@@ -117,7 +119,7 @@ export function ChatPanel({ placeholder }: { placeholder: string }) {
               animate={{ opacity: 1, scaleY: 1 }}
               transition={{ duration: 0.22, ease: [0.32, 0.72, 0, 1] }}
               style={{ transformOrigin: "top" }}
-              className="flex flex-col px-3 pt-1 pb-3"
+              className="flex flex-col px-3 pt-1"
             >
               {isEmpty ? (
                 <EmptyHistory />
@@ -127,7 +129,9 @@ export function ChatPanel({ placeholder }: { placeholder: string }) {
             </motion.div>
           )}
         </div>
-        <ChatComposer placeholder={placeholder} onSubmit={handleFreeTextSubmit} />
+        <div className="relative z-[1] -mt-5">
+          <ChatComposer placeholder={placeholder} onSubmit={handleFreeTextSubmit} />
+        </div>
       </div>
     </motion.div>
   );
