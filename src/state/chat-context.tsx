@@ -75,3 +75,100 @@ export function nextMessageId(): string {
   messageCounter += 1;
   return `msg_${messageCounter}`;
 }
+
+// ---------------------------------------------------------------------------
+// ChatProvider + useChat
+// ---------------------------------------------------------------------------
+
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useReducer,
+  type ReactNode,
+} from "react";
+import { useAppState } from "./app-state-context";
+
+interface ChatContextValue {
+  messages: ChatMessage[];
+  mode: ChatPanelMode;
+  /** Returns the id of the new message so the caller can update_pending later. */
+  append: (input: Omit<ChatMessage, "id" | "createdAt">) => string;
+  updatePending: (id: string, text: string) => void;
+  clear: () => void;
+  setMode: (mode: ChatBarMode) => void;
+  openSidebar: () => void;
+  closeSidebar: () => void;
+}
+
+const ChatContext = createContext<ChatContextValue | null>(null);
+
+export function ChatProvider({ children }: { children: ReactNode }) {
+  const [state, dispatch] = useReducer(chatReducer, INITIAL_CHAT_STATE);
+  const { wizardSessionId, signals, resumingSignalId } = useAppState();
+
+  // Reset the chat when the wizard session id changes (new signal flow started).
+  useEffect(() => {
+    dispatch({ type: "clear" });
+  }, [wizardSessionId]);
+
+  // Resume-then-launch path: when the actively-resumed signal leaves draft
+  // status, clear history. Skipped when no signal is resumed (the
+  // wizardSessionId effect already covers fresh-start / restart paths).
+  const resumedSignal = useMemo(
+    () => (resumingSignalId ? signals.find((s) => s.id === resumingSignalId) ?? null : null),
+    [resumingSignalId, signals]
+  );
+  const resumedStatus = resumedSignal?.status;
+  useEffect(() => {
+    if (resumedStatus && resumedStatus !== "draft") {
+      dispatch({ type: "clear" });
+    }
+  }, [resumedStatus]);
+
+  const append = useCallback(
+    (input: Omit<ChatMessage, "id" | "createdAt">) => {
+      const message: ChatMessage = {
+        ...input,
+        id: nextMessageId(),
+        createdAt: Date.now(),
+      };
+      dispatch({ type: "append", message });
+      return message.id;
+    },
+    []
+  );
+
+  const updatePending = useCallback((id: string, text: string) => {
+    dispatch({ type: "update_pending", id, text });
+  }, []);
+
+  const clear = useCallback(() => dispatch({ type: "clear" }), []);
+  const setMode = useCallback((mode: ChatBarMode) => dispatch({ type: "set_mode", mode }), []);
+  const openSidebar = useCallback(() => dispatch({ type: "open_sidebar" }), []);
+  const closeSidebar = useCallback(() => dispatch({ type: "close_sidebar" }), []);
+
+  const value = useMemo<ChatContextValue>(
+    () => ({
+      messages: state.messages,
+      mode: state.mode,
+      append,
+      updatePending,
+      clear,
+      setMode,
+      openSidebar,
+      closeSidebar,
+    }),
+    [state.messages, state.mode, append, updatePending, clear, setMode, openSidebar, closeSidebar]
+  );
+
+  return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
+}
+
+export function useChat(): ChatContextValue {
+  const ctx = useContext(ChatContext);
+  if (!ctx) throw new Error("useChat must be used inside <ChatProvider>");
+  return ctx;
+}
