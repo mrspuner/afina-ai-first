@@ -31,7 +31,7 @@ export function ChatPanelHeader({
             className="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground"
           >
             <ChevronDown
-              className={cn("h-4 w-4 transition-transform", expanded && "rotate-180")}
+              className={cn("h-4 w-4 transition-transform", !expanded && "rotate-180")}
             />
           </button>
         )}
