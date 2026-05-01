@@ -97,15 +97,10 @@ export function ChatPanel({ placeholder }: { placeholder: string }) {
         <div
           className={cn(
             "flex flex-col overflow-hidden rounded-[10px] border border-white/15 pb-5 transition-colors duration-200",
-            expanded ? "bg-[#171717]" : "bg-transparent"
+            expanded ? "bg-[#171717]" : "bg-[#333008]"
           )}
         >
-          <div
-            className={cn(
-              "px-3 py-2 transition-colors duration-200",
-              expanded ? "bg-transparent" : "bg-[rgba(255,236,0,0.17)]"
-            )}
-          >
+          <div className="px-3 py-2">
             <ChatPanelHeader
               mode={chat.mode}
               onToggleBar={() => chat.setMode(expanded ? "collapsed" : "expanded")}
