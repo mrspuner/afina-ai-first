@@ -35,12 +35,12 @@ export function ChatComposer({ placeholder, onSubmit }: ChatComposerProps) {
     <PromptInput
       onSubmit={handleSubmit}
       className={cn(
+        // Opaque dark surface so the yellow header tint does not seep through.
         "[&_[data-slot=input-group]]:rounded-[10px]!",
         "[&_[data-slot=input-group]]:border!",
-        "[&_[data-slot=input-group]]:border-white/15!",
-        "[&_[data-slot=input-group]]:bg-white/5!",
-        "dark:[&_[data-slot=input-group]]:bg-white/5!",
-        "[&_[data-slot=input-group]]:backdrop-blur-[14.8px]"
+        "[&_[data-slot=input-group]]:border-white/10!",
+        "[&_[data-slot=input-group]]:bg-[#171717]!",
+        "dark:[&_[data-slot=input-group]]:bg-[#171717]!"
       )}
     >
       <ChipEditableInput
