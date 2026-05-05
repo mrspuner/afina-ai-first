@@ -140,7 +140,7 @@ function MascotHint({ open, children }: { open: boolean; children: ReactNode }) 
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 4, scale: 0.96 }}
             transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-            className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 -translate-x-1/2 whitespace-nowrap rounded-md border border-white/10 bg-[#171717] px-2.5 py-1.5 text-xs text-foreground shadow-[0_4px_16px_rgba(0,0,0,0.3)]"
+            className="pointer-events-none absolute bottom-full left-0 z-10 mb-2 whitespace-nowrap rounded-md border border-white/10 bg-[#171717] px-2.5 py-1.5 text-xs text-foreground shadow-[0_4px_16px_rgba(0,0,0,0.3)]"
           >
             {MASCOT_HINT_TEXT}
           </motion.span>
