@@ -135,7 +135,7 @@ export function ChatPanel({ placeholder }: { placeholder: string }) {
           onOpenSidebar={chat.openSidebar}
           onCloseSidebar={chat.closeSidebar}
         />
-        {isEmpty ? <EmptyHistory /> : <ChatHistoryList messages={chat.messages} variant="sidebar" />}
+        {isEmpty ? <EmptyHistory /> : <ChatHistoryList messages={chat.messages} />}
         <ChatComposer placeholder={placeholder} onSubmit={handleSubmit} />
       </motion.aside>
     );

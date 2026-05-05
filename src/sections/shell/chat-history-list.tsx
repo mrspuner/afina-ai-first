@@ -53,21 +53,9 @@ function MessageRow({ message }: { message: ChatMessage }) {
 
 interface ChatHistoryListProps {
   messages: ChatMessage[];
-  /**
-   * `collapsed` — short peek window inside the bar (latest messages with
-   * fade-mask). `bar` — scrollable window inside the chat container.
-   * `sidebar` — fills the parent's height.
-   */
-  variant: "collapsed" | "bar" | "sidebar";
 }
 
-const VARIANT_HEIGHT: Record<ChatHistoryListProps["variant"], string> = {
-  collapsed: "max-h-[100px]",
-  bar: "max-h-[360px]",
-  sidebar: "h-full",
-};
-
-export function ChatHistoryList({ messages, variant }: ChatHistoryListProps) {
+export function ChatHistoryList({ messages }: ChatHistoryListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showTopFade, setShowTopFade] = useState(false);
   const [showBottomFade, setShowBottomFade] = useState(false);
@@ -96,10 +84,7 @@ export function ChatHistoryList({ messages, variant }: ChatHistoryListProps) {
       <div
         ref={scrollRef}
         onScroll={updateFades}
-        className={cn(
-          "h-full overflow-y-auto px-3",
-          VARIANT_HEIGHT[variant]
-        )}
+        className="h-full overflow-y-auto px-3"
       >
         {messages.map((m) => (
           <MessageRow key={m.id} message={m} />
