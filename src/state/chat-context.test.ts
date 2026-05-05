@@ -5,7 +5,6 @@ import { chatReducer, type ChatState, type ChatMessage } from "./chat-context";
 const empty: ChatState = {
   messages: [],
   mode: "collapsed",
-  previousBarMode: "collapsed",
 };
 
 function msg(partial: Partial<ChatMessage> & Pick<ChatMessage, "role" | "text">): ChatMessage {
@@ -48,44 +47,31 @@ describe("chatReducer", () => {
       type: "append",
       message: msg({ role: "user", text: "x" }),
     });
-    s = { ...s, mode: "expanded" };
+    s = { ...s, mode: "sidebar" };
     s = chatReducer(s, { type: "clear" });
     expect(s.messages).toEqual([]);
-    expect(s.mode).toBe("expanded");
-  });
-
-  it("set_mode toggles between collapsed and expanded", () => {
-    let s = chatReducer(empty, { type: "set_mode", mode: "expanded" });
-    expect(s.mode).toBe("expanded");
-    s = chatReducer(s, { type: "set_mode", mode: "collapsed" });
-    expect(s.mode).toBe("collapsed");
-  });
-
-  it("open_sidebar remembers the bar mode and switches to sidebar", () => {
-    let s: ChatState = { ...empty, mode: "expanded", previousBarMode: "collapsed" };
-    s = chatReducer(s, { type: "open_sidebar" });
     expect(s.mode).toBe("sidebar");
-    expect(s.previousBarMode).toBe("expanded");
   });
+});
 
-  it("close_sidebar restores the remembered bar mode", () => {
-    let s: ChatState = {
-      ...empty,
-      mode: "sidebar",
-      previousBarMode: "expanded",
-    };
-    s = chatReducer(s, { type: "close_sidebar" });
-    expect(s.mode).toBe("expanded");
-  });
-
-  it("open_sidebar from sidebar is a no-op (does not overwrite previousBarMode)", () => {
-    let s: ChatState = {
-      ...empty,
-      mode: "sidebar",
-      previousBarMode: "expanded",
-    };
-    s = chatReducer(s, { type: "open_sidebar" });
+describe("chatReducer mode transitions", () => {
+  it("open_sidebar from collapsed → sidebar", () => {
+    const s = chatReducer(empty, { type: "open_sidebar" });
     expect(s.mode).toBe("sidebar");
-    expect(s.previousBarMode).toBe("expanded");
+  });
+
+  it("close_sidebar returns to collapsed", () => {
+    const s1 = chatReducer(empty, { type: "open_sidebar" });
+    const s2 = chatReducer(s1, { type: "close_sidebar" });
+    expect(s2.mode).toBe("collapsed");
+  });
+
+  it("open_sidebar when already sidebar is a no-op (same reference)", () => {
+    const s1 = chatReducer(empty, { type: "open_sidebar" });
+    expect(chatReducer(s1, { type: "open_sidebar" })).toBe(s1);
+  });
+
+  it("close_sidebar when already collapsed is a no-op (same reference)", () => {
+    expect(chatReducer(empty, { type: "close_sidebar" })).toBe(empty);
   });
 });

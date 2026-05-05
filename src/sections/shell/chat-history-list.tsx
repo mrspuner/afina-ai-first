@@ -55,7 +55,7 @@ interface ChatHistoryListProps {
   messages: ChatMessage[];
   /**
    * `collapsed` — short peek window inside the bar (latest messages with
-   * fade-mask). `bar` — taller scrollable window in expanded bar mode.
+   * fade-mask). `bar` — scrollable window inside the chat container.
    * `sidebar` — fills the parent's height.
    */
   variant: "collapsed" | "bar" | "sidebar";

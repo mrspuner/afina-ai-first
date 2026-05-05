@@ -13,20 +13,17 @@ export interface ChatMessage {
   createdAt: number;
 }
 
-export type ChatPanelMode = "collapsed" | "expanded" | "sidebar";
-export type ChatBarMode = "collapsed" | "expanded";
+export type ChatPanelMode = "collapsed" | "sidebar";
 
 export interface ChatState {
   messages: ChatMessage[];
   mode: ChatPanelMode;
-  previousBarMode: ChatBarMode;
 }
 
 export type ChatAction =
   | { type: "append"; message: ChatMessage }
   | { type: "update_pending"; id: string; text: string }
   | { type: "clear" }
-  | { type: "set_mode"; mode: ChatBarMode }
   | { type: "open_sidebar" }
   | { type: "close_sidebar" };
 
@@ -46,20 +43,11 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
     case "clear": {
       return { ...state, messages: [] };
     }
-    case "set_mode": {
-      return { ...state, mode: action.mode };
-    }
     case "open_sidebar": {
-      if (state.mode === "sidebar") return state;
-      return {
-        ...state,
-        mode: "sidebar",
-        previousBarMode: state.mode === "expanded" ? "expanded" : "collapsed",
-      };
+      return state.mode === "sidebar" ? state : { ...state, mode: "sidebar" };
     }
     case "close_sidebar": {
-      if (state.mode !== "sidebar") return state;
-      return { ...state, mode: state.previousBarMode };
+      return state.mode === "collapsed" ? state : { ...state, mode: "collapsed" };
     }
   }
 }
@@ -67,7 +55,6 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
 export const INITIAL_CHAT_STATE: ChatState = {
   messages: [],
   mode: "collapsed",
-  previousBarMode: "collapsed",
 };
 
 let messageCounter = 0;
@@ -98,7 +85,6 @@ interface ChatContextValue {
   append: (input: Omit<ChatMessage, "id" | "createdAt">) => string;
   updatePending: (id: string, text: string) => void;
   clear: () => void;
-  setMode: (mode: ChatBarMode) => void;
   openSidebar: () => void;
   closeSidebar: () => void;
 }
@@ -146,7 +132,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const clear = useCallback(() => dispatch({ type: "clear" }), []);
-  const setMode = useCallback((mode: ChatBarMode) => dispatch({ type: "set_mode", mode }), []);
   const openSidebar = useCallback(() => dispatch({ type: "open_sidebar" }), []);
   const closeSidebar = useCallback(() => dispatch({ type: "close_sidebar" }), []);
 
@@ -157,11 +142,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       append,
       updatePending,
       clear,
-      setMode,
       openSidebar,
       closeSidebar,
     }),
-    [state.messages, state.mode, append, updatePending, clear, setMode, openSidebar, closeSidebar]
+    [state.messages, state.mode, append, updatePending, clear, openSidebar, closeSidebar]
   );
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
