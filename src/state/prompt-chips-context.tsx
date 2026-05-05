@@ -10,7 +10,7 @@ import {
 } from "react";
 import { nanoid } from "nanoid";
 
-export type PromptChipKind = "trigger" | "mode" | "node";
+export type PromptChipKind = "trigger" | "mode" | "node" | "section";
 
 export interface PromptChip {
   id: string;
