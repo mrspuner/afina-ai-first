@@ -1,6 +1,7 @@
 // src/sections/shell/chat-panel-header.tsx
 "use client";
 
+import Image from "next/image";
 import { Maximize2, X } from "lucide-react";
 import type { ChatPanelMode } from "@/state/chat-context";
 
@@ -14,7 +15,10 @@ export function ChatPanelHeader({ mode, onOpenSidebar, onCloseSidebar }: ChatPan
   const inSidebar = mode === "sidebar";
   return (
     <div className="flex w-full items-center justify-between px-1 py-0.5">
-      <span className="text-xs font-medium text-muted-foreground">Работа с ИИ</span>
+      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+        <Image src="/mascot-icon.svg" alt="" width={14} height={14} aria-hidden className="shrink-0" />
+        Афина ИИ
+      </span>
       <div className="flex items-center">
         {inSidebar ? (
           <button
