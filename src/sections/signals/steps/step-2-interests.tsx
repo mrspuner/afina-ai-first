@@ -1,12 +1,12 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Check, ChevronDown, Plus, Minus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StepContent } from "@/sections/signals/steps/step-content";
 import { StepProps } from "@/types/campaign";
-import { useAppState } from "@/state/app-state-context";
+import { useAppState, useAppDispatch } from "@/state/app-state-context";
 import { VERTICALS, getInterestById } from "@/data/triggers-by-vertical";
 import { getInterestsForDirection } from "@/data/interests-by-direction";
 import { getTriggerDomains } from "@/data/trigger-domains";
@@ -19,7 +19,9 @@ import {
   type ParsedTriggerCommand,
   type TriggerDelta,
 } from "@/lib/trigger-edit-parser";
-import { TriggerConfigurePopover } from "./trigger-configure-popover";
+import { usePromptChips } from "@/state/prompt-chips-context";
+import { TriggerEditProvider, type TriggerEditApi } from "@/state/trigger-edit-context";
+import { computeRandomRemix } from "@/lib/random-remix";
 import { cn } from "@/lib/utils";
 
 /** Return a copy of `obj` without the given key. Avoids the
@@ -101,6 +103,33 @@ function MascotIcon({ className }: { className?: string }) {
   );
 }
 
+function SectionHeader({
+  label,
+  sectionId,
+  onClick,
+}: {
+  label: string;
+  sectionId: "interests" | "triggers";
+  onClick: () => void;
+}) {
+  return (
+    <div className="mb-3 flex items-center gap-2">
+      <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+        {label}
+      </p>
+      <button
+        type="button"
+        onClick={onClick}
+        aria-label={`Спросить AI про ${label.toLowerCase()}`}
+        className="inline-flex h-5 w-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        data-section-id={sectionId}
+      >
+        <Image src="/mascot-icon.svg" alt="" width={14} height={14} aria-hidden />
+      </button>
+    </div>
+  );
+}
+
 function DeltaChip({
   domain,
   variant,
@@ -137,12 +166,11 @@ interface TriggerCardProps {
   domains: string[];
   selected: boolean;
   delta: TriggerDelta;
-  isEditing: boolean;
   highlight: boolean;
   expanded: boolean;
   onToggle: () => void;
   onToggleExpanded: () => void;
-  renderConfigureButton: (button: React.ReactElement) => React.ReactElement;
+  onConfigureClick: () => void;
   onRemoveDelta: (bucket: "added" | "excluded", domain: string) => void;
 }
 
@@ -198,12 +226,11 @@ function TriggerCard({
   domains,
   selected,
   delta,
-  isEditing,
   highlight,
   expanded,
   onToggle,
   onToggleExpanded,
-  renderConfigureButton,
+  onConfigureClick,
   onRemoveDelta,
 }: TriggerCardProps) {
   const hasDelta = selected && !isDeltaEmpty(delta);
@@ -217,7 +244,6 @@ function TriggerCard({
         selected
           ? "border-brand/50 bg-brand-muted"
           : "border-border bg-card hover:border-brand/30",
-        isEditing && "ring-2 ring-brand/50",
         highlight && "ring-2 ring-brand transition-shadow"
       )}
     >
@@ -277,21 +303,17 @@ function TriggerCard({
 
           {showConfigureButton && (
             <div className="flex">
-              {renderConfigureButton(
-                <button
-                  type="button"
-                  aria-pressed={isEditing}
-                  className={cn(
-                    "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
-                    isEditing
-                      ? "border-primary bg-primary/10 text-foreground"
-                      : "border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground"
-                  )}
-                >
-                  <MascotIcon className="h-4 w-4" />
-                  Настроить
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={onConfigureClick}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
+                  "border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground"
+                )}
+              >
+                <MascotIcon className="h-4 w-4" />
+                Настроить
+              </button>
             </div>
           )}
         </div>
@@ -301,7 +323,9 @@ function TriggerCard({
 }
 
 export function Step2Interests({ data, onNext }: StepProps) {
-  const { clientDirection } = useAppState();
+  const { clientDirection, wizardRemixToken } = useAppState();
+  const dispatch = useAppDispatch();
+  const { pushChip, clearChips } = usePromptChips();
   const vertical = useMemo(
     () => resolveVertical(clientDirection),
     [clientDirection]
@@ -372,7 +396,6 @@ export function Step2Interests({ data, onNext }: StepProps) {
   const [highlightedTriggerIds, setHighlightedTriggerIds] = useState<
     Set<string>
   >(() => new Set());
-  const [activePopoverTriggerId, setActivePopoverTriggerId] = useState<string | null>(null);
 
   // The list of trigger objects available — flattened from all interests
   // selected (so user can mix triggers across multiple interests).
@@ -406,7 +429,6 @@ export function Step2Interests({ data, onNext }: StepProps) {
         ? prev.filter((t) => t !== triggerId)
         : [...prev, triggerId]
     );
-    setActivePopoverTriggerId((cur) => (cur === triggerId ? null : cur));
   }
 
   function toggleExpanded(triggerId: string) {
@@ -452,6 +474,74 @@ export function Step2Interests({ data, onNext }: StepProps) {
     });
   }
 
+  // ---- Chip helpers ----
+
+  function pushSectionChip(section: "interests" | "triggers") {
+    clearChips();
+    pushChip({
+      id: `section_${section}`,
+      kind: "section",
+      label: section === "interests" ? "Интересы" : "Триггеры",
+      payload: section,
+      removable: true,
+    });
+  }
+
+  function pushTriggerChip(triggerId: string, triggerLabel: string) {
+    clearChips();
+    pushChip({
+      id: `trigger_${triggerId}`,
+      kind: "trigger",
+      label: triggerLabel,
+      payload: triggerId,
+      removable: true,
+    });
+    const el = document.querySelector<HTMLDivElement>('[role="textbox"][contenteditable="true"]');
+    el?.focus();
+  }
+
+  // ---- TriggerEditApi for the PromptBar bridge ----
+
+  const triggerEditApi = useMemo<TriggerEditApi>(() => ({
+    applyToTrigger: (triggerId, parsed) => {
+      handleApplyParsed(triggerId, parsed);
+    },
+    highlightTrigger: (triggerId) => {
+      setHighlightedTriggerIds(new Set([triggerId]));
+      window.setTimeout(() => setHighlightedTriggerIds(new Set()), 600);
+    },
+    randomRemix: () => {
+      dispatch({ type: "wizard_random_remix" });
+    },
+    resolveTriggerIdByLabel: (label) => {
+      const found = availableTriggers.find(({ trigger }) => trigger.label === label);
+      return found ? found.trigger.id : null;
+    },
+  }), [availableTriggers, dispatch]);
+
+  // ---- Remix subscriber: re-roll selection when wizardRemixToken increments ----
+
+  useEffect(() => {
+    if (wizardRemixToken === 0) return;
+    const vertical = {
+      interestIds: interestsForDirection.map((i) => i.id),
+      triggerIdsByInterest: Object.fromEntries(
+        interestsForDirection.map((i) => [i.id, i.triggers.map((t) => t.id)])
+      ),
+      domainsByTrigger: Object.fromEntries(
+        interestsForDirection.flatMap((i) =>
+          i.triggers.map((t) => [t.id, getTriggerDomains(t.id)])
+        )
+      ),
+    };
+    const r = computeRandomRemix(vertical, wizardRemixToken * 31 + 7);
+    setSelectedInterests(r.interestIds);
+    setSelectedTriggers(r.triggerIds);
+    setDeltas(r.deltas);
+    setHighlightedTriggerIds(new Set(r.triggerIds));
+    window.setTimeout(() => setHighlightedTriggerIds(new Set()), 800);
+  }, [wizardRemixToken, interestsForDirection]);
+
   const hasInterest = selectedInterests.length > 0;
   const canContinue = hasInterest || selectedTriggers.length > 0;
 
@@ -486,89 +576,79 @@ export function Step2Interests({ data, onNext }: StepProps) {
   }
 
   return (
-    <StepContent
-      title="Какие интересы и триггеры вы ищете?"
-      subtitle="Мы уже сгенерили настройки под вас — выберите интересы и триггеры в любом порядке."
-    >
-      <div className="flex flex-col gap-6">
-        {/* Interests */}
-        <div>
-          <p className="mb-3 text-xs font-medium uppercase tracking-widest text-muted-foreground">
-            Интересы
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {interestsForDirection.map((interest) => (
-              <InterestChip
-                key={interest.id}
-                label={interest.label}
-                selected={selectedInterests.includes(interest.id)}
-                onToggle={() => toggleInterest(interest.id)}
-              />
-            ))}
+    <TriggerEditProvider value={triggerEditApi}>
+      <StepContent
+        title="Какие интересы и триггеры вы ищете?"
+        subtitle="Мы уже сгенерили настройки под вас — выберите интересы и триггеры в любом порядке."
+      >
+        <div className="flex flex-col gap-6">
+          {/* Interests */}
+          <div>
+            <SectionHeader
+              label="Интересы"
+              sectionId="interests"
+              onClick={() => pushSectionChip("interests")}
+            />
+            <div className="flex flex-wrap gap-2">
+              {interestsForDirection.map((interest) => (
+                <InterestChip
+                  key={interest.id}
+                  label={interest.label}
+                  selected={selectedInterests.includes(interest.id)}
+                  onToggle={() => toggleInterest(interest.id)}
+                />
+              ))}
+            </div>
           </div>
-        </div>
 
-        {/* Triggers */}
-        <div>
-          <p className="mb-3 text-xs font-medium uppercase tracking-widest text-muted-foreground">
-            Триггеры
-          </p>
-          <div
-            className={cn(
-              "flex flex-col gap-2 transition-opacity",
-              !hasInterest && "pointer-events-none opacity-50"
+          {/* Triggers */}
+          <div>
+            <SectionHeader
+              label="Триггеры"
+              sectionId="triggers"
+              onClick={() => pushSectionChip("triggers")}
+            />
+            <div
+              className={cn(
+                "flex flex-col gap-2 transition-opacity",
+                !hasInterest && "pointer-events-none opacity-50"
+              )}
+            >
+              {availableTriggers.map(({ trigger }) => (
+                <TriggerCard
+                  key={trigger.id}
+                  trigger={trigger}
+                  domains={getTriggerDomains(trigger.id)}
+                  selected={selectedTriggers.includes(trigger.id)}
+                  delta={deltas[trigger.id] ?? EMPTY_DELTA}
+                  highlight={highlightedTriggerIds.has(trigger.id)}
+                  expanded={expandedTriggerIds.has(trigger.id)}
+                  onToggle={() => toggleTrigger(trigger.id)}
+                  onToggleExpanded={() => toggleExpanded(trigger.id)}
+                  onConfigureClick={() => pushTriggerChip(trigger.id, trigger.label)}
+                  onRemoveDelta={(bucket, domain) =>
+                    handleRemoveDelta(trigger.id, bucket, domain)
+                  }
+                />
+              ))}
+            </div>
+            {!hasInterest && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Сначала выберите хотя бы один интерес — триггеры подстроятся под него
+              </p>
             )}
-          >
-            {availableTriggers.map(({ trigger }) => (
-              <TriggerCard
-                key={trigger.id}
-                trigger={trigger}
-                domains={getTriggerDomains(trigger.id)}
-                selected={selectedTriggers.includes(trigger.id)}
-                delta={deltas[trigger.id] ?? EMPTY_DELTA}
-                isEditing={activePopoverTriggerId === trigger.id}
-                highlight={highlightedTriggerIds.has(trigger.id)}
-                expanded={expandedTriggerIds.has(trigger.id)}
-                onToggle={() => toggleTrigger(trigger.id)}
-                onToggleExpanded={() => toggleExpanded(trigger.id)}
-                renderConfigureButton={(button) => (
-                  <TriggerConfigurePopover
-                    open={activePopoverTriggerId === trigger.id}
-                    onOpenChange={(open) =>
-                      setActivePopoverTriggerId(open ? trigger.id : null)
-                    }
-                    triggerLabel={trigger.label}
-                    onApply={(parsed) => handleApplyParsed(trigger.id, parsed)}
-                    onHighlightStart={() =>
-                      setHighlightedTriggerIds(new Set([trigger.id]))
-                    }
-                    onHighlightEnd={() => setHighlightedTriggerIds(new Set())}
-                  >
-                    {button}
-                  </TriggerConfigurePopover>
-                )}
-                onRemoveDelta={(bucket, domain) =>
-                  handleRemoveDelta(trigger.id, bucket, domain)
-                }
-              />
-            ))}
           </div>
-          {!hasInterest && (
-            <p className="mt-2 text-xs text-muted-foreground">
-              Сначала выберите хотя бы один интерес — триггеры подстроятся под него
-            </p>
-          )}
-        </div>
 
-        <div className="flex flex-col items-start gap-1.5">
-          <Button disabled={!canContinue} onClick={handleContinue}>
-            Продолжить
-          </Button>
-          <p className="text-xs text-muted-foreground">
-            Если нужного нет в списке — напишите в поле чата
-          </p>
+          <div className="flex flex-col items-start gap-1.5">
+            <Button disabled={!canContinue} onClick={handleContinue}>
+              Продолжить
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              Если нужного нет в списке — напишите в поле чата
+            </p>
+          </div>
         </div>
-      </div>
-    </StepContent>
+      </StepContent>
+    </TriggerEditProvider>
   );
 }
