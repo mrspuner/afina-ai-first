@@ -162,7 +162,10 @@ export function Step6Summary({ data, onNext, onGoToStep }: StepProps) {
       <Separator className="my-4" />
 
       <div className="flex justify-start">
-        <Button onClick={() => onNext({})}>
+        <Button
+          onClick={() => onNext({})}
+          className="bg-brand text-brand-foreground hover:bg-brand/90"
+        >
           {enoughBalance ? "Запустить" : "Пополнить и запустить"}
         </Button>
       </div>

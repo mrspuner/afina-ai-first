@@ -86,7 +86,7 @@ function InterestChip({
       className={cn(
         "rounded-lg border px-3 py-2 text-left text-sm transition-all",
         selected
-          ? "border-primary bg-accent text-foreground ring-1 ring-primary"
+          ? "border-brand/50 bg-brand-muted text-foreground"
           : "border-border bg-card text-muted-foreground hover:bg-accent hover:text-foreground"
       )}
     >
@@ -167,10 +167,10 @@ function TriggerCard({
       className={cn(
         "overflow-hidden rounded-lg border transition-colors",
         selected
-          ? "border-primary bg-accent/40 ring-1 ring-primary"
-          : "border-border bg-card hover:border-primary/50",
-        isEditing && "ring-2 ring-primary/60",
-        highlight && "ring-2 ring-amber-400/70 transition-shadow"
+          ? "border-brand/50 bg-brand-muted"
+          : "border-border bg-card hover:border-brand/30",
+        isEditing && "ring-2 ring-brand/50",
+        highlight && "ring-2 ring-brand transition-shadow"
       )}
     >
       <div className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm">

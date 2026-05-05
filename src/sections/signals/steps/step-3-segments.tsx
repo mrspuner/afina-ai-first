@@ -60,7 +60,7 @@ export function Step3Segments({ data, onNext }: StepProps) {
               className={cn(
                 "flex items-center justify-between rounded-lg border px-4 py-3 text-left transition-all",
                 isSelected
-                  ? "border-primary bg-accent ring-1 ring-primary"
+                  ? "border-brand/50 bg-brand-muted"
                   : "border-border bg-card hover:bg-accent"
               )}
             >

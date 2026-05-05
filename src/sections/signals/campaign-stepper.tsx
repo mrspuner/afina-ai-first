@@ -52,7 +52,7 @@ export function CampaignStepper({
                   isCompleted &&
                     "border-primary bg-primary text-primary-foreground",
                   isActive &&
-                    "border-primary bg-background text-primary ring-2 ring-primary/20",
+                    "border-brand bg-brand text-brand-foreground ring-2 ring-brand/25",
                   isPending && "border-border bg-background text-muted-foreground"
                 )}
               >
