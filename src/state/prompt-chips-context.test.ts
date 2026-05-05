@@ -67,4 +67,22 @@ describe("promptChipsReducer", () => {
     const b = promptChipsReducer(a, { type: "clear" });
     expect(b.chips).toEqual([]);
   });
+
+  it("supports section kind chips", () => {
+    const s = promptChipsReducer(
+      { chips: [] },
+      {
+        type: "push",
+        chip: {
+          id: "section_interests",
+          kind: "section",
+          label: "Интересы",
+          payload: "interests",
+          removable: true,
+        },
+      }
+    );
+    expect(s.chips[0].kind).toBe("section");
+    expect(s.chips[0].label).toBe("Интересы");
+  });
 });

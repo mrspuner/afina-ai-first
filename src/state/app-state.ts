@@ -149,6 +149,13 @@ export type AppState = {
    * the wizard moves off step 5 or unmounts.
    */
   budgetHelpShown: boolean;
+  /**
+   * Monotonic counter bumped on every `wizard_random_remix` action.
+   * Step-2 subscribes to this token and re-rolls its random selection
+   * whenever it increments. Starts at 0; increments unconditionally
+   * regardless of current view.
+   */
+  wizardRemixToken: number;
 };
 
 export type Action =
@@ -200,7 +207,8 @@ export type Action =
   | { type: "resume_signal_in_wizard"; signalId: string }
   | { type: "resume_signal_in_wizard_handled" }
   | { type: "wizard_step_changed"; step: number | null }
-  | { type: "budget_help_shown" };
+  | { type: "budget_help_shown" }
+  | { type: "wizard_random_remix" };
 // PARALLEL-WORKTREE INSERTION POINT — survey actions (B), billing/signal-status actions (E).
 // Each worktree appends its own action variants to the union above; resolve merges by
 // keeping every appended line and adding the matching reducer case at the end of appReducer.
@@ -226,6 +234,7 @@ export const initialState: AppState = {
   wizardSessionId: 0,
   wizardCurrentStep: null,
   budgetHelpShown: false,
+  wizardRemixToken: 0,
 };
 
 export function appReducer(state: AppState, action: Action): AppState {
@@ -683,6 +692,9 @@ export function appReducer(state: AppState, action: Action): AppState {
 
     case "budget_help_shown":
       return { ...state, budgetHelpShown: true };
+
+    case "wizard_random_remix":
+      return { ...state, wizardRemixToken: state.wizardRemixToken + 1 };
     // PARALLEL-WORTREE INSERTION POINT — append survey/billing/signal-status cases
     // immediately above this comment to keep merges trivial.
   }

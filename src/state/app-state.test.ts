@@ -947,3 +947,13 @@ describe("appReducer — signals_badge_set", () => {
     expect(cleared.notifications.signalsBadge).toBe(false);
   });
 });
+
+describe("appReducer — wizard_random_remix", () => {
+  it("wizard_random_remix increments wizardRemixToken", () => {
+    const s0 = initialState;
+    const s1 = appReducer(s0, { type: "wizard_random_remix" });
+    const s2 = appReducer(s1, { type: "wizard_random_remix" });
+    expect(s1.wizardRemixToken).toBe(s0.wizardRemixToken + 1);
+    expect(s2.wizardRemixToken).toBe(s0.wizardRemixToken + 2);
+  });
+});
