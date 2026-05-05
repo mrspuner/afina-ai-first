@@ -223,6 +223,7 @@ interface TriggerCardProps {
   expanded: boolean;
   onToggle: () => void;
   onToggleExpanded: () => void;
+  onCheckboxToggle: () => void;
   onRemoveDelta: (bucket: "added" | "excluded", domain: string) => void;
 }
 
@@ -282,6 +283,7 @@ function TriggerCard({
   expanded,
   onToggle,
   onToggleExpanded,
+  onCheckboxToggle,
   onRemoveDelta,
 }: TriggerCardProps) {
   const hasDelta = selected && !isDeltaEmpty(delta);
@@ -300,19 +302,23 @@ function TriggerCard({
       <div className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm">
         <button
           type="button"
+          onClick={onCheckboxToggle}
+          aria-pressed={selected}
+          aria-label={selected ? "Убрать из выбранных" : "Добавить в выбранные"}
+          className={cn(
+            "flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border transition-colors",
+            selected
+              ? "border-primary bg-primary text-primary-foreground"
+              : "border-border bg-background hover:border-primary/60"
+          )}
+        >
+          {selected && <Check className="h-3 w-3" />}
+        </button>
+        <button
+          type="button"
           onClick={onToggle}
           className="flex flex-1 items-center gap-3 text-left"
         >
-          <span
-            className={cn(
-              "flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border transition-colors",
-              selected
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-border bg-background"
-            )}
-          >
-            {selected && <Check className="h-3 w-3" />}
-          </span>
           <span
             className={cn(
               "flex-1 font-medium",
@@ -457,6 +463,14 @@ export function Step2Interests({ data, onNext }: StepProps) {
     );
   }
 
+  function toggleTriggerSelection(triggerId: string) {
+    setSelectedTriggers((prev) =>
+      prev.includes(triggerId)
+        ? prev.filter((t) => t !== triggerId)
+        : [...prev, triggerId]
+    );
+  }
+
   function toggleExpanded(triggerId: string) {
     setExpandedTriggerIds((prev) => {
       const next = new Set(prev);
@@ -466,14 +480,13 @@ export function Step2Interests({ data, onNext }: StepProps) {
     });
   }
 
-  // Single click action on the trigger row: toggles selection, expands the
-  // card, and pushes a prompt-bar chip so the user can configure it via chat.
-  // Clicking a selected trigger again deselects it, collapses, and removes
-  // only that trigger's chip — leaving sibling chips and typed text intact.
+  // Click on the trigger row only toggles expansion + chip presence in the
+  // prompt bar. Selection is *not* touched here — the trigger auto-activates
+  // later, when the user submits a chat command targeting its chip (see
+  // handleApplyParsed).
   function handleTriggerClick(triggerId: string, triggerLabel: string) {
-    const isSelected = selectedTriggers.includes(triggerId);
-    if (isSelected) {
-      setSelectedTriggers((prev) => prev.filter((t) => t !== triggerId));
+    const isExpanded = expandedTriggerIds.has(triggerId);
+    if (isExpanded) {
       setExpandedTriggerIds((prev) => {
         const next = new Set(prev);
         next.delete(triggerId);
@@ -481,7 +494,6 @@ export function Step2Interests({ data, onNext }: StepProps) {
       });
       removeChip(`trigger_${triggerId}`);
     } else {
-      setSelectedTriggers((prev) => [...prev, triggerId]);
       setExpandedTriggerIds((prev) => {
         const next = new Set(prev);
         next.add(triggerId);
@@ -495,6 +507,12 @@ export function Step2Interests({ data, onNext }: StepProps) {
     triggerId: string,
     parsed: Exclude<ParsedTriggerCommand, { kind: "fallback" }>
   ) {
+    // Submitting a chat command for a trigger auto-activates it — clicking
+    // the card no longer toggles selection, so this is the path that flips
+    // an unchecked trigger into the campaign.
+    setSelectedTriggers((prev) =>
+      prev.includes(triggerId) ? prev : [...prev, triggerId]
+    );
     setDeltas((prev) => {
       const current = prev[triggerId] ?? EMPTY_DELTA;
       let updated: TriggerDelta;
@@ -678,6 +696,7 @@ export function Step2Interests({ data, onNext }: StepProps) {
                   expanded={expandedTriggerIds.has(trigger.id)}
                   onToggle={() => handleTriggerClick(trigger.id, trigger.label)}
                   onToggleExpanded={() => toggleExpanded(trigger.id)}
+                  onCheckboxToggle={() => toggleTriggerSelection(trigger.id)}
                   onRemoveDelta={(bucket, domain) =>
                     handleRemoveDelta(trigger.id, bucket, domain)
                   }
