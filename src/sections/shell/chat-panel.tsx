@@ -69,13 +69,13 @@ function TransientReply({ messages }: { messages: ChatMessage[] }) {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -3 }}
           transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
-          className="flex items-start gap-1.5 px-1 pb-1.5 text-xs leading-snug text-muted-foreground"
+          className="flex items-start gap-2 px-1 pb-1.5 text-sm leading-snug text-foreground"
         >
           {latest.pending ? (
-            <span className="inline-flex items-center gap-1 py-1">
-              <span className="h-1 w-1 animate-pulse rounded-full bg-muted-foreground/70" />
-              <span className="h-1 w-1 animate-pulse rounded-full bg-muted-foreground/70 [animation-delay:120ms]" />
-              <span className="h-1 w-1 animate-pulse rounded-full bg-muted-foreground/70 [animation-delay:240ms]" />
+            <span className="inline-flex items-center gap-1 py-1.5">
+              <span className="h-1 w-1 animate-pulse rounded-full bg-foreground/80" />
+              <span className="h-1 w-1 animate-pulse rounded-full bg-foreground/80 [animation-delay:120ms]" />
+              <span className="h-1 w-1 animate-pulse rounded-full bg-foreground/80 [animation-delay:240ms]" />
             </span>
           ) : (
             <span>{latest.text}</span>
