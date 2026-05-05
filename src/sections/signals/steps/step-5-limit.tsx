@@ -95,7 +95,7 @@ export function Step5Limit({ data, onNext }: StepProps) {
               "relative flex h-[140px] flex-col items-start gap-1.5 rounded-lg border p-4 text-left transition-colors",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
               mode === "recommended"
-                ? "border-yellow-400/50 bg-yellow-400/[0.04]"
+                ? "border-brand/60 bg-brand-muted"
                 : "border-border bg-card hover:bg-accent/50",
               recommendedValue <= 0 && "cursor-not-allowed opacity-50"
             )}
@@ -134,7 +134,7 @@ export function Step5Limit({ data, onNext }: StepProps) {
               "relative flex h-[140px] flex-col items-start gap-1.5 rounded-lg border p-4 text-left transition-colors",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
               mode === "custom"
-                ? "border-yellow-400/50 bg-yellow-400/[0.04]"
+                ? "border-brand/60 bg-brand-muted"
                 : "border-border bg-card hover:bg-accent/50"
             )}
           >
@@ -209,7 +209,7 @@ function RadioDot({ active }: { active: boolean }) {
       className={cn(
         "absolute right-3 top-3 h-3 w-3 rounded-full border-2 transition-colors",
         active
-          ? "border-yellow-400 bg-yellow-400"
+          ? "border-foreground bg-foreground"
           : "border-border bg-transparent"
       )}
     />

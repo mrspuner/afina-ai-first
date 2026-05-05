@@ -84,7 +84,7 @@ export function Step8Result({ signal, onUseInCampaign }: Step8ResultProps) {
       <div className="flex flex-col gap-5">
         {/* Main count */}
         <div className="rounded-lg border border-border bg-card px-6 py-5 text-center">
-          <p className="text-4xl font-bold tabular-nums text-foreground">
+          <p className="text-4xl font-bold tabular-nums text-brand">
             {formatNumber(totalSignals)}
           </p>
           <p className="mt-1 text-sm text-muted-foreground">сигналов найдено</p>

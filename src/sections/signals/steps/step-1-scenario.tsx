@@ -66,7 +66,7 @@ export function Step1Scenario({ data, onNext }: StepProps) {
             className={cn(
               "flex flex-col items-start rounded-lg border p-4 text-left transition-all",
               visualScenario === s.id
-                ? "border-primary bg-accent ring-1 ring-primary"
+                ? "border-brand/50 bg-brand-muted"
                 : "border-border bg-card hover:bg-accent hover:border-border"
             )}
           >
