@@ -1,6 +1,14 @@
 "use client";
 
-import { createContext, useContext, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import type { ParsedTriggerCommand } from "@/lib/trigger-edit-parser";
 
 export interface TriggerEditApi {
@@ -24,18 +32,44 @@ export const NOOP_TRIGGER_EDIT_API: TriggerEditApi = {
   resolveTriggerIdByLabel: () => null,
 };
 
-const Ctx = createContext<TriggerEditApi>(NOOP_TRIGGER_EDIT_API);
+/**
+ * Registry-провайдер: api публикуется владельцем (step-2) через
+ * useRegisterTriggerEdit, читается потребителями (PromptBar) через
+ * useTriggerEdit. Это позволяет step-2 и баром быть siblings в дереве,
+ * а не один внутри другого — без подобного registry бар получал бы NOOP.
+ */
+interface RegistryValue {
+  api: TriggerEditApi;
+  setApi: (api: TriggerEditApi | null) => void;
+}
 
-export function TriggerEditProvider({
-  value,
-  children,
-}: {
-  value: TriggerEditApi;
-  children: ReactNode;
-}) {
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+const RegistryCtx = createContext<RegistryValue>({
+  api: NOOP_TRIGGER_EDIT_API,
+  setApi: () => {},
+});
+
+export function TriggerEditRegistryProvider({ children }: { children: ReactNode }) {
+  const [api, setApiState] = useState<TriggerEditApi>(NOOP_TRIGGER_EDIT_API);
+  const setApi = useCallback((next: TriggerEditApi | null) => {
+    setApiState(next ?? NOOP_TRIGGER_EDIT_API);
+  }, []);
+  const value = useMemo<RegistryValue>(() => ({ api, setApi }), [api, setApi]);
+  return <RegistryCtx.Provider value={value}>{children}</RegistryCtx.Provider>;
 }
 
 export function useTriggerEdit(): TriggerEditApi {
-  return useContext(Ctx);
+  return useContext(RegistryCtx).api;
+}
+
+/**
+ * Регистрирует api в registry на время mount'a компонента. Передавай api,
+ * стабильный между ререндерами (useMemo) — иначе registry будет дёргаться
+ * каждый рендер.
+ */
+export function useRegisterTriggerEdit(api: TriggerEditApi): void {
+  const { setApi } = useContext(RegistryCtx);
+  useEffect(() => {
+    setApi(api);
+    return () => setApi(null);
+  }, [api, setApi]);
 }

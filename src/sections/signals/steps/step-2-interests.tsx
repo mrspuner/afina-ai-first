@@ -20,7 +20,7 @@ import {
   type TriggerDelta,
 } from "@/lib/trigger-edit-parser";
 import { usePromptChips } from "@/state/prompt-chips-context";
-import { TriggerEditProvider, type TriggerEditApi } from "@/state/trigger-edit-context";
+import { useRegisterTriggerEdit, type TriggerEditApi } from "@/state/trigger-edit-context";
 import { computeRandomRemix } from "@/lib/random-remix";
 import { cn } from "@/lib/utils";
 
@@ -519,6 +519,10 @@ export function Step2Interests({ data, onNext }: StepProps) {
     },
   }), [availableTriggers, dispatch]);
 
+  // Публикуем api в registry — PromptBar (sibling этого компонента) читает его
+  // через useTriggerEdit. На unmount api сбрасывается в NOOP.
+  useRegisterTriggerEdit(triggerEditApi);
+
   // ---- Remix subscriber: re-roll selection when wizardRemixToken increments ----
 
   useEffect(() => {
@@ -576,7 +580,6 @@ export function Step2Interests({ data, onNext }: StepProps) {
   }
 
   return (
-    <TriggerEditProvider value={triggerEditApi}>
       <StepContent
         title="Какие интересы и триггеры вы ищете?"
         subtitle="Мы уже сгенерили настройки под вас — выберите интересы и триггеры в любом порядке."
@@ -649,6 +652,5 @@ export function Step2Interests({ data, onNext }: StepProps) {
           </div>
         </div>
       </StepContent>
-    </TriggerEditProvider>
   );
 }
