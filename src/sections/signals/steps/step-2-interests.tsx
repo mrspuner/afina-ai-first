@@ -1,7 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import { Check, ChevronDown, Plus, Minus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StepContent } from "@/sections/signals/steps/step-content";
@@ -103,6 +104,52 @@ function MascotIcon({ className }: { className?: string }) {
   );
 }
 
+const MASCOT_HINT_TEXT = "Опишите задачу в строке ниже";
+const MASCOT_HINT_LINGER_MS = 4000;
+
+/**
+ * Поповер-подсказка над маскот-кнопкой. Показывается на клик, авто-исчезает
+ * через {@link MASCOT_HINT_LINGER_MS} мс, и сворачивается раньше — если
+ * чипсина с указанным id ушла из PromptBar (сабмит → clearChips, или замена
+ * на другую чипсину). Позиция: точно над якорем, центрирование по горизонтали.
+ */
+function useMascotHint(chipId: string) {
+  const [hintOpen, setHintOpen] = useState(false);
+  const { chips } = usePromptChips();
+  const isMyChipPresent = chips.some((c) => c.id === chipId);
+  const open = hintOpen && isMyChipPresent;
+
+  useEffect(() => {
+    if (!open) return;
+    const t = window.setTimeout(() => setHintOpen(false), MASCOT_HINT_LINGER_MS);
+    return () => window.clearTimeout(t);
+  }, [open]);
+
+  return { open, show: () => setHintOpen(true) };
+}
+
+function MascotHint({ open, children }: { open: boolean; children: ReactNode }) {
+  return (
+    <span className="relative inline-flex">
+      {children}
+      <AnimatePresence>
+        {open && (
+          <motion.span
+            role="status"
+            initial={{ opacity: 0, y: 4, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 4, scale: 0.96 }}
+            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+            className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 -translate-x-1/2 whitespace-nowrap rounded-md border border-white/10 bg-[#171717] px-2.5 py-1.5 text-xs text-foreground shadow-[0_4px_16px_rgba(0,0,0,0.3)]"
+          >
+            {MASCOT_HINT_TEXT}
+          </motion.span>
+        )}
+      </AnimatePresence>
+    </span>
+  );
+}
+
 function SectionHeader({
   label,
   sectionId,
@@ -112,20 +159,26 @@ function SectionHeader({
   sectionId: "interests" | "triggers";
   onClick: () => void;
 }) {
+  const { open, show } = useMascotHint(`section_${sectionId}`);
   return (
     <div className="mb-3 flex items-center gap-2">
       <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
         {label}
       </p>
-      <button
-        type="button"
-        onClick={onClick}
-        aria-label={`Спросить AI про ${label.toLowerCase()}`}
-        className="inline-flex h-5 w-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-        data-section-id={sectionId}
-      >
-        <Image src="/mascot-icon.svg" alt="" width={14} height={14} aria-hidden />
-      </button>
+      <MascotHint open={open}>
+        <button
+          type="button"
+          onClick={() => {
+            onClick();
+            show();
+          }}
+          aria-label={`Спросить AI про ${label.toLowerCase()}`}
+          className="inline-flex h-5 w-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          data-section-id={sectionId}
+        >
+          <Image src="/mascot-icon.svg" alt="" width={14} height={14} aria-hidden />
+        </button>
+      </MascotHint>
     </div>
   );
 }
@@ -236,6 +289,7 @@ function TriggerCard({
   const hasDelta = selected && !isDeltaEmpty(delta);
   const showDomainList = expanded && domains.length > 0;
   const showConfigureButton = expanded && selected;
+  const { open: hintOpen, show: showHint } = useMascotHint(`trigger_${trigger.id}`);
 
   return (
     <div
@@ -303,17 +357,22 @@ function TriggerCard({
 
           {showConfigureButton && (
             <div className="flex">
-              <button
-                type="button"
-                onClick={onConfigureClick}
-                className={cn(
-                  "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
-                  "border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground"
-                )}
-              >
-                <MascotIcon className="h-4 w-4" />
-                Настроить
-              </button>
+              <MascotHint open={hintOpen}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onConfigureClick();
+                    showHint();
+                  }}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
+                    "border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground"
+                  )}
+                >
+                  <MascotIcon className="h-4 w-4" />
+                  Настроить
+                </button>
+              </MascotHint>
             </div>
           )}
         </div>
