@@ -14,28 +14,37 @@ import {
   ChipEditableInput,
   type ChipEditableInputHandle,
 } from "@/components/ai-elements/chip-editable-input";
+import type { ChipSegment } from "@/state/prompt-chips-context";
+import { usePromptChips } from "@/state/prompt-chips-context";
 import { cn } from "@/lib/utils";
+
+export interface ChatComposerSubmitPayload {
+  text: string;
+  segments: ChipSegment[];
+}
 
 interface ChatComposerProps {
   placeholder: string;
-  onSubmit: (text: string) => void;
+  onSubmit: (payload: ChatComposerSubmitPayload) => void;
 }
 
 export function ChatComposer({ placeholder, onSubmit }: ChatComposerProps) {
   const editorRef = useRef<ChipEditableInputHandle>(null);
+  const { clearChips } = usePromptChips();
 
   function handleSubmit(message: PromptInputMessage) {
     const text = (message.text ?? "").trim();
-    if (!text) return;
-    onSubmit(text);
+    const segments = editorRef.current?.getSegments() ?? [];
+    if (!text && segments.length === 0) return;
+    onSubmit({ text, segments });
     editorRef.current?.clear();
+    clearChips();
   }
 
   return (
     <PromptInput
       onSubmit={handleSubmit}
       className={cn(
-        // Opaque dark surface so the yellow header tint does not seep through.
         "[&_[data-slot=input-group]]:rounded-[10px]!",
         "[&_[data-slot=input-group]]:border!",
         "[&_[data-slot=input-group]]:border-white/10!",
