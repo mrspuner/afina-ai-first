@@ -213,9 +213,15 @@ function WorkspaceInner({
   const visibleSteps = Array.from({ length: maxStep }, (_, i) => i + 1);
 
   return (
-    <div className="relative flex flex-1 flex-col overflow-hidden">
+    <div
+      className="relative flex flex-1 flex-col overflow-hidden transition-[padding] duration-300"
+      style={{ paddingRight: "var(--chat-sidebar-width, 0px)" }}
+    >
       {currentStep >= 2 && (
-        <div className="absolute right-6 top-6 z-10">
+        <div
+          className="absolute top-6 z-10 transition-[right] duration-300"
+          style={{ right: "calc(1.5rem + var(--chat-sidebar-width, 0px))" }}
+        >
           <CampaignStepper
             currentStep={currentStep}
             maxStep={maxStep}

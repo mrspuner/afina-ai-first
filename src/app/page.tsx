@@ -1,8 +1,9 @@
 "use client";
 
 import { PromptInputProvider } from "@/components/ai-elements/prompt-input";
-import { TriggerEditProvider } from "@/state/trigger-edit-context";
 import { PromptChipsProvider } from "@/state/prompt-chips-context";
+import { ChatProvider } from "@/state/chat-context";
+import { ChatPanel } from "@/sections/shell/chat-panel";
 import { useAppState, useAppDispatch } from "@/state/app-state-context";
 import { AppSidebar } from "@/sections/shell/app-sidebar";
 import { LaunchFlyout } from "@/sections/shell/launch-flyout";
@@ -46,9 +47,9 @@ export default function Home() {
 
   return (
     <PromptInputProvider>
-      <TriggerEditProvider>
       <PromptChipsProvider>
       <WelcomeChatProvider value={welcomeChat}>
+        <ChatProvider>
         <div className="flex h-screen overflow-hidden bg-background">
           <AppSidebar
             activeNav={activeSection ?? undefined}
@@ -63,13 +64,17 @@ export default function Home() {
           />
           <div className="relative flex flex-1 flex-col overflow-hidden">
             {renderMain()}
-            <ShellBottomBar />
+            {view.kind === "guided-signal" ? (
+              <ChatPanel placeholder="Введите ваши параметры или задайте вопрос" />
+            ) : (
+              <ShellBottomBar />
+            )}
             <DevPanel />
           </div>
         </div>
+        </ChatProvider>
       </WelcomeChatProvider>
       </PromptChipsProvider>
-      </TriggerEditProvider>
     </PromptInputProvider>
   );
 }

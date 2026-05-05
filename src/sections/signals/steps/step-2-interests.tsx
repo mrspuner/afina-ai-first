@@ -1,32 +1,25 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Check, Plus, Minus, X } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Check, ChevronDown, Plus, Minus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StepContent } from "@/sections/signals/steps/step-content";
 import { StepProps } from "@/types/campaign";
 import { useAppState } from "@/state/app-state-context";
 import { VERTICALS, getInterestById } from "@/data/triggers-by-vertical";
 import { getInterestsForDirection } from "@/data/interests-by-direction";
+import { getTriggerDomains } from "@/data/trigger-domains";
 import type { Interest, Trigger, Vertical } from "@/types/directions";
 import {
   applyEditToDelta,
   EMPTY_DELTA,
   isDeltaEmpty,
-  parseTriggerCommand,
   removeFromDelta,
   type ParsedTriggerCommand,
   type TriggerDelta,
 } from "@/lib/trigger-edit-parser";
-import {
-  useTriggerEditHost,
-  type TriggerEditSubmitResult,
-} from "@/state/trigger-edit-context";
-import {
-  usePromptChips,
-  type ChipSegment,
-} from "@/state/prompt-chips-context";
+import { TriggerConfigurePopover } from "./trigger-configure-popover";
 import { cn } from "@/lib/utils";
 
 /** Return a copy of `obj` without the given key. Avoids the
@@ -141,26 +134,81 @@ function DeltaChip({
 
 interface TriggerCardProps {
   trigger: Trigger;
+  domains: string[];
   selected: boolean;
   delta: TriggerDelta;
   isEditing: boolean;
   highlight: boolean;
+  expanded: boolean;
   onToggle: () => void;
-  onConfigureClick: () => void;
+  onToggleExpanded: () => void;
+  renderConfigureButton: (button: React.ReactElement) => React.ReactElement;
   onRemoveDelta: (bucket: "added" | "excluded", domain: string) => void;
+}
+
+function DeltaBlock({
+  delta,
+  onRemoveDelta,
+}: {
+  delta: TriggerDelta;
+  onRemoveDelta: (bucket: "added" | "excluded", domain: string) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      {delta.added.length > 0 && (
+        <div className="flex items-start gap-2 text-xs">
+          <span className="mt-0.5 inline-flex items-center gap-1 font-medium text-muted-foreground">
+            <Plus className="h-3 w-3" /> Добавлено
+          </span>
+          <div className="flex flex-wrap gap-1.5">
+            {delta.added.map((d) => (
+              <DeltaChip
+                key={`add-${d}`}
+                domain={d}
+                variant="added"
+                onRemove={() => onRemoveDelta("added", d)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+      {delta.excluded.length > 0 && (
+        <div className="flex items-start gap-2 text-xs">
+          <span className="mt-0.5 inline-flex items-center gap-1 font-medium text-muted-foreground">
+            <Minus className="h-3 w-3" /> Исключено
+          </span>
+          <div className="flex flex-wrap gap-1.5">
+            {delta.excluded.map((d) => (
+              <DeltaChip
+                key={`exc-${d}`}
+                domain={d}
+                variant="excluded"
+                onRemove={() => onRemoveDelta("excluded", d)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function TriggerCard({
   trigger,
+  domains,
   selected,
   delta,
   isEditing,
   highlight,
+  expanded,
   onToggle,
-  onConfigureClick,
+  onToggleExpanded,
+  renderConfigureButton,
   onRemoveDelta,
 }: TriggerCardProps) {
-  const showDelta = selected && !isDeltaEmpty(delta);
+  const hasDelta = selected && !isDeltaEmpty(delta);
+  const showDomainList = expanded && domains.length > 0;
+  const showConfigureButton = expanded && selected;
 
   return (
     <div
@@ -199,58 +247,51 @@ function TriggerCard({
           </span>
         </button>
 
-        {selected && (
-          <button
-            type="button"
-            onClick={onConfigureClick}
-            aria-pressed={isEditing}
+        <button
+          type="button"
+          onClick={onToggleExpanded}
+          aria-expanded={expanded}
+          aria-label={expanded ? "Свернуть домены" : "Показать домены"}
+          className="shrink-0 inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        >
+          <ChevronDown
             className={cn(
-              "shrink-0 inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
-              isEditing
-                ? "border-primary bg-primary/10 text-foreground"
-                : "border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground"
+              "h-4 w-4 transition-transform duration-200",
+              expanded && "rotate-180"
             )}
-          >
-            <MascotIcon className="h-4 w-4" />
-            Настроить
-          </button>
-        )}
+          />
+        </button>
       </div>
 
-      {showDelta && (
-        <div className="animate-in fade-in-0 slide-in-from-top-1 flex flex-col gap-2 border-t border-primary/20 bg-background/40 px-3 py-3">
-          {delta.added.length > 0 && (
-            <div className="flex items-start gap-2 text-xs">
-              <span className="mt-0.5 inline-flex items-center gap-1 font-medium text-muted-foreground">
-                <Plus className="h-3 w-3" /> Добавлено
-              </span>
-              <div className="flex flex-wrap gap-1.5">
-                {delta.added.map((d) => (
-                  <DeltaChip
-                    key={`add-${d}`}
-                    domain={d}
-                    variant="added"
-                    onRemove={() => onRemoveDelta("added", d)}
-                  />
-                ))}
-              </div>
-            </div>
+      {(showDomainList || hasDelta || showConfigureButton) && (
+        <div className="animate-in fade-in-0 slide-in-from-top-1 flex flex-col gap-3 border-t border-primary/20 bg-background/40 px-3 py-3">
+          {showDomainList && (
+            <ul className="flex flex-wrap gap-x-3 gap-y-1 font-mono text-sm tracking-tight text-foreground/85">
+              {domains.map((d) => (
+                <li key={d}>{d}</li>
+              ))}
+            </ul>
           )}
-          {delta.excluded.length > 0 && (
-            <div className="flex items-start gap-2 text-xs">
-              <span className="mt-0.5 inline-flex items-center gap-1 font-medium text-muted-foreground">
-                <Minus className="h-3 w-3" /> Исключено
-              </span>
-              <div className="flex flex-wrap gap-1.5">
-                {delta.excluded.map((d) => (
-                  <DeltaChip
-                    key={`exc-${d}`}
-                    domain={d}
-                    variant="excluded"
-                    onRemove={() => onRemoveDelta("excluded", d)}
-                  />
-                ))}
-              </div>
+
+          {hasDelta && <DeltaBlock delta={delta} onRemoveDelta={onRemoveDelta} />}
+
+          {showConfigureButton && (
+            <div className="flex">
+              {renderConfigureButton(
+                <button
+                  type="button"
+                  aria-pressed={isEditing}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
+                    isEditing
+                      ? "border-primary bg-primary/10 text-foreground"
+                      : "border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground"
+                  )}
+                >
+                  <MascotIcon className="h-4 w-4" />
+                  Настроить
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -325,25 +366,13 @@ export function Step2Interests({ data, onNext }: StepProps) {
     initialPrefill.triggerIds
   );
   const [deltas, setDeltas] = useState<Record<string, TriggerDelta>>({});
+  const [expandedTriggerIds, setExpandedTriggerIds] = useState<Set<string>>(
+    () => new Set()
+  );
   const [highlightedTriggerIds, setHighlightedTriggerIds] = useState<
     Set<string>
   >(() => new Set());
-
-  const host = useTriggerEditHost();
-  const chipsApi = usePromptChips();
-
-  // Triggers currently in edit context = trigger ids of chips in the prompt
-  // bar. Multiple triggers can be edited simultaneously; the next text submit
-  // applies the parsed command to each.
-  const editTargetIds = useMemo(() => {
-    const set = new Set<string>();
-    for (const c of chipsApi.chips) {
-      if (c.kind === "trigger" && typeof c.payload === "string") {
-        set.add(c.payload);
-      }
-    }
-    return set;
-  }, [chipsApi.chips]);
+  const [activePopoverTriggerId, setActivePopoverTriggerId] = useState<string | null>(null);
 
   // The list of trigger objects available — flattened from all interests
   // selected (so user can mix triggers across multiple interests).
@@ -358,8 +387,7 @@ export function Step2Interests({ data, onNext }: StepProps) {
       );
   }, [interestsForDirection, selectedInterests]);
 
-  // Lookup map for resolving label → trigger object (used by the submit
-  // pipeline since the prompt-bar lives elsewhere).
+  // Lookup map for resolving label → trigger object (used by handleContinue).
   const triggerById = useMemo(() => {
     const m = new Map<string, Trigger>();
     for (const { trigger } of availableTriggers) m.set(trigger.id, trigger);
@@ -373,34 +401,41 @@ export function Step2Interests({ data, onNext }: StepProps) {
   }
 
   function toggleTrigger(triggerId: string) {
-    setSelectedTriggers((prev) => {
-      const next = prev.includes(triggerId)
+    setSelectedTriggers((prev) =>
+      prev.includes(triggerId)
         ? prev.filter((t) => t !== triggerId)
-        : [...prev, triggerId];
-      // Unchecking a trigger also drops its edit chip from the prompt-bar
-      // — you can't edit a trigger you're no longer selecting.
-      if (!next.includes(triggerId) && editTargetIds.has(triggerId)) {
-        chipsApi.removeChip(`trigger_${triggerId}`);
-      }
+        : [...prev, triggerId]
+    );
+    setActivePopoverTriggerId((cur) => (cur === triggerId ? null : cur));
+  }
+
+  function toggleExpanded(triggerId: string) {
+    setExpandedTriggerIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(triggerId)) next.delete(triggerId);
+      else next.add(triggerId);
       return next;
     });
   }
 
-  function handleConfigureClick(triggerId: string) {
-    const chipId = `trigger_${triggerId}`;
-    if (editTargetIds.has(triggerId)) {
-      // Toggle off — remove this trigger from the edit context.
-      chipsApi.removeChip(chipId);
-      return;
-    }
-    const trigger = triggerById.get(triggerId);
-    if (!trigger) return;
-    chipsApi.pushChip({
-      id: chipId,
-      kind: "trigger",
-      label: trigger.label,
-      payload: triggerId,
-      removable: true,
+  function handleApplyParsed(
+    triggerId: string,
+    parsed: Exclude<ParsedTriggerCommand, { kind: "fallback" }>
+  ) {
+    setDeltas((prev) => {
+      const current = prev[triggerId] ?? EMPTY_DELTA;
+      let updated: TriggerDelta;
+      if (parsed.kind === "clear-added") {
+        updated = { ...current, added: [] };
+      } else if (parsed.kind === "clear-excluded") {
+        updated = { ...current, excluded: [] };
+      } else {
+        updated = applyEditToDelta(current, parsed.add, parsed.exclude);
+      }
+      const next = { ...prev };
+      if (isDeltaEmpty(updated)) delete next[triggerId];
+      else next[triggerId] = updated;
+      return next;
     });
   }
 
@@ -416,95 +451,6 @@ export function Step2Interests({ data, onNext }: StepProps) {
       return { ...prev, [triggerId]: next };
     });
   }
-
-  // Submit pipeline — receives one segment per chip (chip + its trailing
-  // text). Each segment runs the parser independently so user can write
-  //   "<chip A> добавь x.ru, <chip B> исключи y.ru"
-  // and have x.ru land on A's delta, y.ru on B's.
-  const submit = useCallback(
-    async (segments: ChipSegment[]): Promise<TriggerEditSubmitResult> => {
-      const triggerSegments = segments.filter(
-        (s) => s.chip.kind === "trigger"
-      );
-      if (triggerSegments.length === 0) {
-        return { ok: false, message: "Нет активных триггеров для правки." };
-      }
-
-      // Validate every segment up-front. If any segment fails the parser we
-      // surface the first fallback message and abort the whole submit so the
-      // user can fix their input — matches the prior single-target behavior.
-      const parsedPerSegment: Array<{
-        triggerId: string;
-        parsed: Exclude<ParsedTriggerCommand, { kind: "fallback" }>;
-      }> = [];
-      for (const seg of triggerSegments) {
-        const triggerId = seg.chip.payload as string;
-        if (!triggerId) continue;
-        // Empty text means the user dropped a chip without a command —
-        // skip it silently.
-        if (seg.text.length === 0) continue;
-        const parsed = parseTriggerCommand(seg.text);
-        if (parsed.kind === "fallback") {
-          host.setHint(parsed.message);
-          return { ok: false, message: parsed.message };
-        }
-        parsedPerSegment.push({ triggerId, parsed });
-      }
-      if (parsedPerSegment.length === 0) {
-        return {
-          ok: false,
-          message:
-            "Напишите команду после чипсы — например, «добавь auto1.ru».",
-        };
-      }
-
-      host.setHint(null);
-      host.setProcessing(true);
-      setHighlightedTriggerIds(
-        new Set(parsedPerSegment.map((s) => s.triggerId))
-      );
-      await new Promise((r) => setTimeout(r, 350));
-
-      setDeltas((prev) => {
-        const next = { ...prev };
-        for (const { triggerId, parsed } of parsedPerSegment) {
-          const current = next[triggerId] ?? EMPTY_DELTA;
-          if (parsed.kind === "clear-added") {
-            const updated: TriggerDelta = { ...current, added: [] };
-            if (isDeltaEmpty(updated)) delete next[triggerId];
-            else next[triggerId] = updated;
-          } else if (parsed.kind === "clear-excluded") {
-            const updated: TriggerDelta = { ...current, excluded: [] };
-            if (isDeltaEmpty(updated)) delete next[triggerId];
-            else next[triggerId] = updated;
-          } else {
-            next[triggerId] = applyEditToDelta(
-              current,
-              parsed.add,
-              parsed.exclude
-            );
-          }
-        }
-        return next;
-      });
-
-      host.setProcessing(false);
-      window.setTimeout(() => setHighlightedTriggerIds(new Set()), 600);
-      return { ok: true };
-    },
-    [host]
-  );
-
-  // Register submit with the trigger-edit pipeline. The prompt-bar routes
-  // submissions here whenever it sees trigger chips. Cleared on step unmount.
-  useEffect(() => {
-    host.registerSubmit(submit);
-    return () => {
-      host.setHint(null);
-      host.setProcessing(false);
-      host.registerSubmit(null);
-    };
-  }, [host, submit]);
 
   const hasInterest = selectedInterests.length > 0;
   const canContinue = hasInterest || selectedTriggers.length > 0;
@@ -577,12 +523,30 @@ export function Step2Interests({ data, onNext }: StepProps) {
               <TriggerCard
                 key={trigger.id}
                 trigger={trigger}
+                domains={getTriggerDomains(trigger.id)}
                 selected={selectedTriggers.includes(trigger.id)}
                 delta={deltas[trigger.id] ?? EMPTY_DELTA}
-                isEditing={editTargetIds.has(trigger.id)}
+                isEditing={activePopoverTriggerId === trigger.id}
                 highlight={highlightedTriggerIds.has(trigger.id)}
+                expanded={expandedTriggerIds.has(trigger.id)}
                 onToggle={() => toggleTrigger(trigger.id)}
-                onConfigureClick={() => handleConfigureClick(trigger.id)}
+                onToggleExpanded={() => toggleExpanded(trigger.id)}
+                renderConfigureButton={(button) => (
+                  <TriggerConfigurePopover
+                    open={activePopoverTriggerId === trigger.id}
+                    onOpenChange={(open) =>
+                      setActivePopoverTriggerId(open ? trigger.id : null)
+                    }
+                    triggerLabel={trigger.label}
+                    onApply={(parsed) => handleApplyParsed(trigger.id, parsed)}
+                    onHighlightStart={() =>
+                      setHighlightedTriggerIds(new Set([trigger.id]))
+                    }
+                    onHighlightEnd={() => setHighlightedTriggerIds(new Set())}
+                  >
+                    {button}
+                  </TriggerConfigurePopover>
+                )}
                 onRemoveDelta={(bucket, domain) =>
                   handleRemoveDelta(trigger.id, bucket, domain)
                 }
@@ -592,14 +556,6 @@ export function Step2Interests({ data, onNext }: StepProps) {
           {!hasInterest && (
             <p className="mt-2 text-xs text-muted-foreground">
               Сначала выберите хотя бы один интерес — триггеры подстроятся под него
-            </p>
-          )}
-          {hasInterest && editTargetIds.size > 0 && (
-            <p className="mt-2 text-xs text-muted-foreground">
-              Команды из промпт-бара применятся к {editTargetIds.size === 1
-                ? "выбранному триггеру"
-                : `${editTargetIds.size} выбранным триггерам`}
-              .
             </p>
           )}
         </div>
