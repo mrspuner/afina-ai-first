@@ -223,7 +223,6 @@ interface TriggerCardProps {
   expanded: boolean;
   onToggle: () => void;
   onToggleExpanded: () => void;
-  onConfigureClick: () => void;
   onRemoveDelta: (bucket: "added" | "excluded", domain: string) => void;
 }
 
@@ -283,13 +282,10 @@ function TriggerCard({
   expanded,
   onToggle,
   onToggleExpanded,
-  onConfigureClick,
   onRemoveDelta,
 }: TriggerCardProps) {
   const hasDelta = selected && !isDeltaEmpty(delta);
   const showDomainList = expanded && domains.length > 0;
-  const showConfigureButton = expanded && selected;
-  const { open: hintOpen, show: showHint } = useMascotHint(`trigger_${trigger.id}`);
 
   return (
     <div
@@ -343,7 +339,7 @@ function TriggerCard({
         </button>
       </div>
 
-      {(showDomainList || hasDelta || showConfigureButton) && (
+      {(showDomainList || hasDelta) && (
         <div className="animate-in fade-in-0 slide-in-from-top-1 flex flex-col gap-3 border-t border-primary/20 bg-background/40 px-3 py-3">
           {showDomainList && (
             <ul className="flex flex-wrap gap-x-3 gap-y-1 font-mono text-sm tracking-tight text-foreground/85">
@@ -354,27 +350,6 @@ function TriggerCard({
           )}
 
           {hasDelta && <DeltaBlock delta={delta} onRemoveDelta={onRemoveDelta} />}
-
-          {showConfigureButton && (
-            <div className="flex">
-              <MascotHint open={hintOpen}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    onConfigureClick();
-                    showHint();
-                  }}
-                  className={cn(
-                    "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
-                    "border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground"
-                  )}
-                >
-                  <MascotIcon className="h-4 w-4" />
-                  Настроить
-                </button>
-              </MascotHint>
-            </div>
-          )}
         </div>
       )}
     </div>
@@ -384,7 +359,7 @@ function TriggerCard({
 export function Step2Interests({ data, onNext }: StepProps) {
   const { clientDirection, wizardRemixToken } = useAppState();
   const dispatch = useAppDispatch();
-  const { pushChip, clearChips } = usePromptChips();
+  const { pushChip, removeChip, clearChips } = usePromptChips();
   const vertical = useMemo(
     () => resolveVertical(clientDirection),
     [clientDirection]
@@ -482,14 +457,6 @@ export function Step2Interests({ data, onNext }: StepProps) {
     );
   }
 
-  function toggleTrigger(triggerId: string) {
-    setSelectedTriggers((prev) =>
-      prev.includes(triggerId)
-        ? prev.filter((t) => t !== triggerId)
-        : [...prev, triggerId]
-    );
-  }
-
   function toggleExpanded(triggerId: string) {
     setExpandedTriggerIds((prev) => {
       const next = new Set(prev);
@@ -497,6 +464,31 @@ export function Step2Interests({ data, onNext }: StepProps) {
       else next.add(triggerId);
       return next;
     });
+  }
+
+  // Single click action on the trigger row: toggles selection, expands the
+  // card, and pushes a prompt-bar chip so the user can configure it via chat.
+  // Clicking a selected trigger again deselects it, collapses, and removes
+  // only that trigger's chip — leaving sibling chips and typed text intact.
+  function handleTriggerClick(triggerId: string, triggerLabel: string) {
+    const isSelected = selectedTriggers.includes(triggerId);
+    if (isSelected) {
+      setSelectedTriggers((prev) => prev.filter((t) => t !== triggerId));
+      setExpandedTriggerIds((prev) => {
+        const next = new Set(prev);
+        next.delete(triggerId);
+        return next;
+      });
+      removeChip(`trigger_${triggerId}`);
+    } else {
+      setSelectedTriggers((prev) => [...prev, triggerId]);
+      setExpandedTriggerIds((prev) => {
+        const next = new Set(prev);
+        next.add(triggerId);
+        return next;
+      });
+      pushTriggerChip(triggerId, triggerLabel);
+    }
   }
 
   function handleApplyParsed(
@@ -547,7 +539,6 @@ export function Step2Interests({ data, onNext }: StepProps) {
   }
 
   function pushTriggerChip(triggerId: string, triggerLabel: string) {
-    clearChips();
     pushChip({
       id: `trigger_${triggerId}`,
       kind: "trigger",
@@ -685,9 +676,8 @@ export function Step2Interests({ data, onNext }: StepProps) {
                   delta={deltas[trigger.id] ?? EMPTY_DELTA}
                   highlight={highlightedTriggerIds.has(trigger.id)}
                   expanded={expandedTriggerIds.has(trigger.id)}
-                  onToggle={() => toggleTrigger(trigger.id)}
+                  onToggle={() => handleTriggerClick(trigger.id, trigger.label)}
                   onToggleExpanded={() => toggleExpanded(trigger.id)}
-                  onConfigureClick={() => pushTriggerChip(trigger.id, trigger.label)}
                   onRemoveDelta={(bucket, domain) =>
                     handleRemoveDelta(trigger.id, bucket, domain)
                   }
