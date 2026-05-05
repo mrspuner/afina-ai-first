@@ -48,7 +48,7 @@ export function CampaignStepper({
               {/* Circle */}
               <div
                 className={cn(
-                  "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[10px] font-medium transition-colors",
+                  "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[10px] font-medium transition-colors duration-200 ease-out",
                   isCompleted &&
                     "border-primary bg-primary text-primary-foreground",
                   isActive &&
@@ -79,7 +79,7 @@ export function CampaignStepper({
               onClick={() => isClickable && onStepClick(step)}
               disabled={!isClickable}
               className={cn(
-                "py-1 text-xs transition-colors",
+                "py-1 text-xs transition-colors duration-200 ease-out",
                 isActive && "font-medium text-foreground",
                 isClickable
                   ? "cursor-pointer text-foreground hover:text-primary"

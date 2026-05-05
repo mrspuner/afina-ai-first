@@ -202,8 +202,14 @@ export function ShellBottomBar() {
   // Статистика) and workflow. Transient wizard steps (guided-signal,
   // awaiting-campaign, campaign-select) keep the 3% offset so they don't
   // cover the step's primary CTA.
+  //
+  // The bar is always rendered at `bottom: 20px`; the transient offset is
+  // applied via `transform: translateY(...)` so the position transition
+  // animates on the GPU instead of triggering a layout reflow on every
+  // frame (the previous `animate={{ bottom }}` motion.div was animating a
+  // layout property).
   const pinnedToBottom = isWorkflow || view.kind === "section" || onWelcome;
-  const floatBottom = pinnedToBottom ? "20px" : "3%";
+  const transientOffset = "calc(-3vh + 20px)";
 
   const barRef = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
@@ -226,12 +232,16 @@ export function ShellBottomBar() {
     <>
       <SelectedNodeChipEffect selected={selectedWorkflowNode} />
       <ClearChipsOnViewChangeEffect viewKind={view.kind} />
-      <motion.div
+      <div
         ref={barRef}
-        className="fixed left-[120px] right-0 z-30 flex justify-center px-6"
-        initial={false}
-        animate={{ bottom: floatBottom }}
-        transition={{ duration: 0.55, ease: [0.32, 0.72, 0, 1] }}
+        className="fixed left-[120px] right-0 bottom-5 z-30 flex justify-center px-6 will-change-transform"
+        style={{
+          transform: pinnedToBottom
+            ? undefined
+            : `translateY(${transientOffset})`,
+          transition:
+            "transform 550ms var(--ease-out-strong)",
+        }}
       >
         <div
           className={cn(
@@ -373,7 +383,7 @@ export function ShellBottomBar() {
               </div>
             )}
         </div>
-      </motion.div>
+      </div>
     </>
   );
 }

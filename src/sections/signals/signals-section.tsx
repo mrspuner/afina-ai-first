@@ -101,10 +101,11 @@ export function SignalsSection() {
           <SignalsEmptyState onCreate={handleCreate} onUpload={() => setUploadOpen(true)} />
         ) : (
           <div className="flex flex-col gap-3">
-            {sorted.map((s) => (
+            {sorted.map((s, i) => (
               <SignalCard
                 key={s.id}
                 signal={s}
+                index={i}
                 onCreateCampaign={handleCreateCampaign}
                 onDownload={handleDownload}
                 onResumeAwaiting={handleResumeAwaiting}

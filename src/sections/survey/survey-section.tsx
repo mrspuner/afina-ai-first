@@ -60,10 +60,10 @@ export function SurveySection({
         {phase.kind === "form" ? (
           <motion.div
             key="form"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.25 }}
+            initial={{ opacity: 0, x: -16 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -16 }}
+            transition={{ duration: 0.28, ease: [0.23, 1, 0.32, 1] }}
             className="flex w-full justify-center"
           >
             <SurveyForm
@@ -75,12 +75,15 @@ export function SurveySection({
             />
           </motion.div>
         ) : (
+          // Forward into awaiting → slides in from the right; previous form
+          // exits to the left. Reads as "moving forward through the flow"
+          // instead of a flat crossfade.
           <motion.div
             key="awaiting"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.25 }}
+            initial={{ opacity: 0, x: 16 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 16 }}
+            transition={{ duration: 0.28, ease: [0.23, 1, 0.32, 1] }}
             className="flex w-full justify-center"
           >
             <SurveyAwaiting

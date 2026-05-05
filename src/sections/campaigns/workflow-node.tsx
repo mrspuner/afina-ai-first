@@ -120,7 +120,7 @@ export function WorkflowNodeComponent({ id, data, selected }: NodeProps<Workflow
         boxShadow: selected
           ? "0 12px 40px -12px rgba(0,0,0,0.65), 0 0 0 1px rgba(255,255,255,0.04)"
           : "none",
-        transition: "border-color 0.3s ease, background 0.3s ease",
+        transition: "border-color 0.3s var(--ease-out), background 0.3s var(--ease-out)",
       }}
     >
       <Handle type="target" position={Position.Left} style={HANDLE_STYLE} />
@@ -133,7 +133,7 @@ export function WorkflowNodeComponent({ id, data, selected }: NodeProps<Workflow
             fontWeight: 500,
             color: s.color,
             lineHeight: "1.4",
-            transition: "color 0.3s ease, font-size 0.3s ease",
+            transition: "color 0.3s var(--ease-out)",
           }}
         >
           <div
@@ -240,7 +240,7 @@ export const WORKFLOW_NODE_STATE_CSS = `
     animation: wf-processing 0.7s ease-in-out infinite;
   }
   .wf-node-just-updated {
-    animation: wf-just-updated 1.2s ease-out;
+    animation: wf-just-updated 600ms var(--ease-out);
   }
   @keyframes wf-needs-attention {
     0%,100% { box-shadow: 0 0 0 0 rgba(251,146,60,0.45); }

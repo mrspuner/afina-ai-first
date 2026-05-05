@@ -50,6 +50,12 @@ interface SignalCardProps {
    */
   onOpen?: (signalId: string) => void;
   onDelete?: (signalId: string) => void;
+  /**
+   * Page-entrance stagger position (0-based). Each step adds 40 ms of
+   * animation-delay so a fresh list cascades in instead of popping at
+   * once. A single newly-added card defaults to index 0 (no delay).
+   */
+  index?: number;
 }
 
 export function SignalCard({
@@ -60,6 +66,7 @@ export function SignalCard({
   onResumeEdit,
   onOpen,
   onDelete,
+  index = 0,
 }: SignalCardProps) {
   const { type, count, segments, updatedAt, id } = signal;
   const status = signal.status ?? "ready";
@@ -88,9 +95,10 @@ export function SignalCard({
         role={onOpen ? "button" : undefined}
         tabIndex={onOpen ? 0 : undefined}
         className={cn(
-          "animate-in fade-in-0 slide-in-from-bottom-2 gap-2 px-5 py-4 [--tw-animation-duration:220ms] [--tw-ease:cubic-bezier(0.23,1,0.32,1)]",
+          "animate-in fade-in-0 slide-in-from-bottom-2 gap-2 px-5 py-4 [--tw-animation-duration:220ms] [--tw-ease:var(--ease-out)]",
           onOpen && "cursor-pointer transition-colors hover:bg-accent/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
         )}
+        style={index > 0 ? { animationDelay: `${index * 40}ms` } : undefined}
       >
         <div className="flex items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2">
