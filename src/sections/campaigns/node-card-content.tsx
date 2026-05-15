@@ -1,9 +1,12 @@
 "use client";
 
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Pencil } from "lucide-react";
+import Image from "next/image";
 import { usePromptInputController } from "@/components/ai-elements/prompt-input";
 import type { NodeParams, WorkflowNodeData } from "@/types/workflow";
 import { NODE_ACTIONS } from "@/state/node-actions";
+import { getFieldMeta } from "@/state/node-field-editability";
+import { usePromptChips } from "@/state/prompt-chips-context";
 
 type ParamRow = { label: string; value: string };
 
@@ -114,13 +117,16 @@ interface NodeCardBodyProps {
 
 /**
  * Shared body for the expanded node card: attention banner, id, and
- * clickable params list. Clicking a param row inserts the matching
- * NODE_ACTIONS template into the PromptBar — no separate chips row.
+ * params list with per-field edit icons.
+ * - manual fields: pencil icon (inline edit handler wired in Task 11)
+ * - ai fields: mascot icon, pushes chip + prompt template to the prompt bar
+ * - readonly fields: no icon
  * Rendered inline inside WorkflowNodeComponent when the node is selected.
  */
 export function NodeCardBody({ id, data }: NodeCardBodyProps) {
   const actions = data.params ? NODE_ACTIONS[data.params.kind] ?? [] : [];
   const { textInput } = usePromptInputController();
+  const { pushChip } = usePromptChips();
 
   function insertPrompt(template: string) {
     textInput.insertAtCursor(template, {
@@ -130,10 +136,22 @@ export function NodeCardBody({ id, data }: NodeCardBodyProps) {
   }
 
   const rows = data.params ? getParamRows(data.params) : [];
-  // Map chipLabel → promptTemplate so each row can look up its own inserter.
+  // Map chipLabel → promptTemplate so ai rows can look up their inserter.
   const templateByLabel = new Map(
     actions.map((a) => [a.chipLabel, a.promptTemplate] as const)
   );
+
+  function handleAiField(rowLabel: string) {
+    const template = templateByLabel.get(rowLabel);
+    if (template) insertPrompt(template);
+    pushChip({
+      id: `nodefield_${id}_${rowLabel}`,
+      kind: "node",
+      label: `${data.label} · ${rowLabel}`,
+      payload: id,
+      removable: true,
+    });
+  }
 
   return (
     <div className="flex flex-col gap-2 text-left">
@@ -152,44 +170,62 @@ export function NodeCardBody({ id, data }: NodeCardBodyProps) {
       {rows.length > 0 && (
         <div className="flex flex-col gap-0.5">
           {rows.map((row) => {
-            const template = templateByLabel.get(row.label);
-            const isClickable = template !== undefined;
-            const common =
-              "grid grid-cols-[minmax(72px,max-content)_1fr] gap-x-2.5 text-[11px]";
-            if (!isClickable) {
-              return (
-                <div key={row.label} className={common}>
-                  <span className="text-muted-foreground">{row.label}</span>
-                  <span className="truncate text-foreground" title={row.value}>
-                    {row.value}
-                  </span>
-                </div>
+            const editability = data.params
+              ? getFieldMeta(data.params.kind, row.label)?.editability
+              : undefined;
+
+            let trailingIcon: React.ReactNode = null;
+            if (editability === "manual") {
+              trailingIcon = (
+                <button
+                  type="button"
+                  aria-label="Редактировать поле"
+                  className="nodrag ml-1 flex shrink-0 items-center text-muted-foreground/50 hover:text-muted-foreground focus-visible:outline-none"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // inline edit handler wired in Task 11
+                  }}
+                >
+                  <Pencil className="h-3 w-3" />
+                </button>
+              );
+            } else if (editability === "ai") {
+              trailingIcon = (
+                <button
+                  type="button"
+                  aria-label="Передать поле ассистенту"
+                  className="nodrag ml-1 flex shrink-0 items-center text-muted-foreground/50 hover:text-muted-foreground focus-visible:outline-none"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleAiField(row.label);
+                  }}
+                >
+                  <Image
+                    src="/mascot-icon.svg"
+                    width={12}
+                    height={12}
+                    alt=""
+                    aria-hidden
+                  />
+                </button>
               );
             }
+
             return (
-              <button
+              <div
                 key={row.label}
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  insertPrompt(template);
-                }}
-                title={`Вставить шаблон: «${template.trim()} …»`}
-                className={`${common} nodrag -mx-1 rounded-md px-1 py-0.5 text-left transition-colors hover:bg-muted/50 focus-visible:bg-muted/60 focus-visible:outline-none`}
+                className="grid grid-cols-[minmax(72px,max-content)_1fr_auto] items-center gap-x-2.5 text-[11px]"
               >
                 <span className="text-muted-foreground">{row.label}</span>
                 <span className="truncate text-foreground" title={row.value}>
                   {row.value}
                 </span>
-              </button>
+                {trailingIcon}
+              </div>
             );
           })}
         </div>
       )}
-
-      <p className="text-[10px] font-medium text-foreground">
-        Изменить через промпт ниже.
-      </p>
     </div>
   );
 }

@@ -43,7 +43,7 @@ export const NODE_FIELD_EDITABILITY: Record<
     "Голос": { editability: "ai", paramKey: "voiceType" },
   },
   wait: {
-    "Режим": { editability: "ai", paramKey: "mode" },
+    "Режим": { editability: "readonly", paramKey: "mode" },
     "Длительность": { editability: "ai", paramKey: "durationHours" },
     "Событие": { editability: "ai", paramKey: "untilEvent" },
   },
