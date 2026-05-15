@@ -1,6 +1,9 @@
 "use client";
 
 import { motion } from "motion/react";
+import { SiteBlock } from "./site-block";
+import { BusinessBlock } from "./business-block";
+import { RegionsBlock } from "./regions-block";
 
 export function SettingsSection() {
   return (
@@ -20,7 +23,9 @@ export function SettingsSection() {
           </p>
         </header>
         <div className="flex flex-col gap-8">
-          {/* Blocks added in tasks 2–5 */}
+          <SiteBlock />
+          <BusinessBlock />
+          <RegionsBlock />
         </div>
       </motion.div>
     </div>
