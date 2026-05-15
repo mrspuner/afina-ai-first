@@ -2,7 +2,7 @@
 "use client";
 
 import Image from "next/image";
-import { Maximize2, X } from "lucide-react";
+import { PanelRightOpen, X } from "lucide-react";
 import type { ChatPanelMode } from "@/state/chat-context";
 
 interface ChatPanelHeaderProps {
@@ -36,7 +36,7 @@ export function ChatPanelHeader({ mode, onOpenSidebar, onCloseSidebar }: ChatPan
             aria-label="Открыть в drawer"
             className="inline-flex h-7 w-7 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground"
           >
-            <Maximize2 className="h-4 w-4" />
+            <PanelRightOpen className="h-4 w-4" />
           </button>
         )}
       </div>
