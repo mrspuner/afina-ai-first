@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { motion } from "motion/react";
 import Image from "next/image";
 import { Mic } from "lucide-react";
@@ -31,6 +31,8 @@ import { parseCampaignQuery } from "@/state/parse-campaign-filter";
 import { useWelcomeChat } from "@/sections/welcome/welcome-chat-context";
 import { OnboardingChatChips } from "@/sections/welcome/onboarding-chat-view";
 import { CampaignsPromptChips } from "@/sections/campaigns/campaigns-prompt-chips";
+import { PromptBar } from "./prompt-bar";
+import { useChat } from "@/state/chat-context";
 
 function AttachmentFileList() {
   const { files } = usePromptInputAttachments();
@@ -114,6 +116,7 @@ export function ShellBottomBar() {
   } = state;
   const welcomeChat = useWelcomeChat();
   const chipsApi = usePromptChips();
+  const { openSidebar } = useChat();
 
   const editorRef = useRef<ChipEditableInputHandle>(null);
 
@@ -179,160 +182,105 @@ export function ShellBottomBar() {
     view.kind === "section" && (view.name === "Сигналы" || view.name === "Кампании") ? "Напишите, что вы хотите сделать" :
     "Выберите шаг или задайте вопрос…";
 
-  const isWorkflow = isWorkflowView(state);
   const onWelcome = isOnWelcome(state);
-  // Pin near bottom on welcome, section views (Сигналы / Кампании /
-  // Статистика) and workflow. Transient wizard steps (guided-signal,
-  // awaiting-campaign, campaign-select) keep the 3% offset so they don't
-  // cover the step's primary CTA.
-  //
-  // The bar is always rendered at `bottom: 20px`; the transient offset is
-  // applied via `transform: translateY(...)` so the position transition
-  // animates on the GPU instead of triggering a layout reflow on every
-  // frame (the previous `animate={{ bottom }}` motion.div was animating a
-  // layout property).
-  const pinnedToBottom = isWorkflow || view.kind === "section" || onWelcome;
-  const transientOffset = "calc(-3vh + 20px)";
-
-  const barRef = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => {
-    const el = barRef.current;
-    if (!el) return;
-    const apply = () => {
-      const h = el.getBoundingClientRect().height;
-      document.documentElement.style.setProperty("--promptbar-height", `${Math.round(h)}px`);
-    };
-    apply();
-    const ro = new ResizeObserver(apply);
-    ro.observe(el);
-    return () => {
-      ro.disconnect();
-      document.documentElement.style.removeProperty("--promptbar-height");
-    };
-  }, [view.kind]);
 
   return (
     <>
       <SelectedNodeChipEffect selected={selectedWorkflowNode} />
       <ClearChipsOnViewChangeEffect viewKind={view.kind} />
-      <div
-        ref={barRef}
-        className="fixed left-[120px] right-0 bottom-5 z-30 flex justify-center px-6 will-change-transform"
-        style={{
-          transform: pinnedToBottom
-            ? undefined
-            : `translateY(${transientOffset})`,
-          transition:
-            "transform 550ms var(--ease-out-strong)",
-        }}
+      <PromptBar
+        onOpenDrawer={openSidebar}
+        slot={
+          view.kind === "guided-signal" &&
+          wizardCurrentStep === 5 &&
+          budgetHelpShown ? (
+            <motion.div
+              key="budget-help-answer"
+              initial={{ y: 6, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ duration: 0.26, ease: [0.23, 1, 0.32, 1] }}
+              data-testid="budget-help-answer"
+              className="flex items-start gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/80"
+            >
+              <Image
+                src="/mascot-icon.svg"
+                alt=""
+                width={16}
+                height={16}
+                className="mt-0.5 shrink-0"
+                aria-hidden
+              />
+              <span className="leading-snug">
+                Рекомендуемая сумма рассчитана из размера вашей базы и средних
+                цен по сегментам. Мы заложили её так, чтобы хватило на полный
+                цикл сбора сигналов без перерасхода — обычно это 5–35% от
+                размера базы в рублях.
+              </span>
+            </motion.div>
+          ) : undefined
+        }
       >
-        <div
+        <PromptInput
+          onSubmit={handlePromptSubmit}
           className={cn(
-            "flex w-full max-w-[720px] flex-col gap-3 rounded-[34px] p-6",
-            // Outer frosted card (Figma node 18750:213937): dark translucent
-            // panel with a subtle 2px backdrop blur — no outer shadow, the
-            // "solidity" comes from the inner InputGroup's 17px/9px halo.
-            "bg-[rgba(10,10,10,0.75)] backdrop-blur-[2px]"
+            "[&_[data-slot=input-group]]:rounded-[10px]!",
+            "[&_[data-slot=input-group]]:border!",
+            "[&_[data-slot=input-group]]:border-white/15!",
+            "[&_[data-slot=input-group]]:bg-white/5!",
+            "dark:[&_[data-slot=input-group]]:bg-white/5!",
+            "[&_[data-slot=input-group]]:backdrop-blur-[14.8px]",
+            "[&_[data-slot=input-group]]:shadow-[0_0_17px_9px_rgba(0,0,0,0.19)]"
           )}
         >
-          {/* Budget-step help: clicking the chip below the prompt-bar swaps
-              it for a mascot-styled answer block here, mirroring how the
-              trigger-edit hint surfaces on the interests step. */}
-          {view.kind === "guided-signal" &&
-            wizardCurrentStep === 5 &&
-            budgetHelpShown && (
-              <motion.div
-                key="budget-help-answer"
-                initial={{ y: 6, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
+          <AttachmentFileList />
+          <ChipEditableInput
+            ref={editorRef}
+            className="px-3 py-2"
+            placeholder={chatPlaceholder}
+          />
+          <PromptInputFooter>
+            <PromptInputTools>
+              <PromptInputButton tooltip="Голосовой ввод">
+                <Mic className="h-4 w-4" />
+              </PromptInputButton>
+            </PromptInputTools>
+            <PromptInputSubmit />
+          </PromptInputFooter>
+        </PromptInput>
+        {onWelcome && welcomeChat && (
+          <OnboardingChatChips
+            chips={welcomeChat.chips}
+            onChipClick={welcomeChat.submitChip}
+          />
+        )}
+        {view.kind === "section" && view.name === "Кампании" && campaigns.length > 0 && (
+          <CampaignsPromptChips
+            onChipClick={(text) => {
+              const { statuses, sort } = parseCampaignQuery(text);
+              if (statuses.length > 0 || sort !== "default") {
+                dispatch({ type: "campaigns_query_set", statuses, sort });
+              }
+            }}
+          />
+        )}
+        {view.kind === "guided-signal" &&
+          wizardCurrentStep === 5 &&
+          !budgetHelpShown && (
+            <div className="flex flex-wrap justify-start gap-2">
+              <motion.button
+                type="button"
+                onClick={() => dispatch({ type: "budget_help_shown" })}
+                initial={{ y: 6, opacity: 0, scale: 0.96 }}
+                animate={{ y: 0, opacity: 1, scale: 1 }}
                 transition={{ duration: 0.26, ease: [0.23, 1, 0.32, 1] }}
-                data-testid="budget-help-answer"
-                className="flex items-start gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/80"
+                whileTap={{ scale: 0.97 }}
+                className="rounded-full border border-white/10 bg-[#171717] px-[13px] py-[7px] text-[12px] text-white transition-colors duration-150 ease-out hover:bg-[#1f1f1f]"
               >
-                <Image
-                  src="/mascot-icon.svg"
-                  alt=""
-                  width={16}
-                  height={16}
-                  className="mt-0.5 shrink-0"
-                  aria-hidden
-                />
-                <span className="leading-snug">
-                  Рекомендуемая сумма рассчитана из размера вашей базы и средних
-                  цен по сегментам. Мы заложили её так, чтобы хватило на полный
-                  цикл сбора сигналов без перерасхода — обычно это 5–35% от
-                  размера базы в рублях.
-                </span>
-              </motion.div>
-            )}
-          <PromptInput
-            onSubmit={handlePromptSubmit}
-            // `className` lands on the <form>, but the visual wrapper is the
-            // inner <InputGroup data-slot="input-group">. Override the
-            // shadcn defaults (border-input, dark:bg-input/30, rounded-lg)
-            // via a descendant selector so the PromptBar matches the Figma:
-            //   bg rgba(255,255,255,0.05) + border rgba(255,255,255,0.15)
-            //   rounded-[10px] + backdrop-blur-[14.8px] + soft dark halo.
-            className={cn(
-              "[&_[data-slot=input-group]]:rounded-[10px]!",
-              "[&_[data-slot=input-group]]:border!",
-              "[&_[data-slot=input-group]]:border-white/15!",
-              "[&_[data-slot=input-group]]:bg-white/5!",
-              "dark:[&_[data-slot=input-group]]:bg-white/5!",
-              "[&_[data-slot=input-group]]:backdrop-blur-[14.8px]",
-              "[&_[data-slot=input-group]]:shadow-[0_0_17px_9px_rgba(0,0,0,0.19)]"
-            )}
-          >
-            <AttachmentFileList />
-            <ChipEditableInput
-              ref={editorRef}
-              className="px-3 py-2"
-              placeholder={chatPlaceholder}
-            />
-            <PromptInputFooter>
-              <PromptInputTools>
-                <PromptInputButton tooltip="Голосовой ввод">
-                  <Mic className="h-4 w-4" />
-                </PromptInputButton>
-              </PromptInputTools>
-              <PromptInputSubmit />
-            </PromptInputFooter>
-          </PromptInput>
-          {onWelcome && welcomeChat && (
-            <OnboardingChatChips
-              chips={welcomeChat.chips}
-              onChipClick={welcomeChat.submitChip}
-            />
+                Как рассчитывается рекомендуемый бюджет?
+              </motion.button>
+            </div>
           )}
-          {view.kind === "section" && view.name === "Кампании" && campaigns.length > 0 && (
-            <CampaignsPromptChips
-              onChipClick={(text) => {
-                const { statuses, sort } = parseCampaignQuery(text);
-                if (statuses.length > 0 || sort !== "default") {
-                  dispatch({ type: "campaigns_query_set", statuses, sort });
-                }
-              }}
-            />
-          )}
-          {view.kind === "guided-signal" &&
-            wizardCurrentStep === 5 &&
-            !budgetHelpShown && (
-              <div className="flex flex-wrap justify-start gap-2">
-                <motion.button
-                  type="button"
-                  onClick={() => dispatch({ type: "budget_help_shown" })}
-                  initial={{ y: 6, opacity: 0, scale: 0.96 }}
-                  animate={{ y: 0, opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.26, ease: [0.23, 1, 0.32, 1] }}
-                  whileTap={{ scale: 0.97 }}
-                  className="rounded-full border border-white/10 bg-[#171717] px-[13px] py-[7px] text-[12px] text-white transition-colors duration-150 ease-out hover:bg-[#1f1f1f]"
-                >
-                  Как рассчитывается рекомендуемый бюджет?
-                </motion.button>
-              </div>
-            )}
-        </div>
-      </div>
+      </PromptBar>
     </>
   );
 }
