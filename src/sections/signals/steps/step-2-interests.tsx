@@ -234,6 +234,7 @@ interface TriggerCardProps {
   onRemoveDelta: (bucket: "added" | "excluded", domain: string) => void;
   onExcludeSystemDomain: (domain: string) => void;
   onRestoreSystemDomain: (domain: string) => void;
+  onAddDomain: () => void;
 }
 
 function DeltaBlock({
@@ -341,6 +342,7 @@ function TriggerCard({
   onRemoveDelta,
   onExcludeSystemDomain,
   onRestoreSystemDomain,
+  onAddDomain,
 }: TriggerCardProps) {
   const hasDelta = selected && !isDeltaEmpty(delta);
   // System domains split into still-active vs user-excluded (reversible).
@@ -458,6 +460,14 @@ function TriggerCard({
                   onRemove={() => onRemoveDelta("added", d)}
                 />
               ))}
+              <button
+                type="button"
+                onClick={onAddDomain}
+                className="inline-flex items-center gap-1 rounded-md border border-dashed border-border px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:border-brand/40 hover:text-foreground"
+              >
+                <Plus className="h-3 w-3" />
+                Добавить свой домен
+              </button>
             </div>
           )}
 
@@ -708,6 +718,26 @@ export function Step2Interests({ data, onNext }: StepProps) {
     el?.focus();
   }
 
+  // M2.4 — "Add your own domain" → fire an "Добавить домен" tag into the
+  // prompt bar and focus the editor. The user then types the domain; the
+  // existing parseTriggerCommand already understands «добавь domain.ru», so
+  // the AI-path (M5) consumes this with no parser change. The chip reuses the
+  // "section" kind (it is a context tag, not a per-trigger edit chip) and a
+  // stable id so re-clicking the same trigger refreshes rather than stacks.
+  function pushAddDomainChip(triggerId: string) {
+    pushChip({
+      id: `add_domain_${triggerId}`,
+      kind: "section",
+      label: "Добавить домен",
+      payload: triggerId,
+      removable: true,
+    });
+    const el = document.querySelector<HTMLDivElement>(
+      '[role="textbox"][contenteditable="true"]'
+    );
+    el?.focus();
+  }
+
   // ---- TriggerEditApi for the PromptBar bridge ----
 
   const triggerEditApi = useMemo<TriggerEditApi>(() => ({
@@ -846,6 +876,7 @@ export function Step2Interests({ data, onNext }: StepProps) {
                   onRestoreSystemDomain={(domain) =>
                     handleRestoreSystemDomain(trigger.id, domain)
                   }
+                  onAddDomain={() => pushAddDomainChip(trigger.id)}
                 />
               ))}
             </div>
