@@ -217,7 +217,7 @@ function WorkspaceInner({
       className="relative flex flex-1 flex-col overflow-hidden transition-[padding] duration-300"
       style={{ paddingRight: "var(--chat-sidebar-width, 0px)" }}
     >
-      {currentStep >= 2 && (
+      {currentStep >= 1 && (
         <div
           className="absolute top-6 z-10 transition-[right] duration-300"
           style={{ right: "calc(1.5rem + var(--chat-sidebar-width, 0px))" }}
