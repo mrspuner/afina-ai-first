@@ -71,7 +71,7 @@ export function CampaignsSection() {
     dispatch({ type: "sidebar_nav", section: "Сигналы" });
 
   return (
-    <div className="flex flex-1 flex-col overflow-y-auto px-8 pb-40 pt-[140px]">
+    <div className="flex flex-1 flex-col overflow-y-auto px-8 pb-promptbar pt-[140px]">
       <div className="mx-auto flex w-full max-w-2xl flex-col">
         <div className="mb-6 flex items-baseline justify-between gap-4">
           <h1 className="text-[38px] font-semibold leading-[46px] tracking-tight">

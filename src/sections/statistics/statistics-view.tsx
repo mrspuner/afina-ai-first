@@ -345,7 +345,7 @@ export function StatisticsView({ campaignId }: { campaignId?: string } = {}) {
       </div>
 
       {/* Table */}
-      <div className="flex-1 overflow-auto px-8 pb-8">
+      <div className="flex-1 overflow-auto px-8 pb-promptbar">
         <table
           className={cn(
             "w-full border-collapse transition-opacity",

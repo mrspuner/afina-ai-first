@@ -68,6 +68,15 @@
      ring/border utilities can reference `var(--brand)` instead of hardcoding
      amber-400 in the wrong slots. */
   --color-brand: #FFEC00;
+
+  /* Запас под нижний промпт-бар: его offset от низа (20px) + воздух. */
+  --promptbar-gap: 2.25rem;
+}
+
+/* Отступ снизу для скролл-контейнеров — контент не уходит под промпт-бар.
+   --promptbar-height ставит компонент PromptBar; фолбэк на случай до его маунта. */
+@utility pb-promptbar {
+  padding-bottom: calc(var(--promptbar-height, 9rem) + var(--promptbar-gap));
 }
 
 /* Reduced-motion baseline. Crushes any animation/transition we forgot to

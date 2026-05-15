@@ -19,8 +19,7 @@ export function WelcomeView({ chat }: { chat: OnboardingChatState }) {
 
   return (
     <div
-      className="flex flex-1 flex-col items-center justify-center overflow-y-auto px-6 pt-16"
-      style={{ paddingBottom: "calc(var(--promptbar-height, 220px) + 40px)" }}
+      className="flex flex-1 flex-col items-center justify-center overflow-y-auto px-6 pt-16 pb-promptbar"
     >
       <motion.div
         layout
