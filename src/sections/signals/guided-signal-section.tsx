@@ -11,6 +11,7 @@ import { SurveySection } from "@/sections/survey/survey-section";
 import { CampaignWorkspace } from "./campaign-workspace";
 import { TopUpModal, computeShortfall } from "./top-up-modal";
 import { getProcessingDuration } from "@/state/dev-config";
+import { shouldShowSurveyGate } from "@/state/survey-gate";
 
 /**
  * Picks the wizard step to land on when resuming an existing signal — we
@@ -216,7 +217,9 @@ export function GuidedSignalSection() {
     : null;
 
   // Survey gate must be after all hooks — React rule.
-  if (!gatePassed && surveyStatus !== "completed") {
+  const showSurvey =
+    !gatePassed && shouldShowSurveyGate({ surveyStatus, isResuming: Boolean(activeResume) });
+  if (showSurvey) {
     return (
       <SurveySection
         // Mandatory at this entry point — spec: skip is only available on
