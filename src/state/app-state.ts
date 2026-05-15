@@ -108,7 +108,7 @@ export type AppState = {
   workflowCommand: string | null;
   workflowNodeCommand: { commands: Array<{ nodeLabel: string; text: string }> } | null;
   workflowStructuralCommands: { ops: StructuralOp[] } | null;
-  selectedWorkflowNode: { id: string; label: string } | null;
+  selectedWorkflowNode: { id: string; label: string; nodeType?: string } | null;
   aiReply: string | null;
   launchFlyoutOpen: boolean;
   activeSection: SectionName | null;
@@ -181,7 +181,7 @@ export type Action =
   | { type: "preset_applied"; preset: Preset }
   | { type: "workflow_command_submit"; text: string }
   | { type: "workflow_command_handled" }
-  | { type: "workflow_node_selected"; id: string; label: string }
+  | { type: "workflow_node_selected"; id: string; label: string; nodeType?: string }
   | { type: "workflow_node_deselected" }
   | { type: "workflow_node_command_submit"; commands: Array<{ nodeLabel: string; text: string }> }
   | { type: "workflow_node_command_handled" }
@@ -492,7 +492,7 @@ export function appReducer(state: AppState, action: Action): AppState {
     case "workflow_node_selected":
       return {
         ...state,
-        selectedWorkflowNode: { id: action.id, label: action.label },
+        selectedWorkflowNode: { id: action.id, label: action.label, nodeType: action.nodeType },
       };
 
     case "workflow_node_deselected":

@@ -44,7 +44,7 @@ interface WorkflowViewProps {
   signalType?: SignalType;
   signal?: Signal;
   onGraphChange?: (graph: GraphState) => void;
-  onNodeClick?: (id: string, label: string) => void;
+  onNodeClick?: (id: string, label: string, nodeType?: string) => void;
   onPaneClick?: () => void;
 }
 

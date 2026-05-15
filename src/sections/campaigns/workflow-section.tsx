@@ -80,8 +80,8 @@ export function WorkflowSection() {
   }, []);
 
   const handleNodeClick = useCallback(
-    (id: string, label: string) => {
-      dispatch({ type: "workflow_node_selected", id, label });
+    (id: string, label: string, nodeType?: string) => {
+      dispatch({ type: "workflow_node_selected", id, label, nodeType });
     },
     [dispatch]
   );

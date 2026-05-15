@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { getNodeColor } from "@/sections/campaigns/node-visuals";
+import type { NodeTagPayload } from "@/state/prompt-chips-context";
 import { motion } from "motion/react";
 import Image from "next/image";
 import { Mic } from "lucide-react";
@@ -53,13 +55,14 @@ function AttachmentFileList() {
 
 /**
  * Mirrors the currently selected workflow node into a chip in the prompt-bar.
- * Backspace-removal of the chip dispatches `workflow_node_deselected` so the
- * canvas selection state stays in sync.
+ * The chip is colored by the node's kind via getNodeColor. Backspace-removal
+ * of the chip dispatches `workflow_node_deselected` so the canvas selection
+ * state stays in sync.
  */
 function SelectedNodeChipEffect({
   selected,
 }: {
-  selected: { id: string; label: string } | null;
+  selected: { id: string; label: string; nodeType?: string } | null;
 }) {
   const { pushChip } = usePromptChips();
 
@@ -70,11 +73,17 @@ function SelectedNodeChipEffect({
   // Re-clicking the same node is a no-op because pushChip dedups by id.
   useEffect(() => {
     if (!selected) return;
+    const nodeType = selected.nodeType ?? "default";
     pushChip({
       id: `node_${selected.id}`,
       kind: "node",
       label: selected.label,
-      payload: selected.id,
+      payload: {
+        nodeId: selected.id,
+        nodeType,
+        color: getNodeColor(nodeType),
+        // paramLabel absent → whole-node tag
+      } satisfies NodeTagPayload,
       removable: true,
     });
   }, [selected, pushChip]);
