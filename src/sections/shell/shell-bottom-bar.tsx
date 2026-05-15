@@ -30,6 +30,9 @@ import {
 } from "@/state/app-state";
 import { parseStructuralCommands } from "@/state/structural-commands";
 import { parseCampaignQuery } from "@/state/parse-campaign-filter";
+import { decideEnterAction } from "@/state/prompt-bar-enter";
+import { applyDraftToNode } from "@/state/apply-draft";
+import { useDraftQueue } from "@/state/draft-queue-context";
 import { useWelcomeChat } from "@/sections/welcome/welcome-chat-context";
 import { OnboardingChatChips } from "@/sections/welcome/onboarding-chat-view";
 import { CampaignsPromptChips } from "@/sections/campaigns/campaigns-prompt-chips";
@@ -126,6 +129,7 @@ export function ShellBottomBar() {
   } = state;
   const welcomeChat = useWelcomeChat();
   const chipsApi = usePromptChips();
+  const { drafts: draftsRef, clearQueue } = useDraftQueue();
   const { openSidebar } = useChat();
 
   const editorRef = useRef<ChipEditableInputHandle>(null);
@@ -133,6 +137,20 @@ export function ShellBottomBar() {
   function handlePromptSubmit(message: PromptInputMessage) {
     const rawText = message.text ?? "";
     const segments = editorRef.current?.getSegments() ?? [];
+
+    const decision = decideEnterAction({
+      hasActiveTag: segments.length > 0,
+      activeTagFromQueue: false,
+      activeText: rawText,
+      queueLength: draftsRef.length,
+    });
+    if (decision.kind === "apply-all") {
+      for (const d of draftsRef) applyDraftToNode(dispatch, d.chip, d.text);
+      clearQueue();
+      chipsApi.clearChips();
+      editorRef.current?.clear();
+      return;
+    }
 
     if (isOnWelcome(state)) {
       welcomeChat?.submitFreeText(rawText);
