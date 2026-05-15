@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useLayoutEffect } from "react";
-import { motion } from "motion/react";
+import { motion, AnimatePresence } from "motion/react";
 import { useChat } from "@/state/chat-context";
 import { ChatPanelHeader } from "./chat-panel-header";
 import { ChatHistoryList } from "./chat-history-list";
@@ -39,27 +39,30 @@ export function ChatDrawer({ placeholder }: { placeholder: string }) {
     };
   }, [isSidebar]);
 
-  if (!isSidebar) return null;
-
   return (
-    <motion.aside
-      initial={{ x: "100%" }}
-      animate={{ x: 0 }}
-      exit={{ x: "100%" }}
-      transition={{ duration: 0.46, ease: [0.16, 1, 0.3, 1] }}
-      className="fixed right-0 top-0 z-30 flex h-screen w-[420px] flex-col gap-3 border-l border-white/10 bg-[rgba(10,10,10,0.85)] p-4 backdrop-blur-[2px]"
-    >
-      <ChatPanelHeader
-        mode={chat.mode}
-        onOpenSidebar={chat.openSidebar}
-        onCloseSidebar={chat.closeSidebar}
-      />
-      {chat.messages.length === 0 ? (
-        <EmptyHistory />
-      ) : (
-        <ChatHistoryList messages={chat.messages} />
+    <AnimatePresence>
+      {isSidebar && (
+        <motion.aside
+          key="chat-drawer"
+          initial={{ x: "100%" }}
+          animate={{ x: 0 }}
+          exit={{ x: "100%" }}
+          transition={{ duration: 0.46, ease: [0.16, 1, 0.3, 1] }}
+          className="fixed right-0 top-0 z-30 flex h-screen w-[420px] flex-col gap-3 border-l border-white/10 bg-[rgba(10,10,10,0.85)] p-4 backdrop-blur-[2px]"
+        >
+          <ChatPanelHeader
+            mode={chat.mode}
+            onOpenSidebar={chat.openSidebar}
+            onCloseSidebar={chat.closeSidebar}
+          />
+          {chat.messages.length === 0 ? (
+            <EmptyHistory />
+          ) : (
+            <ChatHistoryList messages={chat.messages} />
+          )}
+          <ChatComposer placeholder={placeholder} onSubmit={submit} />
+        </motion.aside>
       )}
-      <ChatComposer placeholder={placeholder} onSubmit={submit} />
-    </motion.aside>
+    </AnimatePresence>
   );
 }
