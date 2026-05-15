@@ -26,6 +26,7 @@ import {
   type TriggerDelta,
 } from "@/lib/trigger-edit-parser";
 import { usePromptChips } from "@/state/prompt-chips-context";
+import { usePromptInputController } from "@/components/ai-elements/prompt-input";
 import { useRegisterTriggerEdit, type TriggerEditApi } from "@/state/trigger-edit-context";
 import { computeRandomRemix } from "@/lib/random-remix";
 import { cn } from "@/lib/utils";
@@ -411,6 +412,7 @@ export function Step2Interests({ data, onNext }: StepProps) {
   const { clientDirection, wizardRemixToken } = useAppState();
   const dispatch = useAppDispatch();
   const { pushChip, clearChips } = usePromptChips();
+  const { textInput } = usePromptInputController();
   const vertical = useMemo(
     () => resolveVertical(clientDirection),
     [clientDirection]
@@ -510,7 +512,7 @@ export function Step2Interests({ data, onNext }: StepProps) {
   // domains can be excluded, new ones added); clicking again deselects it
   // (collapsed to a read-only domain preview). There is no separate
   // expand/collapse control. The trigger chip enters the prompt bar only via
-  // the explicit "Добавить свой домен" button (onAddDomain → pushTriggerChip).
+  // the explicit "Добавить свой домен" button (onAddDomain → handleAddDomain).
   function toggleTriggerSelection(triggerId: string) {
     setSelectedTriggers((prev) =>
       prev.includes(triggerId)
@@ -599,12 +601,14 @@ export function Step2Interests({ data, onNext }: StepProps) {
   }
 
   // M2.4 (revised) — "Добавить свой домен" pulls the TRIGGER NAME into the
-  // prompt bar as a `trigger` chip and focuses the editor. The user then types
-  // the domain; the existing parseTriggerCommand understands «добавь domain.ru»
-  // and useChatSubmit routes `trigger` chips through triggerEdit.applyToTrigger
-  // — so the AI-path consumes this with no parser change. A stable id means
-  // re-clicking the same trigger refreshes the chip rather than stacking.
-  function pushTriggerChip(triggerId: string, triggerLabel: string) {
+  // prompt bar as a `trigger` chip, then pre-fills "добавь домен " AFTER the
+  // tag so the user only needs to type the domain. The chip lands in the
+  // contenteditable via an effect on the next commit, so the text insertion is
+  // deferred one frame to land after the chip (not before it). The full
+  // «добавь домен X.ru» is parsed by parseTriggerCommand into an add-edit, and
+  // useChatSubmit routes `trigger` chips through triggerEdit.applyToTrigger —
+  // no parser change. A stable chip id means re-clicking refreshes, not stacks.
+  function handleAddDomain(triggerId: string, triggerLabel: string) {
     pushChip({
       id: `trigger_${triggerId}`,
       kind: "trigger",
@@ -612,8 +616,16 @@ export function Step2Interests({ data, onNext }: StepProps) {
       payload: triggerId,
       removable: true,
     });
-    const el = document.querySelector<HTMLDivElement>('[role="textbox"][contenteditable="true"]');
+    const el = document.querySelector<HTMLDivElement>(
+      '[role="textbox"][contenteditable="true"]'
+    );
     el?.focus();
+    requestAnimationFrame(() => {
+      textInput.insertAtCursor("добавь домен ", {
+        separator: "smart",
+        preserveTags: true,
+      });
+    });
   }
 
   // ---- TriggerEditApi for the PromptBar bridge ----
@@ -751,7 +763,7 @@ export function Step2Interests({ data, onNext }: StepProps) {
                   onRestoreSystemDomain={(domain) =>
                     handleRestoreSystemDomain(trigger.id, domain)
                   }
-                  onAddDomain={() => pushTriggerChip(trigger.id, trigger.label)}
+                  onAddDomain={() => handleAddDomain(trigger.id, trigger.label)}
                 />
               ))}
             </div>
