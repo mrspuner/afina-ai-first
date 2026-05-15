@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Check, ChevronDown, Plus, Minus, X } from "lucide-react";
+import { Check, ChevronDown, Plus, Minus, X, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StepContent } from "@/sections/signals/steps/step-content";
 import { StepProps } from "@/types/campaign";
@@ -206,7 +206,9 @@ function DeltaChip({
           : "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-300"
       )}
     >
-      {domain}
+      <span className={cn(variant === "excluded" && "line-through")}>
+        {domain}
+      </span>
       <button
         type="button"
         onClick={onRemove}
@@ -230,6 +232,8 @@ interface TriggerCardProps {
   onToggleExpanded: () => void;
   onCheckboxToggle: () => void;
   onRemoveDelta: (bucket: "added" | "excluded", domain: string) => void;
+  onExcludeSystemDomain: (domain: string) => void;
+  onRestoreSystemDomain: (domain: string) => void;
 }
 
 function DeltaBlock({
@@ -279,6 +283,51 @@ function DeltaBlock({
   );
 }
 
+/**
+ * Chip for a SYSTEM domain in the expanded trigger card.
+ *  - active   → neutral chip with ✕; ✕ excludes the domain (reversible).
+ *  - excluded → struck-through red chip with ↩; click restores the domain.
+ * System data is never deleted — exclusion lives in the user-layer delta.
+ */
+function SystemDomainChip({
+  domain,
+  excluded,
+  onExclude,
+  onRestore,
+}: {
+  domain: string;
+  excluded: boolean;
+  onExclude: () => void;
+  onRestore: () => void;
+}) {
+  if (excluded) {
+    return (
+      <button
+        type="button"
+        onClick={onRestore}
+        aria-label={`Вернуть ${domain}`}
+        className="inline-flex items-center gap-1 rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-0.5 font-mono text-xs text-rose-700 transition-colors hover:bg-rose-500/20 dark:text-rose-300"
+      >
+        <span className="line-through">{domain}</span>
+        <Undo2 className="h-3 w-3 opacity-70" />
+      </button>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2 py-0.5 font-mono text-xs text-foreground/85">
+      {domain}
+      <button
+        type="button"
+        onClick={onExclude}
+        aria-label={`Исключить ${domain}`}
+        className="opacity-50 transition-opacity hover:opacity-100"
+      >
+        <X className="h-3 w-3" />
+      </button>
+    </span>
+  );
+}
+
 function TriggerCard({
   trigger,
   domains,
@@ -290,10 +339,11 @@ function TriggerCard({
   onToggleExpanded,
   onCheckboxToggle,
   onRemoveDelta,
+  onExcludeSystemDomain,
+  onRestoreSystemDomain,
 }: TriggerCardProps) {
   const hasDelta = selected && !isDeltaEmpty(delta);
   // System domains split into still-active vs user-excluded (reversible).
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { active: activeSystemDomains, excluded: excludedSystemDomains } =
     splitSystemDomains(domains, delta);
   // Collapsed one-line preview: first PREVIEW_VISIBLE_COUNT active domains + "+N".
@@ -388,14 +438,34 @@ function TriggerCard({
           )}
 
           {showExpandedDomains && (
-            <ul className="flex flex-wrap gap-x-3 gap-y-1 font-mono text-sm tracking-tight text-foreground/85">
+            <div className="flex flex-wrap items-center gap-1.5">
               {domains.map((d) => (
-                <li key={d}>{d}</li>
+                <SystemDomainChip
+                  key={`sys-${d}`}
+                  domain={d}
+                  excluded={excludedSystemDomains.some(
+                    (e) => e.toLowerCase() === d.toLowerCase()
+                  )}
+                  onExclude={() => onExcludeSystemDomain(d)}
+                  onRestore={() => onRestoreSystemDomain(d)}
+                />
               ))}
-            </ul>
+              {delta.added.map((d) => (
+                <DeltaChip
+                  key={`add-${d}`}
+                  domain={d}
+                  variant="added"
+                  onRemove={() => onRemoveDelta("added", d)}
+                />
+              ))}
+            </div>
           )}
 
-          {hasDelta && <DeltaBlock delta={delta} onRemoveDelta={onRemoveDelta} />}
+          {/* Collapsed card: delta summary line. Expanded card shows added/
+              excluded inline as chips above, so DeltaBlock is collapsed-only. */}
+          {hasDelta && !expanded && (
+            <DeltaBlock delta={delta} onRemoveDelta={onRemoveDelta} />
+          )}
         </div>
       )}
     </div>
@@ -586,6 +656,33 @@ export function Step2Interests({ data, onNext }: StepProps) {
     });
   }
 
+  // M2.3 — Exclude a SYSTEM domain. System data is never deleted: this only
+  // appends the domain to the user-layer `excluded` delta (reversible).
+  function handleExcludeSystemDomain(triggerId: string, domain: string) {
+    setSelectedTriggers((prev) =>
+      prev.includes(triggerId) ? prev : [...prev, triggerId]
+    );
+    setDeltas((prev) => {
+      const current = prev[triggerId] ?? EMPTY_DELTA;
+      const updated = applyEditToDelta(current, [], [domain]);
+      const next = { ...prev };
+      if (isDeltaEmpty(updated)) delete next[triggerId];
+      else next[triggerId] = updated;
+      return next;
+    });
+  }
+
+  // M2.3 — Restore a previously-excluded system domain: drop it from the
+  // `excluded` delta. The system domain reappears as a normal active chip.
+  function handleRestoreSystemDomain(triggerId: string, domain: string) {
+    setDeltas((prev) => {
+      const current = prev[triggerId] ?? EMPTY_DELTA;
+      const next = removeFromDelta(current, "excluded", domain);
+      if (isDeltaEmpty(next)) return omitKey(prev, triggerId);
+      return { ...prev, [triggerId]: next };
+    });
+  }
+
   // ---- Chip helpers ----
 
   function pushSectionChip(section: "interests" | "triggers") {
@@ -742,6 +839,12 @@ export function Step2Interests({ data, onNext }: StepProps) {
                   onCheckboxToggle={() => toggleTriggerSelection(trigger.id)}
                   onRemoveDelta={(bucket, domain) =>
                     handleRemoveDelta(trigger.id, bucket, domain)
+                  }
+                  onExcludeSystemDomain={(domain) =>
+                    handleExcludeSystemDomain(trigger.id, domain)
+                  }
+                  onRestoreSystemDomain={(domain) =>
+                    handleRestoreSystemDomain(trigger.id, domain)
                   }
                 />
               ))}
