@@ -10,6 +10,8 @@ import {
   DEFAULT_DIRECTION_ID,
   businessDirectionFromSurvey,
 } from "@/data/business-directions";
+import type { AccountSettings } from "@/types/account-settings";
+import { DEMO_ACCOUNT_SETTINGS } from "@/types/account-settings";
 
 export type SignalType =
   | "Регистрация"
@@ -79,7 +81,7 @@ export type Preset = {
   campaigns: Campaign[];
 };
 
-export type SectionName = "Статистика" | "Сигналы" | "Кампании";
+export type SectionName = "Статистика" | "Сигналы" | "Кампании" | "Настройки";
 
 export type View =
   | { kind: "welcome" }
@@ -119,6 +121,8 @@ export type AppState = {
   // Owned by feature/anketa worktree (B):
   survey: Survey;
   surveyStatus: SurveyStatus;
+  // Owned by feature/m4-settings-section worktree:
+  accountSettings: AccountSettings;
   // Owned by feature/signal-flow worktree (E):
   balance: number;
   notifications: { signalsBadge: boolean };
@@ -204,6 +208,7 @@ export type Action =
   | { type: "survey_completed"; survey: Survey }
   | { type: "survey_skipped" }
   | { type: "survey_reset" }
+  | { type: "settings_updated"; patch: Partial<AccountSettings> }
   | { type: "dev_survey_force_complete" }
   | { type: "balance_topup"; amount: number }
   | { type: "signal_status_changed"; id: string; status: SignalStatus }
@@ -234,6 +239,7 @@ export const initialState: AppState = {
   clientDirection: "finance",
   survey: EMPTY_SURVEY,
   surveyStatus: "not_started",
+  accountSettings: DEMO_ACCOUNT_SETTINGS,
   balance: 0,
   notifications: { signalsBadge: false },
   wizardSessionId: 0,
@@ -712,6 +718,12 @@ export function appReducer(state: AppState, action: Action): AppState {
 
     case "wizard_random_remix":
       return { ...state, wizardRemixToken: state.wizardRemixToken + 1 };
+
+    case "settings_updated":
+      return {
+        ...state,
+        accountSettings: { ...state.accountSettings, ...action.patch },
+      };
     // PARALLEL-WORTREE INSERTION POINT — append survey/billing/signal-status cases
     // immediately above this comment to keep merges trivial.
   }

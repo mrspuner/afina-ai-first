@@ -20,6 +20,7 @@ import { CampaignsSection } from "@/sections/campaigns/campaigns-section";
 import { CampaignTypeView } from "@/sections/campaigns/campaign-type-view";
 import { WorkflowSection } from "@/sections/campaigns/workflow-section";
 import { StatisticsSection } from "@/sections/statistics/statistics-section";
+import { SettingsSection } from "@/sections/settings/settings-section";
 import { DevPanel } from "@/components/dev/dev-panel";
 
 function BottomBarSlot() {
@@ -56,6 +57,7 @@ export default function Home() {
       if (view.name === "Статистика") return <StatisticsSection />;
       if (view.name === "Сигналы") return <SignalsSection />;
       if (view.name === "Кампании") return <CampaignsSection />;
+      if (view.name === "Настройки") return <SettingsSection />;
     }
     return null;
   }
