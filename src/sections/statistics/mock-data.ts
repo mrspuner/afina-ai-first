@@ -13,6 +13,7 @@ import type {
   ColumnKey,
   Currency,
   RowKind,
+  SortState,
   StatisticsFilters,
 } from "./statistics-state";
 
@@ -264,6 +265,39 @@ function labelsForKind(kind: RowKind, period: DateRange): LabeledKey[] {
   }));
 }
 
+/**
+ * Превращает значение ячейки (число или денежная/процентная строка вида
+ * "1 200,50 ₽" / "3.50%") в число для сравнения. Нечисловые остатки
+ * отбрасываются, запятая трактуется как десятичный разделитель.
+ */
+function numericCellValue(data: RowData, column: ColumnKey): number {
+  const raw = data[column];
+  if (typeof raw === "number") return raw;
+  const cleaned = raw
+    .replace(/\s/g, "")
+    .replace(/[^\d,.-]/g, "")
+    .replace(",", ".");
+  const n = Number.parseFloat(cleaned);
+  return Number.isFinite(n) ? n : 0;
+}
+
+/**
+ * Сортирует топ-уровневые строки отчёта по выбранной колонке.
+ * sort: null оставляет исходный порядок. Не мутирует вход.
+ */
+export function sortRows(
+  rows: GeneratedRow[],
+  sort: SortState | null,
+): GeneratedRow[] {
+  if (!sort) return rows;
+  const factor = sort.direction === "asc" ? 1 : -1;
+  return [...rows].sort((a, b) => {
+    const av = numericCellValue(a.data, sort.column);
+    const bv = numericCellValue(b.data, sort.column);
+    return (av - bv) * factor;
+  });
+}
+
 export function generateRows(filters: StatisticsFilters): GeneratedRow[] {
   const period = resolvePeriod(filters.period);
   const topLabels = labelsForKind(filters.rows, period);
@@ -296,7 +330,7 @@ export function generateRows(filters: StatisticsFilters): GeneratedRow[] {
     };
   });
 
-  return rows.slice(0, Math.max(1, filters.rowCount));
+  return sortRows(rows.slice(0, Math.max(1, filters.rowCount)), filters.sort);
 }
 
 export const COLUMN_HEADERS: Record<ColumnKey, string> = {

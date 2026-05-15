@@ -66,6 +66,13 @@ export type ColumnKey =
   | "ar"
   | "rr";
 
+export type SortDirection = "asc" | "desc";
+
+export type SortState = {
+  column: ColumnKey;
+  direction: SortDirection;
+};
+
 export type SearchConditions = {
   include: Record<string, string[]>;
   exclude: Record<string, string[]>;
@@ -80,6 +87,7 @@ export type StatisticsFilters = {
   subRows: RowKind | "none";
   columns: ColumnKey[];
   conditions: SearchConditions;
+  sort: SortState | null;
 };
 
 export const DEFAULT_FILTERS: StatisticsFilters = {
@@ -100,6 +108,7 @@ export const DEFAULT_FILTERS: StatisticsFilters = {
     "actions",
   ],
   conditions: { include: {}, exclude: {} },
+  sort: null,
 };
 
 export type StatisticsAction =
@@ -117,6 +126,7 @@ export type StatisticsAction =
       entity: string;
       values: string[];
     }
+  | { type: "SET_SORT"; sort: SortState | null }
   | { type: "RESET"; filters: StatisticsFilters };
 
 export function statisticsReducer(
@@ -158,6 +168,8 @@ export function statisticsReducer(
           },
         },
       };
+    case "SET_SORT":
+      return { ...state, sort: action.sort };
     case "RESET":
       return action.filters;
   }
