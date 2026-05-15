@@ -21,10 +21,10 @@ import {
   ChipEditableInput,
   type ChipEditableInputHandle,
 } from "@/components/ai-elements/chip-editable-input";
-import type { ChipSegment } from "@/state/prompt-chips-context";
+import type { ChipSegment, PromptChip } from "@/state/prompt-chips-context";
 import { usePromptChips } from "@/state/prompt-chips-context";
 import { useDraftQueue, type Draft } from "@/state/draft-queue-context";
-import { decideEnterAction } from "@/state/prompt-bar-enter";
+import { decideEnterAction, APPLY_ALL_COMMAND } from "@/state/prompt-bar-enter";
 import { applyDraftToNode } from "@/state/apply-draft";
 import { useAppDispatch } from "@/state/app-state-context";
 import { cn } from "@/lib/utils";
@@ -37,11 +37,17 @@ export interface ChatComposerSubmitPayload {
 export interface ChatComposerHandle {
   /** Загружает черновик из очереди обратно в инпут (клик по карточке). */
   loadDraft: (draft: Draft) => void;
+  /** Вставляет полный текст подсказки в инпут после тега (M6.3). */
+  insertSuggestion: (fullText: string) => void;
+  /** Подставляет команду «Применить все изменения» в инпут (M5.6/M6). */
+  insertApplyAllCommand: () => void;
 }
 
 interface ChatComposerProps {
   placeholder: string;
   onSubmit: (payload: ChatComposerSubmitPayload) => void;
+  /** Сообщает родителю текущий активный тег и печатается ли текст после него. */
+  onActiveTagChange?: (info: { tag: PromptChip | null; hasTypedText: boolean }) => void;
 }
 
 /**
@@ -57,7 +63,7 @@ interface ChatComposerProps {
  * через `onTagSwap` и паркует предыдущую пару (тег + текст) в очередь.
  */
 export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(
-  function ChatComposer({ placeholder, onSubmit }, ref) {
+  function ChatComposer({ placeholder, onSubmit, onActiveTagChange }, ref) {
     const editorRef = useRef<ChipEditableInputHandle>(null);
     const { chips, pushChip, removeChip, clearChips } = usePromptChips();
     const { drafts, parkDraft, removeDraft, clearQueue } = useDraftQueue();
@@ -77,6 +83,17 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(
       const seg = editorRef.current?.getActiveSegment() ?? null;
       if (seg) prevActiveRef.current = seg;
     }, [chips]);
+
+    // Сообщаем родителю об активном теге и наличии текста после него (M6).
+    // textInput.value — реактивное значение; меняется при каждом вводе символа.
+    const { textInput } = controller;
+    useEffect(() => {
+      const seg = editorRef.current?.getActiveSegment() ?? null;
+      onActiveTagChange?.({
+        tag: seg ? seg.chip : null,
+        hasTypedText: seg ? seg.text.trim().length > 0 : false,
+      });
+    }, [chips, textInput.value, onActiveTagChange]);
 
     /** Паркует предыдущий активный тег при смене тега (вызов из onTagSwap). */
     function parkPreviousIfNeeded() {
@@ -176,6 +193,20 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(
       () => ({
         loadDraft(draft: Draft) {
           loadInto(draft);
+        },
+        insertSuggestion(fullText: string) {
+          // Текст подставляется ПОСЛЕ тега, не выполняется автоматически.
+          controller.textInput.insertAtCursor(fullText, {
+            separator: "smart",
+            preserveTags: true,
+          });
+          editorRef.current?.focus();
+        },
+        insertApplyAllCommand() {
+          editorRef.current?.clear();
+          clearChips();
+          controller.textInput.insertAtCursor(APPLY_ALL_COMMAND, { separator: "none" });
+          editorRef.current?.focus();
         },
       }),
       // loadInto closes over stable callbacks + refs; recreated each render

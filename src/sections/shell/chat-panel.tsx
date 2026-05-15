@@ -1,12 +1,14 @@
 "use client";
 
-import { useMemo, useRef, useState, useEffect } from "react";
+import { useMemo, useRef, useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { useChat, type ChatMessage } from "@/state/chat-context";
 import { ChatComposer, type ChatComposerHandle } from "./chat-composer";
 import { PromptBar } from "./prompt-bar";
 import { useChatSubmit } from "./use-chat-submit";
 import { DraftQueueList } from "./draft-queue-list";
+import { SuggestionBar } from "./suggestion-bar";
+import type { PromptChip } from "@/state/prompt-chips-context";
 
 const TRANSIENT_REPLY_LINGER_MS = 3500;
 
@@ -71,6 +73,21 @@ export function ChatPanel({ placeholder }: { placeholder: string }) {
   const chat = useChat();
   const { submit } = useChatSubmit();
   const composerRef = useRef<ChatComposerHandle>(null);
+  const [activeInfo, setActiveInfo] = useState<{
+    tag: PromptChip | null;
+    hasTypedText: boolean;
+  }>({ tag: null, hasTypedText: false });
+
+  const handleActiveTagChange = useCallback(
+    (info: { tag: PromptChip | null; hasTypedText: boolean }) => {
+      setActiveInfo((prev) =>
+        prev.tag === info.tag && prev.hasTypedText === info.hasTypedText
+          ? prev
+          : info
+      );
+    },
+    []
+  );
 
   return (
     <PromptBar
@@ -85,7 +102,21 @@ export function ChatPanel({ placeholder }: { placeholder: string }) {
         </>
       }
     >
-      <ChatComposer ref={composerRef} placeholder={placeholder} onSubmit={submit} />
+      <ChatComposer
+        ref={composerRef}
+        placeholder={placeholder}
+        onSubmit={submit}
+        onActiveTagChange={handleActiveTagChange}
+      />
+      <SuggestionBar
+        activeTag={activeInfo.tag}
+        hasTypedText={activeInfo.hasTypedText}
+        isWelcome={false}
+        onPickSuggestion={(fullText) =>
+          composerRef.current?.insertSuggestion(fullText)
+        }
+        onPickApplyAll={() => composerRef.current?.insertApplyAllCommand()}
+      />
     </PromptBar>
   );
 }
