@@ -6,7 +6,8 @@ import {
   ChevronsUpDown,
   Download,
   RefreshCw,
-  Settings2,
+  Search,
+  SlidersHorizontal,
 } from "lucide-react";
 import { Fragment, useMemo, useReducer, useState } from "react";
 
@@ -36,7 +37,10 @@ import {
   BUILTIN_TEMPLATES,
   type ReportTemplate,
 } from "./report-templates";
-import { StatisticsSettingsDrawer } from "./statistics-settings-drawer";
+import { DrillInPopover } from "./drill-in-popover";
+import { buildViewSettingsLevel } from "./view-settings-levels";
+import { buildSearchSettingsLevel } from "./search-settings-levels";
+import { SaveTemplatePopover } from "./save-template-dialog";
 import {
   filtersEqual,
   statisticsReducer,
@@ -132,7 +136,6 @@ export function StatisticsView({ campaignId }: { campaignId?: string } = {}) {
   );
 
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
-  const [drawerOpen, setDrawerOpen] = useState(false);
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -176,10 +179,9 @@ export function StatisticsView({ campaignId }: { campaignId?: string } = {}) {
     setTemplatePickerOpen(false);
   }
 
-  function handleApply() {
+  function handleSave() {
     setApplied(draft);
     setExpandedKeys(new Set());
-    setDrawerOpen(false);
   }
 
   function handleSaveTemplate(name: string) {
@@ -198,7 +200,6 @@ export function StatisticsView({ campaignId }: { campaignId?: string } = {}) {
     setActiveTemplateId(id);
     setApplied(draft);
     setExpandedKeys(new Set());
-    setDrawerOpen(false);
   }
 
   function handleRefresh() {
@@ -328,19 +329,36 @@ export function StatisticsView({ campaignId }: { campaignId?: string } = {}) {
             onClick={handleRefresh}
             aria-label="Обновить"
           >
-            <RefreshCw
-              className={cn("h-4 w-4", refreshing && "animate-spin")}
-            />
+            <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} />
           </Button>
           <Separator orientation="vertical" className="h-5" />
-          <Button
-            variant="default"
-            size="icon"
-            onClick={() => setDrawerOpen(true)}
-            aria-label="Настройки отчёта"
-          >
-            <Settings2 className="h-4 w-4" />
-          </Button>
+          <DrillInPopover
+            trigger={
+              <>
+                <SlidersHorizontal className="h-4 w-4" />
+                Настройка вида
+              </>
+            }
+            root={buildViewSettingsLevel(draft, dispatch)}
+            dirty={dirty}
+            onSave={handleSave}
+            rootFooterExtra={
+              <SaveTemplatePopover onSave={handleSaveTemplate} disabled={!dirty}>
+                Сохранить как шаблон
+              </SaveTemplatePopover>
+            }
+          />
+          <DrillInPopover
+            trigger={
+              <>
+                <Search className="h-4 w-4" />
+                Условия поиска
+              </>
+            }
+            root={buildSearchSettingsLevel(draft, dispatch)}
+            dirty={dirty}
+            onSave={handleSave}
+          />
         </div>
       </div>
 
@@ -448,16 +466,6 @@ export function StatisticsView({ campaignId }: { campaignId?: string } = {}) {
         </table>
       </div>
 
-      <StatisticsSettingsDrawer
-        open={drawerOpen}
-        onOpenChange={setDrawerOpen}
-        template={activeTemplate}
-        draft={draft}
-        dispatch={dispatch}
-        dirty={dirty}
-        onApply={handleApply}
-        onSave={handleSaveTemplate}
-      />
     </main>
   );
 }
