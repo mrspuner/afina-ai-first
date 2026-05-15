@@ -240,7 +240,7 @@ function WorkspaceInner({
             initial={step === animatingStep ? { y: 60, opacity: 0 } : false}
             animate={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.35, ease: "easeOut" }}
-            className="flex min-h-screen flex-col items-center justify-center px-8 pb-promptbar pt-10"
+            className="flex min-h-screen shrink-0 flex-col items-center justify-center px-8 pb-promptbar pt-10"
           >
             {renderStepContent(step)}
           </motion.div>
