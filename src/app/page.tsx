@@ -4,6 +4,7 @@ import { PromptInputProvider } from "@/components/ai-elements/prompt-input";
 import { PromptChipsProvider } from "@/state/prompt-chips-context";
 import { ChatProvider } from "@/state/chat-context";
 import { TriggerEditRegistryProvider } from "@/state/trigger-edit-context";
+import { DraftQueueProvider } from "@/state/draft-queue-context";
 import { ChatPanel } from "@/sections/shell/chat-panel";
 import { ChatDrawer } from "@/sections/shell/chat-drawer";
 import { useAppState, useAppDispatch } from "@/state/app-state-context";
@@ -65,6 +66,7 @@ export default function Home() {
       <PromptChipsProvider>
       <WelcomeChatProvider value={welcomeChat}>
         <ChatProvider>
+        <DraftQueueProvider>
         <TriggerEditRegistryProvider>
         <div className="flex h-screen overflow-hidden bg-background">
           <AppSidebar
@@ -86,6 +88,7 @@ export default function Home() {
           </div>
         </div>
         </TriggerEditRegistryProvider>
+        </DraftQueueProvider>
         </ChatProvider>
       </WelcomeChatProvider>
       </PromptChipsProvider>
