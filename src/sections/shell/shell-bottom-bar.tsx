@@ -35,6 +35,7 @@ import { OnboardingChatChips } from "@/sections/welcome/onboarding-chat-view";
 import { CampaignsPromptChips } from "@/sections/campaigns/campaigns-prompt-chips";
 import { PromptBar } from "./prompt-bar";
 import { useChat } from "@/state/chat-context";
+import { DraftQueueList } from "./draft-queue-list";
 
 function AttachmentFileList() {
   const { files } = usePromptInputAttachments();
@@ -200,33 +201,36 @@ export function ShellBottomBar() {
       <PromptBar
         onOpenDrawer={openSidebar}
         slot={
-          view.kind === "guided-signal" &&
-          wizardCurrentStep === 5 &&
-          budgetHelpShown ? (
-            <motion.div
-              key="budget-help-answer"
-              initial={{ y: 6, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ duration: 0.26, ease: [0.23, 1, 0.32, 1] }}
-              data-testid="budget-help-answer"
-              className="flex items-start gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/80"
-            >
-              <Image
-                src="/mascot-icon.svg"
-                alt=""
-                width={16}
-                height={16}
-                className="mt-0.5 shrink-0"
-                aria-hidden
-              />
-              <span className="leading-snug">
-                Рекомендуемая сумма рассчитана из размера вашей базы и средних
-                цен по сегментам. Мы заложили её так, чтобы хватило на полный
-                цикл сбора сигналов без перерасхода — обычно это 5–35% от
-                размера базы в рублях.
-              </span>
-            </motion.div>
-          ) : undefined
+          <>
+            <DraftQueueList variant="compact" onTakeDraft={() => {}} />
+            {view.kind === "guided-signal" &&
+            wizardCurrentStep === 5 &&
+            budgetHelpShown ? (
+              <motion.div
+                key="budget-help-answer"
+                initial={{ y: 6, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ duration: 0.26, ease: [0.23, 1, 0.32, 1] }}
+                data-testid="budget-help-answer"
+                className="flex items-start gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/80"
+              >
+                <Image
+                  src="/mascot-icon.svg"
+                  alt=""
+                  width={16}
+                  height={16}
+                  className="mt-0.5 shrink-0"
+                  aria-hidden
+                />
+                <span className="leading-snug">
+                  Рекомендуемая сумма рассчитана из размера вашей базы и средних
+                  цен по сегментам. Мы заложили её так, чтобы хватило на полный
+                  цикл сбора сигналов без перерасхода — обычно это 5–35% от
+                  размера базы в рублях.
+                </span>
+              </motion.div>
+            ) : undefined}
+          </>
         }
       >
         <PromptInput

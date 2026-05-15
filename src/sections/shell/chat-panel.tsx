@@ -6,6 +6,7 @@ import { useChat, type ChatMessage } from "@/state/chat-context";
 import { ChatComposer } from "./chat-composer";
 import { PromptBar } from "./prompt-bar";
 import { useChatSubmit } from "./use-chat-submit";
+import { DraftQueueList } from "./draft-queue-list";
 
 const TRANSIENT_REPLY_LINGER_MS = 3500;
 
@@ -73,7 +74,12 @@ export function ChatPanel({ placeholder }: { placeholder: string }) {
   return (
     <PromptBar
       onOpenDrawer={chat.openSidebar}
-      slot={<TransientReply messages={chat.messages} />}
+      slot={
+        <>
+          <DraftQueueList variant="compact" onTakeDraft={() => {}} />
+          <TransientReply messages={chat.messages} />
+        </>
+      }
     >
       <ChatComposer placeholder={placeholder} onSubmit={submit} />
     </PromptBar>
