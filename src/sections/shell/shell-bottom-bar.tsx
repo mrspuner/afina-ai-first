@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getNodeColor } from "@/sections/campaigns/node-visuals";
-import type { NodeTagPayload } from "@/state/prompt-chips-context";
+import type { NodeTagPayload, PromptChip } from "@/state/prompt-chips-context";
 import { motion } from "motion/react";
 import Image from "next/image";
 import { Mic } from "lucide-react";
@@ -15,6 +15,7 @@ import {
   PromptInputSubmit,
   PromptInputTools,
   usePromptInputAttachments,
+  usePromptInputController,
 } from "@/components/ai-elements/prompt-input";
 import {
   ChipEditableInput,
@@ -30,13 +31,14 @@ import {
 } from "@/state/app-state";
 import { parseStructuralCommands } from "@/state/structural-commands";
 import { parseCampaignQuery } from "@/state/parse-campaign-filter";
-import { decideEnterAction } from "@/state/prompt-bar-enter";
+import { decideEnterAction, APPLY_ALL_COMMAND } from "@/state/prompt-bar-enter";
 import { applyDraftToNode } from "@/state/apply-draft";
 import { useDraftQueue } from "@/state/draft-queue-context";
 import { useWelcomeChat } from "@/sections/welcome/welcome-chat-context";
 import { OnboardingChatChips } from "@/sections/welcome/onboarding-chat-view";
 import { CampaignsPromptChips } from "@/sections/campaigns/campaigns-prompt-chips";
 import { PromptBar } from "./prompt-bar";
+import { SuggestionBar } from "./suggestion-bar";
 import { useChat } from "@/state/chat-context";
 import { DraftQueueList } from "./draft-queue-list";
 
@@ -131,8 +133,27 @@ export function ShellBottomBar() {
   const chipsApi = usePromptChips();
   const { drafts: draftsRef, clearQueue } = useDraftQueue();
   const { openSidebar } = useChat();
+  // PromptInputProvider is mounted globally in page.tsx above ShellBottomBar,
+  // so usePromptInputController() resolves here — the controller context is
+  // created by PromptInputProvider, not by the <PromptInput> form below.
+  const { textInput } = usePromptInputController();
 
   const editorRef = useRef<ChipEditableInputHandle>(null);
+
+  // M6: mirror the editor's single active tag/text into local flags so the
+  // SuggestionBar (which picks welcome/context/apply-all) can react. The source
+  // is imperative DOM (getActiveSegment reads the contenteditable surface owned
+  // and synced by ChipEditableInput's own effect), so this external→internal
+  // sync must run in an effect — eslint-disable marks it intentional. Recomputed
+  // whenever chips or the controller text value change.
+  const [activeTag, setActiveTag] = useState<PromptChip | null>(null);
+  const [hasTypedText, setHasTypedText] = useState(false);
+  useEffect(() => {
+    const seg = editorRef.current?.getActiveSegment() ?? null;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setActiveTag(seg ? seg.chip : null);
+    setHasTypedText(seg ? seg.text.trim().length > 0 : false);
+  }, [chipsApi.chips, textInput.value]);
 
   function handlePromptSubmit(message: PromptInputMessage) {
     const rawText = message.text ?? "";
@@ -278,22 +299,43 @@ export function ShellBottomBar() {
             <PromptInputSubmit />
           </PromptInputFooter>
         </PromptInput>
-        {onWelcome && welcomeChat && (
-          <OnboardingChatChips
-            chips={welcomeChat.chips}
-            onChipClick={welcomeChat.submitChip}
-          />
-        )}
-        {view.kind === "section" && view.name === "Кампании" && campaigns.length > 0 && (
-          <CampaignsPromptChips
-            onChipClick={(text) => {
-              const { statuses, sort } = parseCampaignQuery(text);
-              if (statuses.length > 0 || sort !== "default") {
-                dispatch({ type: "campaigns_query_set", statuses, sort });
-              }
-            }}
-          />
-        )}
+        <SuggestionBar
+          activeTag={activeTag}
+          hasTypedText={hasTypedText}
+          isWelcome={
+            onWelcome || (view.kind === "section" && view.name === "Кампании")
+          }
+          welcomeSlot={
+            onWelcome && welcomeChat ? (
+              <OnboardingChatChips
+                chips={welcomeChat.chips}
+                onChipClick={welcomeChat.submitChip}
+              />
+            ) : view.kind === "section" &&
+              view.name === "Кампании" &&
+              campaigns.length > 0 ? (
+              <CampaignsPromptChips
+                onChipClick={(text) => {
+                  const { statuses, sort } = parseCampaignQuery(text);
+                  if (statuses.length > 0 || sort !== "default") {
+                    dispatch({ type: "campaigns_query_set", statuses, sort });
+                  }
+                }}
+              />
+            ) : null
+          }
+          onPickSuggestion={(fullText) => {
+            textInput.insertAtCursor(fullText, {
+              separator: "smart",
+              preserveTags: true,
+            });
+          }}
+          onPickApplyAll={() => {
+            chipsApi.clearChips();
+            editorRef.current?.clear();
+            textInput.insertAtCursor(APPLY_ALL_COMMAND, { separator: "none" });
+          }}
+        />
         {view.kind === "guided-signal" &&
           wizardCurrentStep === 5 &&
           !budgetHelpShown && (
