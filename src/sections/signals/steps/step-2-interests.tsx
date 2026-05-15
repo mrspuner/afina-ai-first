@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Check, ChevronDown, Plus, Minus, X } from "lucide-react";
+import { Check, Plus, X, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StepContent } from "@/sections/signals/steps/step-content";
 import { StepProps } from "@/types/campaign";
@@ -11,6 +11,11 @@ import { useAppState, useAppDispatch } from "@/state/app-state-context";
 import { VERTICALS, getInterestById } from "@/data/triggers-by-vertical";
 import { getInterestsForDirection } from "@/data/interests-by-direction";
 import { getTriggerDomains } from "@/data/trigger-domains";
+import {
+  PREVIEW_VISIBLE_COUNT,
+  previewDomains,
+  splitSystemDomains,
+} from "@/lib/trigger-domain-view";
 import type { Interest, Trigger, Vertical } from "@/types/directions";
 import {
   applyEditToDelta,
@@ -21,6 +26,7 @@ import {
   type TriggerDelta,
 } from "@/lib/trigger-edit-parser";
 import { usePromptChips } from "@/state/prompt-chips-context";
+import { usePromptInputController } from "@/components/ai-elements/prompt-input";
 import { useRegisterTriggerEdit, type TriggerEditApi } from "@/state/trigger-edit-context";
 import { computeRandomRemix } from "@/lib/random-remix";
 import { cn } from "@/lib/utils";
@@ -201,7 +207,9 @@ function DeltaChip({
           : "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-300"
       )}
     >
-      {domain}
+      <span className={cn(variant === "excluded" && "line-through")}>
+        {domain}
+      </span>
       <button
         type="button"
         onClick={onRemove}
@@ -220,57 +228,55 @@ interface TriggerCardProps {
   selected: boolean;
   delta: TriggerDelta;
   highlight: boolean;
-  expanded: boolean;
   onToggle: () => void;
-  onToggleExpanded: () => void;
-  onCheckboxToggle: () => void;
   onRemoveDelta: (bucket: "added" | "excluded", domain: string) => void;
+  onExcludeSystemDomain: (domain: string) => void;
+  onRestoreSystemDomain: (domain: string) => void;
+  onAddDomain: () => void;
 }
 
-function DeltaBlock({
-  delta,
-  onRemoveDelta,
+/**
+ * Chip for a SYSTEM domain in the expanded trigger card.
+ *  - active   → neutral chip with ✕; ✕ excludes the domain (reversible).
+ *  - excluded → struck-through red chip with ↩; click restores the domain.
+ * System data is never deleted — exclusion lives in the user-layer delta.
+ */
+function SystemDomainChip({
+  domain,
+  excluded,
+  onExclude,
+  onRestore,
 }: {
-  delta: TriggerDelta;
-  onRemoveDelta: (bucket: "added" | "excluded", domain: string) => void;
+  domain: string;
+  excluded: boolean;
+  onExclude: () => void;
+  onRestore: () => void;
 }) {
+  if (excluded) {
+    return (
+      <button
+        type="button"
+        onClick={onRestore}
+        aria-label={`Вернуть ${domain}`}
+        className="inline-flex items-center gap-1 rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-0.5 font-mono text-xs text-rose-700 transition-colors hover:bg-rose-500/20 dark:text-rose-300"
+      >
+        <span className="line-through">{domain}</span>
+        <Undo2 className="h-3 w-3 opacity-70" />
+      </button>
+    );
+  }
   return (
-    <div className="flex flex-col gap-2">
-      {delta.added.length > 0 && (
-        <div className="flex items-start gap-2 text-xs">
-          <span className="mt-0.5 inline-flex items-center gap-1 font-medium text-muted-foreground">
-            <Plus className="h-3 w-3" /> Добавлено
-          </span>
-          <div className="flex flex-wrap gap-1.5">
-            {delta.added.map((d) => (
-              <DeltaChip
-                key={`add-${d}`}
-                domain={d}
-                variant="added"
-                onRemove={() => onRemoveDelta("added", d)}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-      {delta.excluded.length > 0 && (
-        <div className="flex items-start gap-2 text-xs">
-          <span className="mt-0.5 inline-flex items-center gap-1 font-medium text-muted-foreground">
-            <Minus className="h-3 w-3" /> Исключено
-          </span>
-          <div className="flex flex-wrap gap-1.5">
-            {delta.excluded.map((d) => (
-              <DeltaChip
-                key={`exc-${d}`}
-                domain={d}
-                variant="excluded"
-                onRemove={() => onRemoveDelta("excluded", d)}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
+    <span className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2 py-0.5 font-mono text-xs text-foreground/85">
+      {domain}
+      <button
+        type="button"
+        onClick={onExclude}
+        aria-label={`Исключить ${domain}`}
+        className="opacity-50 transition-opacity hover:opacity-100"
+      >
+        <X className="h-3 w-3" />
+      </button>
+    </span>
   );
 }
 
@@ -280,14 +286,21 @@ function TriggerCard({
   selected,
   delta,
   highlight,
-  expanded,
   onToggle,
-  onToggleExpanded,
-  onCheckboxToggle,
   onRemoveDelta,
+  onExcludeSystemDomain,
+  onRestoreSystemDomain,
+  onAddDomain,
 }: TriggerCardProps) {
-  const hasDelta = selected && !isDeltaEmpty(delta);
-  const showDomainList = expanded && domains.length > 0;
+  // Selection IS expansion: a selected trigger is highlighted, open and
+  // editable; an unselected one is collapsed to a read-only domain preview.
+  const { active: activeSystemDomains, excluded: excludedSystemDomains } =
+    splitSystemDomains(domains, delta);
+  // Collapsed preview: first PREVIEW_VISIBLE_COUNT active domains as chips + "+N".
+  const collapsedPreview = previewDomains(
+    activeSystemDomains,
+    PREVIEW_VISIBLE_COUNT
+  );
 
   return (
     <div
@@ -299,63 +312,96 @@ function TriggerCard({
         highlight && "ring-2 ring-brand transition-shadow"
       )}
     >
-      <div className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm">
-        <button
-          type="button"
-          onClick={onCheckboxToggle}
-          aria-pressed={selected}
-          aria-label={selected ? "Убрать из выбранных" : "Добавить в выбранные"}
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-pressed={selected}
+        aria-label={
+          selected ? "Свернуть и убрать триггер" : "Выбрать и раскрыть триггер"
+        }
+        className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm"
+      >
+        <span
+          aria-hidden
           className={cn(
             "flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border transition-colors",
             selected
               ? "border-primary bg-primary text-primary-foreground"
-              : "border-border bg-background hover:border-primary/60"
+              : "border-border bg-background"
           )}
         >
           {selected && <Check className="h-3 w-3" />}
-        </button>
+        </span>
+        <span
+          className={cn(
+            "flex-1 font-medium",
+            selected ? "text-foreground" : "text-muted-foreground"
+          )}
+        >
+          {trigger.label}
+        </span>
+      </button>
+
+      {/* Collapsed (unselected): read-only system-domain preview as chips +
+          "+N". Clicking it selects + expands the card — there is no separate
+          expand control. */}
+      {!selected && (
         <button
           type="button"
           onClick={onToggle}
-          className="flex flex-1 items-center gap-3 text-left"
+          aria-label="Выбрать и раскрыть триггер"
+          className="flex w-full flex-wrap items-center gap-1.5 border-t border-primary/20 bg-background/40 px-3 py-3 text-left"
         >
-          <span
-            className={cn(
-              "flex-1 font-medium",
-              selected ? "text-foreground" : "text-muted-foreground"
-            )}
-          >
-            {trigger.label}
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={onToggleExpanded}
-          aria-expanded={expanded}
-          aria-label={expanded ? "Свернуть домены" : "Показать домены"}
-          className="shrink-0 inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-        >
-          <ChevronDown
-            className={cn(
-              "h-4 w-4 transition-transform duration-200",
-              expanded && "rotate-180"
-            )}
-          />
-        </button>
-      </div>
-
-      {(showDomainList || hasDelta) && (
-        <div className="animate-in fade-in-0 slide-in-from-top-1 flex flex-col gap-3 border-t border-primary/20 bg-background/40 px-3 py-3">
-          {showDomainList && (
-            <ul className="flex flex-wrap gap-x-3 gap-y-1 font-mono text-sm tracking-tight text-foreground/85">
-              {domains.map((d) => (
-                <li key={d}>{d}</li>
-              ))}
-            </ul>
+          {collapsedPreview.visible.map((d) => (
+            <span
+              key={d}
+              className="inline-flex items-center rounded-md border border-border bg-card px-2 py-0.5 font-mono text-xs text-foreground/85"
+            >
+              {d}
+            </span>
+          ))}
+          {collapsedPreview.overflowCount > 0 && (
+            <span className="inline-flex items-center rounded-md border border-border bg-card px-2 py-0.5 text-xs text-muted-foreground">
+              +{collapsedPreview.overflowCount}
+            </span>
           )}
+        </button>
+      )}
 
-          {hasDelta && <DeltaBlock delta={delta} onRemoveDelta={onRemoveDelta} />}
+      {/* Expanded (selected): every domain as a chip. System domains carry a
+          reversible ✕; user-added domains are green chips; the dashed button
+          adds a new domain via the prompt bar. */}
+      {selected && (
+        <div className="animate-in fade-in-0 slide-in-from-top-1 border-t border-primary/20 bg-background/40 px-3 py-3">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {domains.map((d) => (
+              <SystemDomainChip
+                key={`sys-${d}`}
+                domain={d}
+                excluded={excludedSystemDomains.some(
+                  (e) => e.toLowerCase() === d.toLowerCase()
+                )}
+                onExclude={() => onExcludeSystemDomain(d)}
+                onRestore={() => onRestoreSystemDomain(d)}
+              />
+            ))}
+            {delta.added.map((d) => (
+              <DeltaChip
+                key={`add-${d}`}
+                domain={d}
+                variant="added"
+                onRemove={() => onRemoveDelta("added", d)}
+              />
+            ))}
+            <button
+              type="button"
+              onClick={onAddDomain}
+              className="inline-flex items-center gap-1 rounded-md border border-dashed border-border px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:border-brand/40 hover:text-foreground"
+            >
+              <Plus className="h-3 w-3" />
+              Добавить свой домен
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -365,7 +411,8 @@ function TriggerCard({
 export function Step2Interests({ data, onNext }: StepProps) {
   const { clientDirection, wizardRemixToken } = useAppState();
   const dispatch = useAppDispatch();
-  const { pushChip, removeChip, clearChips } = usePromptChips();
+  const { pushChip, clearChips } = usePromptChips();
+  const { textInput } = usePromptInputController();
   const vertical = useMemo(
     () => resolveVertical(clientDirection),
     [clientDirection]
@@ -430,9 +477,6 @@ export function Step2Interests({ data, onNext }: StepProps) {
     initialPrefill.triggerIds
   );
   const [deltas, setDeltas] = useState<Record<string, TriggerDelta>>({});
-  const [expandedTriggerIds, setExpandedTriggerIds] = useState<Set<string>>(
-    () => new Set()
-  );
   const [highlightedTriggerIds, setHighlightedTriggerIds] = useState<
     Set<string>
   >(() => new Set());
@@ -463,6 +507,12 @@ export function Step2Interests({ data, onNext }: StepProps) {
     );
   }
 
+  // M2 (revised) — Selection IS expansion. A trigger has a single interactive
+  // state: clicking the card selects it (highlighted, open, editable — system
+  // domains can be excluded, new ones added); clicking again deselects it
+  // (collapsed to a read-only domain preview). There is no separate
+  // expand/collapse control. The trigger chip enters the prompt bar only via
+  // the explicit "Добавить свой домен" button (onAddDomain → handleAddDomain).
   function toggleTriggerSelection(triggerId: string) {
     setSelectedTriggers((prev) =>
       prev.includes(triggerId)
@@ -471,45 +521,12 @@ export function Step2Interests({ data, onNext }: StepProps) {
     );
   }
 
-  function toggleExpanded(triggerId: string) {
-    setExpandedTriggerIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(triggerId)) next.delete(triggerId);
-      else next.add(triggerId);
-      return next;
-    });
-  }
-
-  // Click on the trigger row only toggles expansion + chip presence in the
-  // prompt bar. Selection is *not* touched here — the trigger auto-activates
-  // later, when the user submits a chat command targeting its chip (see
-  // handleApplyParsed).
-  function handleTriggerClick(triggerId: string, triggerLabel: string) {
-    const isExpanded = expandedTriggerIds.has(triggerId);
-    if (isExpanded) {
-      setExpandedTriggerIds((prev) => {
-        const next = new Set(prev);
-        next.delete(triggerId);
-        return next;
-      });
-      removeChip(`trigger_${triggerId}`);
-    } else {
-      setExpandedTriggerIds((prev) => {
-        const next = new Set(prev);
-        next.add(triggerId);
-        return next;
-      });
-      pushTriggerChip(triggerId, triggerLabel);
-    }
-  }
-
   function handleApplyParsed(
     triggerId: string,
     parsed: Exclude<ParsedTriggerCommand, { kind: "fallback" }>
   ) {
-    // Submitting a chat command for a trigger auto-activates it — clicking
-    // the card no longer toggles selection, so this is the path that flips
-    // an unchecked trigger into the campaign.
+    // Submitting a chat command for a trigger auto-activates it, so editing
+    // an unchecked trigger via the prompt bar flips it into the campaign.
     setSelectedTriggers((prev) =>
       prev.includes(triggerId) ? prev : [...prev, triggerId]
     );
@@ -543,6 +560,33 @@ export function Step2Interests({ data, onNext }: StepProps) {
     });
   }
 
+  // M2.3 — Exclude a SYSTEM domain. System data is never deleted: this only
+  // appends the domain to the user-layer `excluded` delta (reversible).
+  function handleExcludeSystemDomain(triggerId: string, domain: string) {
+    setSelectedTriggers((prev) =>
+      prev.includes(triggerId) ? prev : [...prev, triggerId]
+    );
+    setDeltas((prev) => {
+      const current = prev[triggerId] ?? EMPTY_DELTA;
+      const updated = applyEditToDelta(current, [], [domain]);
+      const next = { ...prev };
+      if (isDeltaEmpty(updated)) delete next[triggerId];
+      else next[triggerId] = updated;
+      return next;
+    });
+  }
+
+  // M2.3 — Restore a previously-excluded system domain: drop it from the
+  // `excluded` delta. The system domain reappears as a normal active chip.
+  function handleRestoreSystemDomain(triggerId: string, domain: string) {
+    setDeltas((prev) => {
+      const current = prev[triggerId] ?? EMPTY_DELTA;
+      const next = removeFromDelta(current, "excluded", domain);
+      if (isDeltaEmpty(next)) return omitKey(prev, triggerId);
+      return { ...prev, [triggerId]: next };
+    });
+  }
+
   // ---- Chip helpers ----
 
   function pushSectionChip(section: "interests" | "triggers") {
@@ -556,7 +600,15 @@ export function Step2Interests({ data, onNext }: StepProps) {
     });
   }
 
-  function pushTriggerChip(triggerId: string, triggerLabel: string) {
+  // M2.4 (revised) — "Добавить свой домен" pulls the TRIGGER NAME into the
+  // prompt bar as a `trigger` chip, then pre-fills "добавь домен " AFTER the
+  // tag so the user only needs to type the domain. The chip lands in the
+  // contenteditable via an effect on the next commit, so the text insertion is
+  // deferred one frame to land after the chip (not before it). The full
+  // «добавь домен X.ru» is parsed by parseTriggerCommand into an add-edit, and
+  // useChatSubmit routes `trigger` chips through triggerEdit.applyToTrigger —
+  // no parser change. A stable chip id means re-clicking refreshes, not stacks.
+  function handleAddDomain(triggerId: string, triggerLabel: string) {
     pushChip({
       id: `trigger_${triggerId}`,
       kind: "trigger",
@@ -564,8 +616,16 @@ export function Step2Interests({ data, onNext }: StepProps) {
       payload: triggerId,
       removable: true,
     });
-    const el = document.querySelector<HTMLDivElement>('[role="textbox"][contenteditable="true"]');
+    const el = document.querySelector<HTMLDivElement>(
+      '[role="textbox"][contenteditable="true"]'
+    );
     el?.focus();
+    requestAnimationFrame(() => {
+      textInput.insertAtCursor("добавь домен ", {
+        separator: "smart",
+        preserveTags: true,
+      });
+    });
   }
 
   // ---- TriggerEditApi for the PromptBar bridge ----
@@ -693,13 +753,17 @@ export function Step2Interests({ data, onNext }: StepProps) {
                   selected={selectedTriggers.includes(trigger.id)}
                   delta={deltas[trigger.id] ?? EMPTY_DELTA}
                   highlight={highlightedTriggerIds.has(trigger.id)}
-                  expanded={expandedTriggerIds.has(trigger.id)}
-                  onToggle={() => handleTriggerClick(trigger.id, trigger.label)}
-                  onToggleExpanded={() => toggleExpanded(trigger.id)}
-                  onCheckboxToggle={() => toggleTriggerSelection(trigger.id)}
+                  onToggle={() => toggleTriggerSelection(trigger.id)}
                   onRemoveDelta={(bucket, domain) =>
                     handleRemoveDelta(trigger.id, bucket, domain)
                   }
+                  onExcludeSystemDomain={(domain) =>
+                    handleExcludeSystemDomain(trigger.id, domain)
+                  }
+                  onRestoreSystemDomain={(domain) =>
+                    handleRestoreSystemDomain(trigger.id, domain)
+                  }
+                  onAddDomain={() => handleAddDomain(trigger.id, trigger.label)}
                 />
               ))}
             </div>
