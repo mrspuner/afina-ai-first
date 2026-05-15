@@ -7,6 +7,10 @@ import {
   type Signal,
   type Campaign,
 } from "./app-state";
+import {
+  DEMO_ACCOUNT_SETTINGS,
+  EMPTY_ACCOUNT_SETTINGS,
+} from "@/types/account-settings";
 
 function makeSignal(overrides: Partial<Signal> = {}): Signal {
   return {
@@ -998,5 +1002,59 @@ describe("workflow_node_field_set", () => {
       nodeId: "email",
       patch: { subject: "second" },
     });
+  });
+});
+
+describe("appReducer — settings actions", () => {
+  it("initialState carries the demo account settings", () => {
+    expect(initialState.accountSettings).toEqual(DEMO_ACCOUNT_SETTINGS);
+  });
+
+  it("settings_updated shallow-merges a single field", () => {
+    const next = appReducer(initialState, {
+      type: "settings_updated",
+      patch: { companyWebsite: "newsite.ru" },
+    });
+    expect(next.accountSettings.companyWebsite).toBe("newsite.ru");
+    // other fields untouched
+    expect(next.accountSettings.companyName).toBe(
+      DEMO_ACCOUNT_SETTINGS.companyName
+    );
+  });
+
+  it("settings_updated merges multiple fields at once", () => {
+    const next = appReducer(initialState, {
+      type: "settings_updated",
+      patch: { regions: "Казань", brandTone: "Дружелюбный" },
+    });
+    expect(next.accountSettings.regions).toBe("Казань");
+    expect(next.accountSettings.brandTone).toBe("Дружелюбный");
+  });
+
+  it("settings_updated replaces array fields wholesale", () => {
+    const next = appReducer(initialState, {
+      type: "settings_updated",
+      patch: { domainBlocklist: ["a.ru", "b.ru"] },
+    });
+    expect(next.accountSettings.domainBlocklist).toEqual(["a.ru", "b.ru"]);
+  });
+
+  it("settings_updated does not touch survey or signals slices", () => {
+    const state: AppState = {
+      ...initialState,
+      signals: [makeSignal()],
+    };
+    const next = appReducer(state, {
+      type: "settings_updated",
+      patch: { companyName: "X" },
+    });
+    expect(next.signals).toBe(state.signals);
+    expect(next.survey).toBe(state.survey);
+  });
+
+  it("EMPTY_ACCOUNT_SETTINGS has empty collections", () => {
+    expect(EMPTY_ACCOUNT_SETTINGS.interests).toEqual([]);
+    expect(EMPTY_ACCOUNT_SETTINGS.suggestedInterests).toEqual([]);
+    expect(EMPTY_ACCOUNT_SETTINGS.domainBlocklist).toEqual([]);
   });
 });
