@@ -112,19 +112,29 @@ export function WorkflowSection() {
     };
   }, [aiReply, dispatch]);
 
-  // Resolve node-command labels → ids via the current graph snapshot.
-  // Tags pointing to unknown labels are silently skipped.
+  // Resolve node-commands to node ids via the current graph snapshot. A command
+  // may carry an explicit `nodeId` (node-field/whole-node tag chips from the
+  // prompt bar — the field-name label is NOT a node label and would never
+  // match) or only a `nodeLabel` (ShellBottomBar segment path). Prefer an exact
+  // `nodeId` match; fall back to label resolution otherwise. Commands that
+  // resolve to no node are silently skipped.
   const resolvedNodeCommands = useMemo(() => {
     if (!workflowNodeCommand) return null;
     const g = graphRef.current;
     if (!g) return null;
     const resolved: Array<{ nodeId: string; text: string }> = [];
     for (const cmd of workflowNodeCommand.commands) {
-      const target = normalizeNodeRef(cmd.nodeLabel);
-      const node = g.nodes.find(
-        (n) =>
-          normalizeNodeRef((n.data as WorkflowNodeData).label) === target
-      );
+      let node: WorkflowNode | undefined;
+      if (cmd.nodeId) {
+        node = g.nodes.find((n) => n.id === cmd.nodeId);
+      }
+      if (!node && cmd.nodeLabel) {
+        const target = normalizeNodeRef(cmd.nodeLabel);
+        node = g.nodes.find(
+          (n) =>
+            normalizeNodeRef((n.data as WorkflowNodeData).label) === target
+        );
+      }
       if (node) resolved.push({ nodeId: node.id, text: cmd.text });
     }
     return resolved.length > 0 ? resolved : null;

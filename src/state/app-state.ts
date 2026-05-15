@@ -106,7 +106,7 @@ export type AppState = {
   signals: Signal[];
   campaigns: Campaign[];
   workflowCommand: string | null;
-  workflowNodeCommand: { commands: Array<{ nodeLabel: string; text: string }> } | null;
+  workflowNodeCommand: { commands: Array<{ nodeLabel?: string; nodeId?: string; text: string }> } | null;
   workflowStructuralCommands: { ops: StructuralOp[] } | null;
   selectedWorkflowNode: { id: string; label: string; nodeType?: string } | null;
   aiReply: string | null;
@@ -183,7 +183,7 @@ export type Action =
   | { type: "workflow_command_handled" }
   | { type: "workflow_node_selected"; id: string; label: string; nodeType?: string }
   | { type: "workflow_node_deselected" }
-  | { type: "workflow_node_command_submit"; commands: Array<{ nodeLabel: string; text: string }> }
+  | { type: "workflow_node_command_submit"; commands: Array<{ nodeLabel?: string; nodeId?: string; text: string }> }
   | { type: "workflow_node_command_handled" }
   | { type: "workflow_node_field_set"; nodeId: string; patch: Partial<NodeParams> }
   | { type: "workflow_node_field_set_handled" }

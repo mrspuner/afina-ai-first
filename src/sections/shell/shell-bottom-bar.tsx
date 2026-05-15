@@ -21,7 +21,7 @@ import {
   ChipEditableInput,
   type ChipEditableInputHandle,
 } from "@/components/ai-elements/chip-editable-input";
-import { usePromptChips } from "@/state/prompt-chips-context";
+import { usePromptChips, isNodeTagPayload } from "@/state/prompt-chips-context";
 import { cn } from "@/lib/utils";
 import { useAppState, useAppDispatch } from "@/state/app-state-context";
 import {
@@ -192,9 +192,19 @@ export function ShellBottomBar() {
     // Node commands now come from per-chip segments: each `node` chip pairs
     // with the free text typed *between* it and the next chip. Empty-text
     // segments are skipped so a chip without a command doesn't fire a noop.
+    // Node chips carry a NodeTagPayload with a reliable `nodeId` — pass it so
+    // the resolver matches by id. For a node-field chip `chip.label` is the
+    // field name (not a node label) and would never resolve; `nodeLabel` is
+    // still passed as a fallback for whole-node chips.
     const nodeCommands = segments
       .filter((s) => s.chip.kind === "node" && s.text.length > 0)
-      .map((s) => ({ nodeLabel: s.chip.label, text: s.text }));
+      .map((s) => ({
+        nodeLabel: s.chip.label,
+        nodeId: isNodeTagPayload(s.chip.payload)
+          ? s.chip.payload.nodeId
+          : undefined,
+        text: s.text,
+      }));
 
     if (structural.ops.length > 0) {
       dispatch({
