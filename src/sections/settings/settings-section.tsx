@@ -4,6 +4,7 @@ import { motion } from "motion/react";
 import { SiteBlock } from "./site-block";
 import { BusinessBlock } from "./business-block";
 import { RegionsBlock } from "./regions-block";
+import { SummaryBlock } from "./summary-block";
 
 export function SettingsSection() {
   return (
@@ -26,6 +27,7 @@ export function SettingsSection() {
           <SiteBlock />
           <BusinessBlock />
           <RegionsBlock />
+          <SummaryBlock />
         </div>
       </motion.div>
     </div>
