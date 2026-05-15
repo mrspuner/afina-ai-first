@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { promptChipsReducer, type PromptChipsState } from "./prompt-chips-context";
+import { promptChipsReducer, type NodeTagPayload, type PromptChipsState } from "./prompt-chips-context";
 
 const empty: PromptChipsState = { chips: [] };
 
@@ -84,5 +84,25 @@ describe("promptChipsReducer", () => {
     );
     expect(s.chips[0].kind).toBe("section");
     expect(s.chips[0].label).toBe("Интересы");
+  });
+
+  it("preserves NodeTagPayload with color on push", () => {
+    const next = promptChipsReducer(
+      { chips: [] },
+      {
+        type: "push",
+        chip: {
+          id: "nodefield_n1_Текст",
+          kind: "node",
+          label: "Текст",
+          payload: { nodeId: "n1", nodeType: "sms", color: "#5eead4", paramLabel: "Текст" },
+          removable: true,
+        },
+      }
+    );
+    const p = next.chips[0].payload as NodeTagPayload;
+    expect(p.color).toBe("#5eead4");
+    expect(p.nodeId).toBe("n1");
+    expect(p.paramLabel).toBe("Текст");
   });
 });
