@@ -16,7 +16,7 @@ export function SettingsSection() {
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
-        className="mx-auto w-full max-w-2xl px-10 py-10"
+        className="mx-auto w-full max-w-[720px] px-6 pt-10 pb-promptbar"
       >
         <header className="mb-8">
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">

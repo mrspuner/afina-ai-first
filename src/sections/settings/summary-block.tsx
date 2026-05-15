@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -19,23 +18,8 @@ export function SummaryBlock() {
   }
 
   return (
-    <SettingsBlock
-      title="AI-саммари о компании"
-      description="Резюме, которое AI составил о вашей компании. Отредактируйте текст и сохраните."
-    >
+    <SettingsBlock title="Саммари о компании">
       <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-1.5">
-          <Image
-            src="/mascot-icon.svg"
-            alt=""
-            width={14}
-            height={14}
-            aria-hidden
-          />
-          <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-            Сгенерировано AI
-          </span>
-        </div>
         <Textarea
           id="settings-summary"
           rows={5}

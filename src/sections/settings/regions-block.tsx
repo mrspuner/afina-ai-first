@@ -9,10 +9,7 @@ export function RegionsBlock() {
   const dispatch = useAppDispatch();
 
   return (
-    <SettingsBlock
-      title="Регионы и география"
-      description="Где компания работает и куда крутит рекламу — нужно рекламной системе для таргетинга."
-    >
+    <SettingsBlock title="Регионы и география">
       <SettingsField
         id="settings-regions"
         label="Регионы"

@@ -4,7 +4,10 @@ import Image from "next/image";
 import { X } from "lucide-react";
 import { SettingsBlock } from "./settings-field";
 import { useAppState, useAppDispatch } from "@/state/app-state-context";
-import { moveSuggestionToActive } from "@/data/account-interests";
+import {
+  moveActiveToSuggestion,
+  moveSuggestionToActive,
+} from "@/data/account-interests";
 import { cn } from "@/lib/utils";
 
 function RemovableInterestChip({
@@ -40,9 +43,13 @@ export function InterestsBlock() {
   const { interests, suggestedInterests } = accountSettings;
 
   function removeInterest(id: string) {
+    const next = moveActiveToSuggestion(accountSettings, id);
     dispatch({
       type: "settings_updated",
-      patch: { interests: interests.filter((i) => i.id !== id) },
+      patch: {
+        interests: next.interests,
+        suggestedInterests: next.suggestedInterests,
+      },
     });
   }
 
@@ -58,10 +65,7 @@ export function InterestsBlock() {
   }
 
   return (
-    <SettingsBlock
-      title="Интересы"
-      description="Базовый набор интересов аккаунта — берётся по умолчанию для новых сигналов. Изменения не затрагивают уже созданные сигналы."
-    >
+    <SettingsBlock title="Интересы">
       {/* Active set */}
       <div className="flex flex-col gap-2">
         {interests.length > 0 ? (

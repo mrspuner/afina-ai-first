@@ -44,3 +44,27 @@ export function moveSuggestionToActive(
     ),
   };
 }
+
+/**
+ * Demote an active interest back to AI suggestions: remove it from `interests`
+ * and append it to `suggestedInterests` (unless already suggested). No-op when
+ * the id is not currently active. Returns a full `AccountSettings` value — all
+ * other fields are preserved by reference.
+ */
+export function moveActiveToSuggestion(
+  settings: AccountSettings,
+  interestId: string
+): AccountSettings {
+  const picked = settings.interests.find((i) => i.id === interestId);
+  if (!picked) return settings;
+  const alreadySuggested = settings.suggestedInterests.some(
+    (i) => i.id === interestId
+  );
+  return {
+    ...settings,
+    interests: settings.interests.filter((i) => i.id !== interestId),
+    suggestedInterests: alreadySuggested
+      ? settings.suggestedInterests
+      : [...settings.suggestedInterests, picked],
+  };
+}

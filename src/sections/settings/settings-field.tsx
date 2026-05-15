@@ -32,16 +32,18 @@ export function SettingsField({
   children,
 }: {
   id?: string;
-  label: string;
+  label?: string;
   hint?: string;
   error?: string;
   children: ReactNode;
 }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="text-sm font-medium text-foreground">
-        {label}
-      </label>
+      {label ? (
+        <label htmlFor={id} className="text-sm font-medium text-foreground">
+          {label}
+        </label>
+      ) : null}
       {children}
       {error ? (
         <p className="text-xs text-destructive">{error}</p>

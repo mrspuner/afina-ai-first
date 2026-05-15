@@ -9,15 +9,8 @@ export function VoiceBlock() {
   const dispatch = useAppDispatch();
 
   return (
-    <SettingsBlock
-      title="Тон голоса бренда"
-      description="Питает AI-генерацию текстов коммуникаций в кампаниях."
-    >
-      <SettingsField
-        id="settings-tone"
-        label="Тон"
-        hint="Как звучит бренд — стиль, обращение, длина фраз."
-      >
+    <SettingsBlock title="Тон голоса бренда">
+      <SettingsField id="settings-tone" label="Тон">
         <Textarea
           id="settings-tone"
           rows={3}
@@ -31,11 +24,7 @@ export function VoiceBlock() {
           }
         />
       </SettingsField>
-      <SettingsField
-        id="settings-messages"
-        label="Ключевые сообщения"
-        hint="Тезисы, которые бренд доносит до аудитории."
-      >
+      <SettingsField id="settings-messages" label="Ключевые сообщения">
         <Textarea
           id="settings-messages"
           rows={3}
