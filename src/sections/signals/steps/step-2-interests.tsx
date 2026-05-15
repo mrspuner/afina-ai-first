@@ -415,15 +415,13 @@ function TriggerCard({
       {(showCollapsedDomains || showExpandedDomains || hasDelta) && (
         <div className="animate-in fade-in-0 slide-in-from-top-1 flex flex-col gap-3 border-t border-primary/20 bg-background/40 px-3 py-3">
           {showCollapsedDomains && (
-            <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 font-mono text-sm tracking-tight text-foreground/85">
-              {collapsedPreview.visible.map((d, i) => (
-                <span key={d} className="inline-flex items-center gap-1.5">
+            <div className="flex flex-wrap items-center gap-1.5">
+              {collapsedPreview.visible.map((d) => (
+                <span
+                  key={d}
+                  className="inline-flex items-center rounded-md border border-border bg-card px-2 py-0.5 font-mono text-xs text-foreground/85"
+                >
                   {d}
-                  {i < collapsedPreview.visible.length - 1 && (
-                    <span aria-hidden className="text-muted-foreground">
-                      ·
-                    </span>
-                  )}
                 </span>
               ))}
               {collapsedPreview.overflowCount > 0 && (
@@ -431,12 +429,12 @@ function TriggerCard({
                   type="button"
                   onClick={onToggleExpanded}
                   aria-label="Показать все домены"
-                  className="ml-0.5 inline-flex items-center rounded px-1 font-sans text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                  className="inline-flex items-center rounded-md border border-border bg-card px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                 >
                   +{collapsedPreview.overflowCount}
                 </button>
               )}
-            </p>
+            </div>
           )}
 
           {showExpandedDomains && (
@@ -485,7 +483,7 @@ function TriggerCard({
 export function Step2Interests({ data, onNext }: StepProps) {
   const { clientDirection, wizardRemixToken } = useAppState();
   const dispatch = useAppDispatch();
-  const { pushChip, removeChip, clearChips } = usePromptChips();
+  const { pushChip, clearChips } = usePromptChips();
   const vertical = useMemo(
     () => resolveVertical(clientDirection),
     [clientDirection]
@@ -600,39 +598,18 @@ export function Step2Interests({ data, onNext }: StepProps) {
     });
   }
 
-  // M2.2 — Click on the trigger card BODY does two things at once (spec 2.3):
-  // it toggles selection AND toggles expansion. The separate-actions model was
-  // found unergonomic. The checkbox (selection only) and the chevron / "+N"
-  // (expansion only) remain split.
-  function handleTriggerClick(triggerId: string, triggerLabel: string) {
-    // Selection: card body always toggles it.
-    toggleTriggerSelection(triggerId);
-    // Expansion + prompt-bar chip presence.
-    const isExpanded = expandedTriggerIds.has(triggerId);
-    if (isExpanded) {
-      setExpandedTriggerIds((prev) => {
-        const next = new Set(prev);
-        next.delete(triggerId);
-        return next;
-      });
-      removeChip(`trigger_${triggerId}`);
-    } else {
-      setExpandedTriggerIds((prev) => {
-        const next = new Set(prev);
-        next.add(triggerId);
-        return next;
-      });
-      pushTriggerChip(triggerId, triggerLabel);
-    }
-  }
+  // M2 (revised) — Click on the trigger card BODY toggles SELECTION only; it
+  // never expands or collapses, so an open card stays open when re-clicked to
+  // deselect. Expansion lives entirely on the chevron / "+N" (onToggleExpanded).
+  // The trigger chip enters the prompt bar only via the explicit "Добавить свой
+  // домен" button (onAddDomain → pushTriggerChip).
 
   function handleApplyParsed(
     triggerId: string,
     parsed: Exclude<ParsedTriggerCommand, { kind: "fallback" }>
   ) {
-    // Submitting a chat command for a trigger auto-activates it — clicking
-    // the card no longer toggles selection, so this is the path that flips
-    // an unchecked trigger into the campaign.
+    // Submitting a chat command for a trigger auto-activates it, so editing
+    // an unchecked trigger via the prompt bar flips it into the campaign.
     setSelectedTriggers((prev) =>
       prev.includes(triggerId) ? prev : [...prev, triggerId]
     );
@@ -706,6 +683,12 @@ export function Step2Interests({ data, onNext }: StepProps) {
     });
   }
 
+  // M2.4 (revised) — "Добавить свой домен" pulls the TRIGGER NAME into the
+  // prompt bar as a `trigger` chip and focuses the editor. The user then types
+  // the domain; the existing parseTriggerCommand understands «добавь domain.ru»
+  // and useChatSubmit routes `trigger` chips through triggerEdit.applyToTrigger
+  // — so the AI-path consumes this with no parser change. A stable id means
+  // re-clicking the same trigger refreshes the chip rather than stacking.
   function pushTriggerChip(triggerId: string, triggerLabel: string) {
     pushChip({
       id: `trigger_${triggerId}`,
@@ -715,26 +698,6 @@ export function Step2Interests({ data, onNext }: StepProps) {
       removable: true,
     });
     const el = document.querySelector<HTMLDivElement>('[role="textbox"][contenteditable="true"]');
-    el?.focus();
-  }
-
-  // M2.4 — "Add your own domain" → fire an "Добавить домен" tag into the
-  // prompt bar and focus the editor. The user then types the domain; the
-  // existing parseTriggerCommand already understands «добавь domain.ru», so
-  // the AI-path (M5) consumes this with no parser change. The chip reuses the
-  // "section" kind (it is a context tag, not a per-trigger edit chip) and a
-  // stable id so re-clicking the same trigger refreshes rather than stacks.
-  function pushAddDomainChip(triggerId: string) {
-    pushChip({
-      id: `add_domain_${triggerId}`,
-      kind: "section",
-      label: "Добавить домен",
-      payload: triggerId,
-      removable: true,
-    });
-    const el = document.querySelector<HTMLDivElement>(
-      '[role="textbox"][contenteditable="true"]'
-    );
     el?.focus();
   }
 
@@ -864,7 +827,7 @@ export function Step2Interests({ data, onNext }: StepProps) {
                   delta={deltas[trigger.id] ?? EMPTY_DELTA}
                   highlight={highlightedTriggerIds.has(trigger.id)}
                   expanded={expandedTriggerIds.has(trigger.id)}
-                  onToggle={() => handleTriggerClick(trigger.id, trigger.label)}
+                  onToggle={() => toggleTriggerSelection(trigger.id)}
                   onToggleExpanded={() => toggleExpanded(trigger.id)}
                   onCheckboxToggle={() => toggleTriggerSelection(trigger.id)}
                   onRemoveDelta={(bucket, domain) =>
@@ -876,7 +839,7 @@ export function Step2Interests({ data, onNext }: StepProps) {
                   onRestoreSystemDomain={(domain) =>
                     handleRestoreSystemDomain(trigger.id, domain)
                   }
-                  onAddDomain={() => pushAddDomainChip(trigger.id)}
+                  onAddDomain={() => pushTriggerChip(trigger.id, trigger.label)}
                 />
               ))}
             </div>
