@@ -11,6 +11,11 @@ import { useAppState, useAppDispatch } from "@/state/app-state-context";
 import { VERTICALS, getInterestById } from "@/data/triggers-by-vertical";
 import { getInterestsForDirection } from "@/data/interests-by-direction";
 import { getTriggerDomains } from "@/data/trigger-domains";
+import {
+  PREVIEW_VISIBLE_COUNT,
+  previewDomains,
+  splitSystemDomains,
+} from "@/lib/trigger-domain-view";
 import type { Interest, Trigger, Vertical } from "@/types/directions";
 import {
   applyEditToDelta,
@@ -287,7 +292,17 @@ function TriggerCard({
   onRemoveDelta,
 }: TriggerCardProps) {
   const hasDelta = selected && !isDeltaEmpty(delta);
-  const showDomainList = expanded && domains.length > 0;
+  // System domains split into still-active vs user-excluded (reversible).
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { active: activeSystemDomains, excluded: excludedSystemDomains } =
+    splitSystemDomains(domains, delta);
+  // Collapsed one-line preview: first PREVIEW_VISIBLE_COUNT active domains + "+N".
+  const collapsedPreview = previewDomains(
+    activeSystemDomains,
+    PREVIEW_VISIBLE_COUNT
+  );
+  const showCollapsedDomains = !expanded && domains.length > 0;
+  const showExpandedDomains = expanded && domains.length > 0;
 
   return (
     <div
@@ -345,9 +360,34 @@ function TriggerCard({
         </button>
       </div>
 
-      {(showDomainList || hasDelta) && (
+      {(showCollapsedDomains || showExpandedDomains || hasDelta) && (
         <div className="animate-in fade-in-0 slide-in-from-top-1 flex flex-col gap-3 border-t border-primary/20 bg-background/40 px-3 py-3">
-          {showDomainList && (
+          {showCollapsedDomains && (
+            <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 font-mono text-sm tracking-tight text-foreground/85">
+              {collapsedPreview.visible.map((d, i) => (
+                <span key={d} className="inline-flex items-center gap-1.5">
+                  {d}
+                  {i < collapsedPreview.visible.length - 1 && (
+                    <span aria-hidden className="text-muted-foreground">
+                      ·
+                    </span>
+                  )}
+                </span>
+              ))}
+              {collapsedPreview.overflowCount > 0 && (
+                <button
+                  type="button"
+                  onClick={onToggleExpanded}
+                  aria-label="Показать все домены"
+                  className="ml-0.5 inline-flex items-center rounded px-1 font-sans text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                >
+                  +{collapsedPreview.overflowCount}
+                </button>
+              )}
+            </p>
+          )}
+
+          {showExpandedDomains && (
             <ul className="flex flex-wrap gap-x-3 gap-y-1 font-mono text-sm tracking-tight text-foreground/85">
               {domains.map((d) => (
                 <li key={d}>{d}</li>
