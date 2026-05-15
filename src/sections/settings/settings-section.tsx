@@ -5,6 +5,7 @@ import { SiteBlock } from "./site-block";
 import { BusinessBlock } from "./business-block";
 import { RegionsBlock } from "./regions-block";
 import { SummaryBlock } from "./summary-block";
+import { InterestsBlock } from "./interests-block";
 
 export function SettingsSection() {
   return (
@@ -28,6 +29,7 @@ export function SettingsSection() {
           <BusinessBlock />
           <RegionsBlock />
           <SummaryBlock />
+          <InterestsBlock />
         </div>
       </motion.div>
     </div>
