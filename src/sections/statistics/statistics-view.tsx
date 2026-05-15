@@ -360,6 +360,7 @@ export function StatisticsView({ campaignId }: { campaignId?: string } = {}) {
             root={buildSearchSettingsLevel(draft, dispatch)}
             dirty={dirty}
             onSave={handleSave}
+            contentWidthClassName="w-[600px]"
           />
         </div>
       </div>

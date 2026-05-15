@@ -9,6 +9,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
 export type DrillLevel = {
   /** Уникальный id уровня в дереве. */
@@ -37,6 +38,8 @@ export type DrillInPopoverProps = {
   align?: "start" | "center" | "end";
   /** Доп. узлы футера 1-го уровня (например, «Сохранить как шаблон»). */
   rootFooterExtra?: React.ReactNode;
+  /** Tailwind-класс ширины PopoverContent. По умолчанию "w-80". */
+  contentWidthClassName?: string;
 };
 
 export function DrillInPopover({
@@ -46,6 +49,7 @@ export function DrillInPopover({
   onSave,
   align,
   rootFooterExtra,
+  contentWidthClassName,
 }: DrillInPopoverProps) {
   const [open, setOpen] = useState(false);
   // Стек id уровней от корня до текущего. Первый элемент — всегда root.id.
@@ -123,7 +127,7 @@ export function DrillInPopover({
       <PopoverContent
         align={align ?? "end"}
         side="bottom"
-        className="w-80 gap-0 p-0"
+        className={cn(contentWidthClassName ?? "w-80", "gap-0 p-0")}
       >
         {/* Шапка уровня */}
         <div className="flex items-center gap-2 border-b border-border px-2 py-2">
