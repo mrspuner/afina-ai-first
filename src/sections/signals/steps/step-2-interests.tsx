@@ -520,11 +520,14 @@ export function Step2Interests({ data, onNext }: StepProps) {
     });
   }
 
-  // Click on the trigger row only toggles expansion + chip presence in the
-  // prompt bar. Selection is *not* touched here — the trigger auto-activates
-  // later, when the user submits a chat command targeting its chip (see
-  // handleApplyParsed).
+  // M2.2 — Click on the trigger card BODY does two things at once (spec 2.3):
+  // it toggles selection AND toggles expansion. The separate-actions model was
+  // found unergonomic. The checkbox (selection only) and the chevron / "+N"
+  // (expansion only) remain split.
   function handleTriggerClick(triggerId: string, triggerLabel: string) {
+    // Selection: card body always toggles it.
+    toggleTriggerSelection(triggerId);
+    // Expansion + prompt-bar chip presence.
     const isExpanded = expandedTriggerIds.has(triggerId);
     if (isExpanded) {
       setExpandedTriggerIds((prev) => {
