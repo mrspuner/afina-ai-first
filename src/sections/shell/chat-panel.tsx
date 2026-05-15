@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useRef, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { useChat, type ChatMessage } from "@/state/chat-context";
-import { ChatComposer } from "./chat-composer";
+import { ChatComposer, type ChatComposerHandle } from "./chat-composer";
 import { PromptBar } from "./prompt-bar";
 import { useChatSubmit } from "./use-chat-submit";
 import { DraftQueueList } from "./draft-queue-list";
@@ -70,18 +70,22 @@ function TransientReply({ messages }: { messages: ChatMessage[] }) {
 export function ChatPanel({ placeholder }: { placeholder: string }) {
   const chat = useChat();
   const { submit } = useChatSubmit();
+  const composerRef = useRef<ChatComposerHandle>(null);
 
   return (
     <PromptBar
       onOpenDrawer={chat.openSidebar}
       slot={
         <>
-          <DraftQueueList variant="compact" onTakeDraft={() => {}} />
+          <DraftQueueList
+            variant="compact"
+            onTakeDraft={(draft) => composerRef.current?.loadDraft(draft)}
+          />
           <TransientReply messages={chat.messages} />
         </>
       }
     >
-      <ChatComposer placeholder={placeholder} onSubmit={submit} />
+      <ChatComposer ref={composerRef} placeholder={placeholder} onSubmit={submit} />
     </PromptBar>
   );
 }

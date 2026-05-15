@@ -21,6 +21,12 @@ import { cn } from "@/lib/utils";
 interface ChipEditableInputProps {
   placeholder?: string;
   className?: string;
+  /**
+   * Вызывается, когда в инпут добавляется НОВЫЙ тег при уже существующем —
+   * M5: предыдущий тег нужно запарковать в очередь. Срабатывает в эффекте
+   * sync chips→DOM до фактической вставки нового чипа.
+   */
+  onTagSwap?: () => void;
 }
 
 export interface ChipEditableInputHandle {
@@ -59,7 +65,7 @@ export interface ChipEditableInputHandle {
 export const ChipEditableInput = forwardRef<
   ChipEditableInputHandle,
   ChipEditableInputProps
->(function ChipEditableInput({ placeholder, className }, ref) {
+>(function ChipEditableInput({ placeholder, className, onTagSwap }, ref) {
   const editorRef = useRef<HTMLDivElement>(null);
   const { chips, removeChip } = usePromptChips();
   const controller = usePromptInputController();
@@ -229,6 +235,10 @@ export const ChipEditableInput = forwardRef<
     for (const chip of chips) {
       const selector = `[data-chip-id="${cssEscape(chip.id)}"]`;
       if (ed.querySelector(selector)) continue;
+      // M5: a NEW chip arriving while a chip already exists means the user
+      // is switching tags — the composer parks the previous tag's draft.
+      const hadChip = ed.querySelector("[data-chip-id]") !== null;
+      if (hadChip) onTagSwap?.();
       const el = createChipElement(chip);
       insertChipAtRange(el, ed, lastRangeRef.current);
       // Refresh the saved range so subsequent chip pushes append after the
@@ -241,7 +251,7 @@ export const ChipEditableInput = forwardRef<
 
     // Re-flush text into controller so external readers see the latest.
     setInput(readText());
-  }, [chips, readText, setInput]);
+  }, [chips, readText, setInput, onTagSwap]);
 
   // External setInput("") (form-submit clear) should also clear DOM text and
   // chips. Other external value changes (rare now) sync into the editor end.
