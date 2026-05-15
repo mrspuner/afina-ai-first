@@ -957,3 +957,46 @@ describe("appReducer — wizard_random_remix", () => {
     expect(s2.wizardRemixToken).toBe(s0.wizardRemixToken + 2);
   });
 });
+
+describe("workflow_node_field_set", () => {
+  it("stores the pending node field patch", () => {
+    const s = appReducer(initialState, {
+      type: "workflow_node_field_set",
+      nodeId: "sms",
+      patch: { text: "Новый текст" },
+    });
+    expect(s.workflowNodeFieldPatch).toEqual({
+      nodeId: "sms",
+      patch: { text: "Новый текст" },
+    });
+  });
+
+  it("clears the patch on handled", () => {
+    const withPatch = appReducer(initialState, {
+      type: "workflow_node_field_set",
+      nodeId: "sms",
+      patch: { text: "x" },
+    });
+    const cleared = appReducer(withPatch, {
+      type: "workflow_node_field_set_handled",
+    });
+    expect(cleared.workflowNodeFieldPatch).toBeNull();
+  });
+
+  it("replaces a previous unhandled patch instead of accumulating", () => {
+    const first = appReducer(initialState, {
+      type: "workflow_node_field_set",
+      nodeId: "sms",
+      patch: { text: "first" },
+    });
+    const second = appReducer(first, {
+      type: "workflow_node_field_set",
+      nodeId: "email",
+      patch: { subject: "second" },
+    });
+    expect(second.workflowNodeFieldPatch).toEqual({
+      nodeId: "email",
+      patch: { subject: "second" },
+    });
+  });
+});

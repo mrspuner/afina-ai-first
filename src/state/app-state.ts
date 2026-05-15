@@ -5,6 +5,7 @@ import type { Survey, SurveyStatus } from "@/types/survey";
 import { EMPTY_SURVEY } from "@/types/survey";
 import type { SignalStatus } from "@/types/signal-status";
 import type { StepData } from "@/types/campaign";
+import type { NodeParams } from "@/types/workflow";
 import {
   DEFAULT_DIRECTION_ID,
   businessDirectionFromSurvey,
@@ -156,6 +157,8 @@ export type AppState = {
    * regardless of current view.
    */
   wizardRemixToken: number;
+  /** Pending inline field edit dispatched from NodeCardBody; cleared by workflow-view after application. */
+  workflowNodeFieldPatch: { nodeId: string; patch: Partial<NodeParams> } | null;
 };
 
 export type Action =
@@ -182,6 +185,8 @@ export type Action =
   | { type: "workflow_node_deselected" }
   | { type: "workflow_node_command_submit"; commands: Array<{ nodeLabel: string; text: string }> }
   | { type: "workflow_node_command_handled" }
+  | { type: "workflow_node_field_set"; nodeId: string; patch: Partial<NodeParams> }
+  | { type: "workflow_node_field_set_handled" }
   | { type: "workflow_structural_commands_submit"; ops: StructuralOp[] }
   | { type: "workflow_structural_commands_handled" }
   | { type: "ai_reply_shown"; text: string }
@@ -235,6 +240,7 @@ export const initialState: AppState = {
   wizardCurrentStep: null,
   budgetHelpShown: false,
   wizardRemixToken: 0,
+  workflowNodeFieldPatch: null,
 };
 
 export function appReducer(state: AppState, action: Action): AppState {
@@ -502,6 +508,15 @@ export function appReducer(state: AppState, action: Action): AppState {
     case "workflow_node_command_handled":
       return { ...state, workflowNodeCommand: null };
 
+    case "workflow_node_field_set":
+      return {
+        ...state,
+        workflowNodeFieldPatch: { nodeId: action.nodeId, patch: action.patch },
+      };
+
+    case "workflow_node_field_set_handled":
+      return { ...state, workflowNodeFieldPatch: null };
+
     case "workflow_structural_commands_submit":
       return {
         ...state,
@@ -575,6 +590,7 @@ export function appReducer(state: AppState, action: Action): AppState {
         selectedWorkflowNode: null,
         workflowCommand: null,
         workflowNodeCommand: null,
+        workflowNodeFieldPatch: null,
         workflowStructuralCommands: null,
         aiReply: null,
         campaignFilter: [],
@@ -592,6 +608,7 @@ export function appReducer(state: AppState, action: Action): AppState {
         selectedWorkflowNode: null,
         workflowCommand: null,
         workflowNodeCommand: null,
+        workflowNodeFieldPatch: null,
         workflowStructuralCommands: null,
         aiReply: null,
         campaignFilter: [],

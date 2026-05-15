@@ -38,6 +38,8 @@ interface WorkflowViewProps {
   onNodeCommandHandled?: () => void;
   structuralOps?: StructuralOp[] | null;
   onStructuralOpsHandled?: () => void;
+  nodeFieldPatch?: { nodeId: string; patch: Partial<NodeParams> } | null;
+  onNodeFieldPatchHandled?: () => void;
   selectedNodeId?: string | null;
   signalType?: SignalType;
   signal?: Signal;
@@ -181,6 +183,8 @@ export function WorkflowView({
   onNodeCommandHandled,
   structuralOps,
   onStructuralOpsHandled,
+  nodeFieldPatch,
+  onNodeFieldPatchHandled,
   selectedNodeId,
   signalType,
   signal,
@@ -325,6 +329,16 @@ export function WorkflowView({
     onNodeCommandHandled?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodeCommand, onNodeCommandHandled]);
+
+  useEffect(() => {
+    if (!nodeFieldPatch) return;
+    setGraph((prev) => ({
+      ...prev,
+      nodes: patchNodeParams(prev.nodes, nodeFieldPatch.nodeId, nodeFieldPatch.patch),
+    }));
+    onNodeFieldPatchHandled?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nodeFieldPatch]);
 
   useEffect(() => {
     if (!structuralOps || structuralOps.length === 0) return;

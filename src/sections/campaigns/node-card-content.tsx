@@ -1,12 +1,14 @@
 "use client";
 
-import { AlertTriangle, Pencil } from "lucide-react";
+import { AlertTriangle, Check, Pencil } from "lucide-react";
 import Image from "next/image";
+import { useState } from "react";
 import { usePromptInputController } from "@/components/ai-elements/prompt-input";
 import type { NodeParams, WorkflowNodeData } from "@/types/workflow";
 import { NODE_ACTIONS } from "@/state/node-actions";
 import { getFieldMeta } from "@/state/node-field-editability";
 import { usePromptChips } from "@/state/prompt-chips-context";
+import { useAppDispatch } from "@/state/app-state-context";
 
 type ParamRow = { label: string; value: string };
 
@@ -127,6 +129,23 @@ export function NodeCardBody({ id, data }: NodeCardBodyProps) {
   const actions = data.params ? NODE_ACTIONS[data.params.kind] ?? [] : [];
   const { textInput } = usePromptInputController();
   const { pushChip } = usePromptChips();
+  const dispatch = useAppDispatch();
+  const [editing, setEditing] = useState<{ label: string; value: string } | null>(null);
+
+  function commitEdit() {
+    if (!editing || !data.params) return;
+    const meta = getFieldMeta(data.params.kind, editing.label);
+    if (!meta?.paramKey) {
+      setEditing(null);
+      return;
+    }
+    dispatch({
+      type: "workflow_node_field_set",
+      nodeId: id,
+      patch: { [meta.paramKey]: editing.value } as Partial<NodeParams>,
+    });
+    setEditing(null);
+  }
 
   function insertPrompt(template: string) {
     textInput.insertAtCursor(template, {
@@ -183,7 +202,7 @@ export function NodeCardBody({ id, data }: NodeCardBodyProps) {
                   className="nodrag ml-1 flex shrink-0 items-center text-muted-foreground/50 hover:text-muted-foreground focus-visible:outline-none"
                   onClick={(e) => {
                     e.stopPropagation();
-                    // inline edit handler wired in Task 11
+                    setEditing({ label: row.label, value: row.value });
                   }}
                 >
                   <Pencil className="h-3 w-3" />
@@ -217,10 +236,37 @@ export function NodeCardBody({ id, data }: NodeCardBodyProps) {
                 className="grid grid-cols-[minmax(72px,max-content)_1fr_auto] items-center gap-x-2.5 text-[11px]"
               >
                 <span className="text-muted-foreground">{row.label}</span>
-                <span className="truncate text-foreground" title={row.value}>
-                  {row.value}
-                </span>
-                {trailingIcon}
+                {editing?.label === row.label ? (
+                  <input
+                    autoFocus
+                    value={editing.value}
+                    onChange={(e) => setEditing({ label: row.label, value: e.target.value })}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") commitEdit();
+                      if (e.key === "Escape") setEditing(null);
+                    }}
+                    className="nodrag min-w-0 flex-1 rounded border border-border bg-background px-1.5 py-0.5 text-[11px] text-foreground"
+                  />
+                ) : (
+                  <span className="truncate text-foreground" title={row.value}>
+                    {row.value}
+                  </span>
+                )}
+                {editing?.label === row.label ? (
+                  <button
+                    type="button"
+                    aria-label="Сохранить поле"
+                    className="nodrag ml-1 flex shrink-0 items-center text-muted-foreground/50 hover:text-muted-foreground focus-visible:outline-none"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      commitEdit();
+                    }}
+                  >
+                    <Check className="h-3 w-3" />
+                  </button>
+                ) : (
+                  trailingIcon
+                )}
               </div>
             );
           })}
