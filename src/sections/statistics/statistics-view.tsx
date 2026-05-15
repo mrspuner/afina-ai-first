@@ -1,6 +1,8 @@
 "use client";
 
 import {
+  ArrowDownIcon,
+  ArrowUpIcon,
   ChevronDown,
   ChevronRight,
   ChevronsUpDown,
@@ -378,14 +380,28 @@ export function StatisticsView({ campaignId }: { campaignId?: string } = {}) {
                   <ChevronsUpDown className="h-3 w-3 opacity-60" />
                 </div>
               </th>
-              {applied.columns.map((col) => (
-                <th
-                  key={col}
-                  className="px-4 py-3 text-right text-xs font-medium text-muted-foreground whitespace-nowrap"
-                >
-                  {COLUMN_HEADERS[col]}
-                </th>
-              ))}
+              {applied.columns.map((col) => {
+                const isSortCol = applied.sort?.column === col;
+                return (
+                  <th
+                    key={col}
+                    className={cn(
+                      "px-4 py-3 text-right text-xs font-medium whitespace-nowrap",
+                      isSortCol ? "text-foreground" : "text-muted-foreground",
+                    )}
+                  >
+                    <span className="inline-flex items-center gap-1">
+                      {COLUMN_HEADERS[col]}
+                      {isSortCol &&
+                        (applied.sort?.direction === "asc" ? (
+                          <ArrowUpIcon className="h-3 w-3" />
+                        ) : (
+                          <ArrowDownIcon className="h-3 w-3" />
+                        ))}
+                    </span>
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>
