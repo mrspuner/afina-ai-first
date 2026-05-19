@@ -8,7 +8,9 @@ import type { NodeParams, WorkflowNodeData } from "@/types/workflow";
 import { NODE_ACTIONS } from "@/state/node-actions";
 import { getFieldMeta } from "@/state/node-field-editability";
 import { usePromptChips } from "@/state/prompt-chips-context";
+import type { NodeTagPayload } from "@/state/prompt-chips-context";
 import { useAppDispatch } from "@/state/app-state-context";
+import { getNodeColor } from "./node-visuals";
 
 type ParamRow = { label: string; value: string };
 
@@ -163,11 +165,21 @@ export function NodeCardBody({ id, data }: NodeCardBodyProps) {
   function handleAiField(rowLabel: string) {
     const template = templateByLabel.get(rowLabel);
     if (template) insertPrompt(template);
+    const nodeType = data.nodeType;
+    const payload: NodeTagPayload = {
+      nodeId: id,
+      nodeType,
+      color: getNodeColor(nodeType),
+      paramLabel: rowLabel,
+    };
     pushChip({
+      // Один активный тег на инпут — id фиксированный по узлу+полю, повторный
+      // клик переписывает чип, а не плодит новые (push дедупит по id).
       id: `nodefield_${id}_${rowLabel}`,
       kind: "node",
-      label: `${data.label} · ${rowLabel}`,
-      payload: id,
+      // Имя узла не пишем — цвет тега обозначает узел (спека M5.2).
+      label: rowLabel,
+      payload,
       removable: true,
     });
   }

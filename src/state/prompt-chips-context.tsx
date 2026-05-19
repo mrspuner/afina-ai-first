@@ -21,6 +21,32 @@ export interface PromptChip {
   removable: boolean;
 }
 
+/**
+ * Payload для тега AI-поля или узла целиком (M5). `paramLabel` отсутствует у
+ * тега узла целиком — у него тег обозначает весь узел, а не один параметр.
+ */
+export interface NodeTagPayload {
+  /** id узла workflow/карточки. */
+  nodeId: string;
+  /** kind узла — нужен для выбора цвета/иконки и каталога подсказок. */
+  nodeType: string;
+  /** Цвет узла (hex) — пилл окрашивается в него. */
+  color: string;
+  /** Имя параметра. undefined → тег узла целиком. */
+  paramLabel?: string;
+}
+
+/** Type guard: payload чипа — это NodeTagPayload. */
+export function isNodeTagPayload(payload: unknown): payload is NodeTagPayload {
+  return (
+    typeof payload === "object" &&
+    payload !== null &&
+    typeof (payload as NodeTagPayload).nodeId === "string" &&
+    typeof (payload as NodeTagPayload).nodeType === "string" &&
+    typeof (payload as NodeTagPayload).color === "string"
+  );
+}
+
 export interface PromptChipsState {
   chips: PromptChip[];
 }
