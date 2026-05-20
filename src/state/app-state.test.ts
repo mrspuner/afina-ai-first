@@ -1005,6 +1005,37 @@ describe("workflow_node_field_set", () => {
   });
 });
 
+describe("appReducer — scenario catalog", () => {
+  it("catalog_open stores returnTo and closes the launch flyout", () => {
+    const state = { ...initialState, launchFlyoutOpen: true };
+    const next = appReducer(state, { type: "catalog_open", returnTo: "launcher" });
+    expect(next.catalog).toEqual({ returnTo: "launcher" });
+    expect(next.launchFlyoutOpen).toBe(false);
+  });
+  it("catalog_close clears the catalog", () => {
+    const state = { ...initialState, catalog: { returnTo: "wizard-step-1" as const } };
+    expect(appReducer(state, { type: "catalog_close" }).catalog).toBeNull();
+  });
+  it("catalog_select from wizard-step-1 stores scenario and stays on guided-signal", () => {
+    const state = {
+      ...initialState,
+      view: { kind: "guided-signal" as const },
+      catalog: { returnTo: "wizard-step-1" as const },
+    };
+    const next = appReducer(state, { type: "catalog_select", scenarioId: "cat-seasonal" });
+    expect(next.catalog).toBeNull();
+    expect(next.selectedScenarioId).toBe("cat-seasonal");
+    expect(next.view.kind).toBe("guided-signal");
+  });
+  it("catalog_select from onboarding starts the signal flow on guided-signal", () => {
+    const state = { ...initialState, catalog: { returnTo: "onboarding" as const } };
+    const next = appReducer(state, { type: "catalog_select", scenarioId: "cat-seasonal" });
+    expect(next.catalog).toBeNull();
+    expect(next.selectedScenarioId).toBe("cat-seasonal");
+    expect(next.view.kind).toBe("guided-signal");
+  });
+});
+
 describe("appReducer — settings actions", () => {
   it("initialState carries the demo account settings", () => {
     expect(initialState.accountSettings).toEqual(DEMO_ACCOUNT_SETTINGS);

@@ -21,6 +21,8 @@ export type SignalType =
   | "Возврат"
   | "Удержание";
 
+export type CatalogReturnTo = "onboarding" | "wizard-step-1" | "launcher";
+
 export const SIGNAL_TYPES = [
   "Регистрация",
   "Первая сделка",
@@ -163,6 +165,10 @@ export type AppState = {
   wizardRemixToken: number;
   /** Pending inline field edit dispatched from NodeCardBody; cleared by workflow-view after application. */
   workflowNodeFieldPatch: { nodeId: string; patch: Partial<NodeParams> } | null;
+  /** Non-null while the scenario catalog modal is open. */
+  catalog: { returnTo: CatalogReturnTo } | null;
+  /** The scenario id chosen in the catalog; read by the wizard on mount. */
+  selectedScenarioId: string | null;
 };
 
 export type Action =
@@ -218,7 +224,10 @@ export type Action =
   | { type: "resume_signal_in_wizard_handled" }
   | { type: "wizard_step_changed"; step: number | null }
   | { type: "budget_help_shown" }
-  | { type: "wizard_random_remix" };
+  | { type: "wizard_random_remix" }
+  | { type: "catalog_open"; returnTo: CatalogReturnTo }
+  | { type: "catalog_close" }
+  | { type: "catalog_select"; scenarioId: string };
 // PARALLEL-WORKTREE INSERTION POINT — survey actions (B), billing/signal-status actions (E).
 // Each worktree appends its own action variants to the union above; resolve merges by
 // keeping every appended line and adding the matching reducer case at the end of appReducer.
@@ -247,6 +256,8 @@ export const initialState: AppState = {
   budgetHelpShown: false,
   wizardRemixToken: 0,
   workflowNodeFieldPatch: null,
+  catalog: null,
+  selectedScenarioId: null,
 };
 
 export function appReducer(state: AppState, action: Action): AppState {
@@ -724,6 +735,25 @@ export function appReducer(state: AppState, action: Action): AppState {
         ...state,
         accountSettings: { ...state.accountSettings, ...action.patch },
       };
+
+    case "catalog_open":
+      return { ...state, catalog: { returnTo: action.returnTo }, launchFlyoutOpen: false };
+
+    case "catalog_close":
+      return { ...state, catalog: null };
+
+    case "catalog_select": {
+      const returnTo = state.catalog?.returnTo;
+      const base = { ...state, catalog: null, selectedScenarioId: action.scenarioId };
+      if (returnTo === "wizard-step-1") return base;
+      return {
+        ...base,
+        view: { kind: "guided-signal" as const },
+        activeSection: null,
+        resumingSignalId: undefined,
+        wizardSessionId: state.wizardSessionId + 1,
+      };
+    }
     // PARALLEL-WORTREE INSERTION POINT — append survey/billing/signal-status cases
     // immediately above this comment to keep merges trivial.
   }
