@@ -180,9 +180,8 @@ export function WorkflowSection() {
       return;
     }
     dispatch({
-      type: "campaign_status_changed",
+      type: "campaign_launched",
       id: currentCampaign.id,
-      status: "active",
       timestamp: new Date().toISOString(),
     });
   }
@@ -191,9 +190,8 @@ export function WorkflowSection() {
     if (!currentCampaign) return;
     dispatch({ type: "balance_topup", amount });
     dispatch({
-      type: "campaign_status_changed",
+      type: "campaign_launched",
       id: currentCampaign.id,
-      status: "active",
       timestamp: new Date().toISOString(),
     });
     setTopUpOpen(false);
