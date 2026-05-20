@@ -740,8 +740,12 @@ export function appReducer(state: AppState, action: Action): AppState {
     case "catalog_open":
       return { ...state, catalog: { returnTo: action.returnTo }, launchFlyoutOpen: false };
 
-    case "catalog_close":
+    case "catalog_close": {
+      if (state.catalog?.returnTo === "onboarding") {
+        return { ...state, catalog: null, view: { kind: "welcome" }, activeSection: null };
+      }
       return { ...state, catalog: null };
+    }
 
     case "catalog_select": {
       const returnTo = state.catalog?.returnTo;
