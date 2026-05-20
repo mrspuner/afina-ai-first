@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { X } from "lucide-react";
+import { ArrowLeft, X } from "lucide-react";
 import Image from "next/image";
+import { Button } from "@/components/ui/button";
 import { useAppState, useAppDispatch } from "@/state/app-state-context";
 import { CanvasHeader, type CanvasHeaderToast } from "./canvas-header";
 import { WorkflowView } from "./workflow-view";
@@ -252,21 +253,30 @@ export function WorkflowSection() {
 
   return (
     <div className="relative flex flex-1 flex-col">
-      <CanvasHeader
-        campaign={currentCampaign}
-        signal={currentSignal}
-        onRename={handleRename}
-        onSaveDraft={handleSaveDraft}
-        onLaunch={handleLaunch}
-        onSchedule={handleSchedule}
-        onPause={handlePause}
-        onResume={handleResume}
-        onDuplicate={handleDuplicate}
-        onGoToStats={handleGoToStats}
-        onCancelSchedule={handleCancelSchedule}
-        toast={toast}
-        onDismissToast={dismissToast}
-      />
+      {view.launched ? (
+        <ReadOnlyWorkflowHeader
+          campaignName={currentCampaign.name}
+          onBack={() =>
+            dispatch({ type: "campaign_opened", id: currentCampaign.id })
+          }
+        />
+      ) : (
+        <CanvasHeader
+          campaign={currentCampaign}
+          signal={currentSignal}
+          onRename={handleRename}
+          onSaveDraft={handleSaveDraft}
+          onLaunch={handleLaunch}
+          onSchedule={handleSchedule}
+          onPause={handlePause}
+          onResume={handleResume}
+          onDuplicate={handleDuplicate}
+          onGoToStats={handleGoToStats}
+          onCancelSchedule={handleCancelSchedule}
+          toast={toast}
+          onDismissToast={dismissToast}
+        />
+      )}
       <div className="relative flex flex-1 flex-col overflow-hidden">
         <WorkflowView
           key={currentCampaign.id}
@@ -283,8 +293,9 @@ export function WorkflowSection() {
           signalType={currentSignal?.type}
           signal={currentSignal ?? undefined}
           onGraphChange={handleGraphChange}
-          onNodeClick={handleNodeClick}
-          onPaneClick={handlePaneClick}
+          // Read-only for launched campaigns — kill node interactions.
+          onNodeClick={view.launched ? undefined : handleNodeClick}
+          onPaneClick={view.launched ? undefined : handlePaneClick}
         />
       </div>
 
@@ -334,6 +345,27 @@ export function WorkflowSection() {
           </motion.div>
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+function ReadOnlyWorkflowHeader({
+  campaignName,
+  onBack,
+}: {
+  campaignName: string;
+  onBack: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-3 border-b border-border px-8 py-4">
+      <Button variant="ghost" size="sm" onClick={onBack} aria-label="Назад">
+        <ArrowLeft className="h-4 w-4" />
+        Назад
+      </Button>
+      <span className="text-sm font-medium text-foreground">{campaignName}</span>
+      <span className="text-xs uppercase tracking-widest text-muted-foreground">
+        · workflow · просмотр
+      </span>
     </div>
   );
 }
