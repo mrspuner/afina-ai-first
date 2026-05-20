@@ -11,6 +11,7 @@ import { useAppState, useAppDispatch } from "@/state/app-state-context";
 import { useChat } from "@/state/chat-context";
 import { AppSidebar } from "@/sections/shell/app-sidebar";
 import { LaunchFlyout } from "@/sections/shell/launch-flyout";
+import { ScenarioCatalogModal } from "@/sections/signals/scenario-catalog-modal";
 import { ShellBottomBar } from "@/sections/shell/shell-bottom-bar";
 import { WelcomeSection } from "@/sections/welcome/welcome-section";
 import { WelcomeChatProvider } from "@/sections/welcome/welcome-chat-context";
@@ -37,7 +38,7 @@ function BottomBarSlot() {
 }
 
 export default function Home() {
-  const { view, launchFlyoutOpen, activeSection } = useAppState();
+  const { view, launchFlyoutOpen, activeSection, catalog } = useAppState();
   const dispatch = useAppDispatch();
   const welcomeChat = useOnboardingChat();
 
@@ -81,6 +82,11 @@ export default function Home() {
           <LaunchFlyout
             open={launchFlyoutOpen}
             onClose={() => dispatch({ type: "flyout_close" })}
+          />
+          <ScenarioCatalogModal
+            open={catalog !== null}
+            onClose={() => dispatch({ type: "catalog_close" })}
+            onSelect={(scenarioId) => dispatch({ type: "catalog_select", scenarioId })}
           />
           <div className="relative flex flex-1 flex-col overflow-hidden">
             {renderMain()}
