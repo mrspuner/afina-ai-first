@@ -227,7 +227,8 @@ export type Action =
   | { type: "wizard_random_remix" }
   | { type: "catalog_open"; returnTo: CatalogReturnTo }
   | { type: "catalog_close" }
-  | { type: "catalog_select"; scenarioId: string };
+  | { type: "catalog_select"; scenarioId: string }
+  | { type: "selected_scenario_consumed" };
 // PARALLEL-WORKTREE INSERTION POINT — survey actions (B), billing/signal-status actions (E).
 // Each worktree appends its own action variants to the union above; resolve merges by
 // keeping every appended line and adding the matching reducer case at the end of appReducer.
@@ -754,6 +755,9 @@ export function appReducer(state: AppState, action: Action): AppState {
         wizardSessionId: state.wizardSessionId + 1,
       };
     }
+
+    case "selected_scenario_consumed":
+      return { ...state, selectedScenarioId: null };
     // PARALLEL-WORTREE INSERTION POINT — append survey/billing/signal-status cases
     // immediately above this comment to keep merges trivial.
   }
