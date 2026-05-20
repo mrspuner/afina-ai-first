@@ -14,6 +14,7 @@ import { LaunchFlyout } from "@/sections/shell/launch-flyout";
 import { ScenarioCatalogModal } from "@/sections/signals/scenario-catalog-modal";
 import { ShellBottomBar } from "@/sections/shell/shell-bottom-bar";
 import { WelcomeSection } from "@/sections/welcome/welcome-section";
+import { SurveySection } from "@/sections/survey/survey-section";
 import { WelcomeChatProvider } from "@/sections/welcome/welcome-chat-context";
 import { useOnboardingChat } from "@/sections/welcome/use-onboarding-chat";
 import { GuidedSignalSection } from "@/sections/signals/guided-signal-section";
@@ -38,12 +39,27 @@ function BottomBarSlot() {
 }
 
 export default function Home() {
-  const { view, launchFlyoutOpen, activeSection, catalog } = useAppState();
+  const { view, launchFlyoutOpen, activeSection, catalog, surveyStatus } = useAppState();
   const dispatch = useAppDispatch();
   const welcomeChat = useOnboardingChat();
 
   function renderMain() {
-    if (view.kind === "welcome") return <WelcomeSection />;
+    if (view.kind === "welcome") {
+      // First-entry 3-screen onboarding: site → enrich → interests →
+      // scenarios → catalog. Skippable; once completed or skipped,
+      // surveyStatus closes the gate and we render WelcomeSection.
+      if (surveyStatus === "not_started") {
+        return (
+          <SurveySection
+            skippable
+            withOnboardingScreens
+            onComplete={() => { /* catalog open routes the user from here */ }}
+            onSkip={() => { /* survey_skipped re-renders WelcomeSection */ }}
+          />
+        );
+      }
+      return <WelcomeSection />;
+    }
     if (view.kind === "guided-signal" || view.kind === "awaiting-campaign")
       return <GuidedSignalSection />;
     if (view.kind === "campaign-select")
