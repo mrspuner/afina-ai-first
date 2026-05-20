@@ -91,6 +91,7 @@ export type View =
   | { kind: "awaiting-campaign" }
   | { kind: "campaign-select" }
   | { kind: "workflow"; campaign: { id: string; name: string }; launched: boolean }
+  | { kind: "campaign"; campaign: { id: string; name: string } }
   | { kind: "section"; name: SectionName; campaignId?: string };
 
 // A "browser-history address" — what we persist to history.state so back/forward
@@ -103,6 +104,7 @@ export type ViewAddress =
   | { kind: "awaiting-campaign" }
   | { kind: "campaign-select" }
   | { kind: "workflow"; campaignId: string }
+  | { kind: "campaign"; campaignId: string }
   | { kind: "section"; name: SectionName; campaignId?: string };
 
 export type AppState = {
@@ -228,7 +230,9 @@ export type Action =
   | { type: "catalog_open"; returnTo: CatalogReturnTo }
   | { type: "catalog_close" }
   | { type: "catalog_select"; scenarioId: string }
-  | { type: "selected_scenario_consumed" };
+  | { type: "selected_scenario_consumed" }
+  | { type: "campaign_launched"; id: string; timestamp: string }
+  | { type: "open_workflow"; campaign: { id: string; name: string }; launched: boolean };
 // PARALLEL-WORKTREE INSERTION POINT — survey actions (B), billing/signal-status actions (E).
 // Each worktree appends its own action variants to the union above; resolve merges by
 // keeping every appended line and adding the matching reducer case at the end of appReducer.
@@ -353,16 +357,15 @@ export function appReducer(state: AppState, action: Action): AppState {
     case "campaign_opened": {
       const c = state.campaigns.find((cc) => cc.id === action.id);
       if (!c) return state;
+      const launched =
+        c.status === "active" || c.status === "paused" || c.status === "completed";
+      // Launched campaigns route to the new campaign feed; draft/scheduled
+      // still go straight into the workflow editor (existing behaviour).
       return {
         ...state,
-        view: {
-          kind: "workflow",
-          campaign: { id: c.id, name: c.name },
-          launched:
-            c.status === "active" ||
-            c.status === "paused" ||
-            c.status === "completed",
-        },
+        view: launched
+          ? { kind: "campaign", campaign: { id: c.id, name: c.name } }
+          : { kind: "workflow", campaign: { id: c.id, name: c.name }, launched: false },
         activeSection: null,
         campaignFilter: [],
         campaignSort: "default",
@@ -762,6 +765,35 @@ export function appReducer(state: AppState, action: Action): AppState {
 
     case "selected_scenario_consumed":
       return { ...state, selectedScenarioId: null };
+
+    case "campaign_launched": {
+      const c = state.campaigns.find((cc) => cc.id === action.id);
+      if (!c) return state;
+      return {
+        ...state,
+        campaigns: state.campaigns.map((cc) =>
+          cc.id === action.id
+            ? {
+                ...cc,
+                status: "active",
+                launchedAt: cc.launchedAt ?? action.timestamp,
+              }
+            : cc
+        ),
+        view: { kind: "campaign", campaign: { id: c.id, name: c.name } },
+        activeSection: null,
+      };
+    }
+
+    case "open_workflow":
+      return {
+        ...state,
+        view: {
+          kind: "workflow",
+          campaign: action.campaign,
+          launched: action.launched,
+        },
+      };
     // PARALLEL-WORTREE INSERTION POINT — append survey/billing/signal-status cases
     // immediately above this comment to keep merges trivial.
   }
@@ -797,6 +829,11 @@ function rebuildViewFromAddress(addr: ViewAddress, campaigns: Campaign[]): View 
           c.status === "completed",
       };
     }
+    case "campaign": {
+      const c = campaigns.find((cc) => cc.id === addr.campaignId);
+      if (!c) return { kind: "section", name: "Кампании" };
+      return { kind: "campaign", campaign: { id: c.id, name: c.name } };
+    }
     case "section":
       return { kind: "section", name: addr.name, campaignId: addr.campaignId };
   }
@@ -818,6 +855,8 @@ export function viewToAddress(view: View): ViewAddress {
       return { kind: "campaign-select" };
     case "workflow":
       return { kind: "workflow", campaignId: view.campaign.id };
+    case "campaign":
+      return { kind: "campaign", campaignId: view.campaign.id };
     case "section":
       return { kind: "section", name: view.name, campaignId: view.campaignId };
   }
