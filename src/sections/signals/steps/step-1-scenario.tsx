@@ -1,81 +1,100 @@
 "use client";
 
+import { useMemo } from "react";
 import { StepContent } from "@/sections/signals/steps/step-content";
 import { StepProps } from "@/types/campaign";
-import { cn } from "@/lib/utils";
-
-const SCENARIOS = [
-  {
-    id: "registration",
-    name: "Регистрация",
-    description: "Возврат пользователей после незавершённой регистрации или брошенной корзины",
-  },
-  {
-    id: "first-deal",
-    name: "Первая сделка",
-    description: "Обогащение данных о клиенте, оценка потенциала и рисков",
-  },
-  {
-    id: "upsell",
-    name: "Апсейл",
-    description: "Мониторинг интереса к конкурентам, предотвращение оттока",
-  },
-  {
-    id: "retention",
-    name: "Удержание",
-    description: "Мониторинг интереса к конкурентам и предотвращение оттока",
-  },
-  {
-    id: "return",
-    name: "Возврат",
-    description: "Определение оптимального момента для повторного контакта",
-  },
-  {
-    id: "reactivation",
-    name: "Реактивация",
-    description: "Определение оптимального момента для повторного контакта",
-  },
-];
+import { useAppState, useAppDispatch } from "@/state/app-state-context";
+import { ScenarioCard } from "@/sections/signals/scenario-card";
+import {
+  baseScenarios,
+  curatedScenarios,
+  getScenario,
+  scenarioCount,
+} from "@/data/scenarios";
 
 export function Step1Scenario({ data, onNext }: StepProps) {
+  const { selectedScenarioId } = useAppState();
+  const dispatch = useAppDispatch();
+
   // Safety net: a sidebar-driven entry to the wizard must NOT visually
-  // pre-select a scenario — `data.scenario` is `null` for that path. If a
-  // future regression sets `data.scenario` to a non-empty string here without
-  // user interaction, this guard keeps step-1 visually pristine until the
-  // user picks one themselves.
-  const visualScenario =
+  // pre-select a scenario — keep step-1 visually pristine until the user
+  // picks one themselves.
+  const wizardScenario =
     typeof data.scenario === "string" && data.scenario.length > 0
       ? data.scenario
       : null;
+
+  // Visual highlight follows wizard state first, then any catalog-selected
+  // scenario that hasn't been committed to the wizard yet.
+  const visualScenario = wizardScenario ?? selectedScenarioId;
+
+  const base = baseScenarios();
+  const curated = curatedScenarios();
+
+  // If the user picked a scenario in the catalog that isn't in either visible
+  // section, surface it as the first card of "Подобрано для вас" — TZ §1.5.
+  const curatedDisplay = useMemo(() => {
+    if (!selectedScenarioId) return curated;
+    const inBase = base.some((s) => s.id === selectedScenarioId);
+    const inCurated = curated.some((s) => s.id === selectedScenarioId);
+    if (inBase || inCurated) return curated;
+    const extra = getScenario(selectedScenarioId);
+    return extra ? [extra, ...curated] : curated;
+  }, [base, curated, selectedScenarioId]);
 
   function handleSelect(id: string) {
     onNext({ scenario: id });
   }
 
+  function handleOpenCatalog() {
+    dispatch({ type: "catalog_open", returnTo: "wizard-step-1" });
+  }
+
   return (
     <StepContent
-      title="Выберите тип сигнала"
-      subtitle="Выберите сценарий, мы зададим нужные вопросы"
+      title="Выберите сценарий"
+      subtitle="Готовая связка сигнала и кампании под бизнес-цель"
     >
-      <div className="grid grid-cols-3 gap-3">
-        {SCENARIOS.map((s) => (
-          <button
-            key={s.id}
-            type="button"
-            onClick={() => handleSelect(s.id)}
-            className={cn(
-              "flex flex-col items-start rounded-lg border p-4 text-left transition-all",
-              visualScenario === s.id
-                ? "border-brand/50 bg-brand-muted"
-                : "border-border bg-card hover:bg-accent hover:border-border"
-            )}
-          >
-            <span className="text-sm font-medium text-foreground">{s.name}</span>
-            <span className="mt-1 text-xs leading-relaxed text-muted-foreground">
-              {s.description}
-            </span>
-          </button>
-        ))}
+      <div className="flex flex-col gap-6">
+        <section>
+          <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-foreground">
+            Базовые сценарии
+          </p>
+          <div className="grid grid-cols-3 gap-3">
+            {base.map((s) => (
+              <ScenarioCard
+                key={s.id}
+                scenario={s}
+                selected={visualScenario === s.id}
+                onClick={handleSelect}
+              />
+            ))}
+          </div>
+        </section>
+
+        <section>
+          <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-foreground">
+            Подобрано для вас
+          </p>
+          <div className="grid grid-cols-3 gap-3">
+            {curatedDisplay.map((s) => (
+              <ScenarioCard
+                key={s.id}
+                scenario={s}
+                selected={visualScenario === s.id}
+                onClick={handleSelect}
+              />
+            ))}
+          </div>
+        </section>
+
+        <button
+          type="button"
+          onClick={handleOpenCatalog}
+          className="self-start rounded-lg border border-border bg-card px-4 py-2 text-sm text-foreground transition-colors hover:bg-accent"
+        >
+          Все {scenarioCount} сценариев →
+        </button>
       </div>
     </StepContent>
   );
