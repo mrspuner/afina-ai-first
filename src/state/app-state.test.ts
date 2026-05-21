@@ -1344,3 +1344,46 @@ describe("isOnboarding", () => {
     expect(isOnboarding(state)).toBe(false);
   });
 });
+
+describe("appReducer — open_campaign_payment", () => {
+  it("switches view to campaign-payment for an existing campaign", () => {
+    const c = makeCampaign({ id: "cmp_A", name: "C" });
+    const state: AppState = { ...initialState, campaigns: [c] };
+    const next = appReducer(state, {
+      type: "open_campaign_payment",
+      campaignId: "cmp_A",
+    });
+    expect(next.view).toEqual({
+      kind: "campaign-payment",
+      campaign: { id: "cmp_A", name: "C" },
+    });
+  });
+
+  it("is a no-op for unknown campaignId", () => {
+    const state: AppState = {
+      ...initialState,
+      campaigns: [makeCampaign({ id: "cmp_A" })],
+    };
+    const next = appReducer(state, {
+      type: "open_campaign_payment",
+      campaignId: "cmp_unknown",
+    });
+    expect(next).toBe(state);
+  });
+
+  it("preserves campaigns and signals arrays untouched", () => {
+    const c = makeCampaign({ id: "cmp_A", name: "C" });
+    const s = makeSignal({ id: "sig_1" });
+    const state: AppState = {
+      ...initialState,
+      campaigns: [c],
+      signals: [s],
+    };
+    const next = appReducer(state, {
+      type: "open_campaign_payment",
+      campaignId: "cmp_A",
+    });
+    expect(next.campaigns).toBe(state.campaigns);
+    expect(next.signals).toBe(state.signals);
+  });
+});

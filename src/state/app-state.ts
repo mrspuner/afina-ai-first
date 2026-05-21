@@ -102,6 +102,7 @@ export type View =
   | { kind: "awaiting-campaign" }
   | { kind: "campaign-select" }
   | { kind: "workflow"; campaign: { id: string; name: string }; launched: boolean }
+  | { kind: "campaign-payment"; campaign: { id: string; name: string } }
   | { kind: "campaign"; campaign: { id: string; name: string } }
   | { kind: "section"; name: SectionName; campaignId?: string };
 
@@ -246,6 +247,7 @@ export type Action =
   | { type: "selected_scenario_consumed" }
   | { type: "campaign_launched"; id: string; timestamp: string }
   | { type: "open_workflow"; campaign: { id: string; name: string }; launched: boolean }
+  | { type: "open_campaign_payment"; campaignId: string }
   | { type: "stats_set_period"; period: Period }
   | { type: "stats_set_calc_method"; method: CalcMethod }
   | { type: "stats_set_currency"; currency: Currency }
@@ -820,6 +822,18 @@ export function appReducer(state: AppState, action: Action): AppState {
           launched: action.launched,
         },
       };
+
+    case "open_campaign_payment": {
+      const c = state.campaigns.find((cc) => cc.id === action.campaignId);
+      if (!c) return state;
+      return {
+        ...state,
+        view: {
+          kind: "campaign-payment",
+          campaign: { id: c.id, name: c.name },
+        },
+      };
+    }
 
     case "stats_set_period":
       return { ...state, stats: statisticsReducer(state.stats, { type: "SET_PERIOD", period: action.period }) };
