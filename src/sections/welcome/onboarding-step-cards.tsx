@@ -9,6 +9,7 @@ import {
 } from "@/state/app-state";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { scenarioCount } from "@/data/scenarios";
 
 type Step = {
   n: 1 | 2 | 3;
@@ -101,13 +102,18 @@ export function OnboardingStepCards() {
           step={step1}
           cta={
             step1Active ? (
-              <Button
-                size="default"
-                className="mt-4 w-full"
-                onClick={() => dispatch({ type: "start_signal_flow" })}
-              >
-                Создать сигнал
-              </Button>
+              <>
+                <span className="mt-3 text-xs font-medium text-foreground">
+                  Под вашу компанию подобрано {scenarioCount} сценариев
+                </span>
+                <Button
+                  size="default"
+                  className="mt-3 w-full"
+                  onClick={() => dispatch({ type: "start_signal_flow" })}
+                >
+                  Создать сигнал
+                </Button>
+              </>
             ) : undefined
           }
         />

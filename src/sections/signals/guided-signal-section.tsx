@@ -7,6 +7,7 @@ import type { Signal } from "@/state/app-state";
 import type { SignalStatus } from "@/types/signal-status";
 import type { StepData } from "@/types/campaign";
 import { SCENARIO_TO_TYPE } from "@/state/scenario-map";
+import { getScenario } from "@/data/scenarios";
 import { SurveySection } from "@/sections/survey/survey-section";
 import { CampaignWorkspace } from "./campaign-workspace";
 import { TopUpModal, computeShortfall } from "./top-up-modal";
@@ -41,10 +42,31 @@ function stepForSignalStatus(status: SignalStatus | undefined): number {
  * the wizard is rendered (smooth handoff, no return to start screen).
  */
 export function GuidedSignalSection() {
-  const { view, surveyStatus, balance, signals, resumingSignalId, wizardSessionId } =
+  const { view, surveyStatus, balance, signals, resumingSignalId, wizardSessionId, selectedScenarioId } =
     useAppState();
   const dispatch = useAppDispatch();
-  const initial = view.kind === "guided-signal" ? view.initialScenario : undefined;
+  const viewInitial = view.kind === "guided-signal" ? view.initialScenario : undefined;
+
+  // One-shot snapshot of a scenario chosen via the catalog from
+  // onboarding/launcher: drives the wizard to start at step 2 with this
+  // scenario pre-selected. Snapshotted at mount so a later
+  // `selected_scenario_consumed` dispatch doesn't reset the wizard mid-life.
+  const [catalogScenarioSnapshot] = useState(() => {
+    if (viewInitial) return undefined;
+    if (!selectedScenarioId) return undefined;
+    const s = getScenario(selectedScenarioId);
+    return s ? { id: s.id, name: s.name } : undefined;
+  });
+  const initial = viewInitial ?? catalogScenarioSnapshot;
+
+  // Clear selectedScenarioId after we've snapshotted it — keeps state hygienic
+  // for the next wizard entry. Runs once on mount.
+  useEffect(() => {
+    if (catalogScenarioSnapshot) {
+      dispatch({ type: "selected_scenario_consumed" });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // One-shot capture of the signal we're resuming. Reading the snapshot
   // straight from `signals` would let a status change (e.g. payment success)

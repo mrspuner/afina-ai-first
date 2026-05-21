@@ -21,6 +21,8 @@ export type SignalType =
   | "Возврат"
   | "Удержание";
 
+export type CatalogReturnTo = "onboarding" | "wizard-step-1" | "launcher";
+
 export const SIGNAL_TYPES = [
   "Регистрация",
   "Первая сделка",
@@ -89,6 +91,7 @@ export type View =
   | { kind: "awaiting-campaign" }
   | { kind: "campaign-select" }
   | { kind: "workflow"; campaign: { id: string; name: string }; launched: boolean }
+  | { kind: "campaign"; campaign: { id: string; name: string } }
   | { kind: "section"; name: SectionName; campaignId?: string };
 
 // A "browser-history address" — what we persist to history.state so back/forward
@@ -101,6 +104,7 @@ export type ViewAddress =
   | { kind: "awaiting-campaign" }
   | { kind: "campaign-select" }
   | { kind: "workflow"; campaignId: string }
+  | { kind: "campaign"; campaignId: string }
   | { kind: "section"; name: SectionName; campaignId?: string };
 
 export type AppState = {
@@ -108,9 +112,9 @@ export type AppState = {
   signals: Signal[];
   campaigns: Campaign[];
   workflowCommand: string | null;
-  workflowNodeCommand: { commands: Array<{ nodeLabel: string; text: string }> } | null;
+  workflowNodeCommand: { commands: Array<{ nodeLabel?: string; nodeId?: string; text: string }> } | null;
   workflowStructuralCommands: { ops: StructuralOp[] } | null;
-  selectedWorkflowNode: { id: string; label: string } | null;
+  selectedWorkflowNode: { id: string; label: string; nodeType?: string } | null;
   aiReply: string | null;
   launchFlyoutOpen: boolean;
   activeSection: SectionName | null;
@@ -163,6 +167,10 @@ export type AppState = {
   wizardRemixToken: number;
   /** Pending inline field edit dispatched from NodeCardBody; cleared by workflow-view after application. */
   workflowNodeFieldPatch: { nodeId: string; patch: Partial<NodeParams> } | null;
+  /** Non-null while the scenario catalog modal is open. */
+  catalog: { returnTo: CatalogReturnTo } | null;
+  /** The scenario id chosen in the catalog; read by the wizard on mount. */
+  selectedScenarioId: string | null;
 };
 
 export type Action =
@@ -185,9 +193,9 @@ export type Action =
   | { type: "preset_applied"; preset: Preset }
   | { type: "workflow_command_submit"; text: string }
   | { type: "workflow_command_handled" }
-  | { type: "workflow_node_selected"; id: string; label: string }
+  | { type: "workflow_node_selected"; id: string; label: string; nodeType?: string }
   | { type: "workflow_node_deselected" }
-  | { type: "workflow_node_command_submit"; commands: Array<{ nodeLabel: string; text: string }> }
+  | { type: "workflow_node_command_submit"; commands: Array<{ nodeLabel?: string; nodeId?: string; text: string }> }
   | { type: "workflow_node_command_handled" }
   | { type: "workflow_node_field_set"; nodeId: string; patch: Partial<NodeParams> }
   | { type: "workflow_node_field_set_handled" }
@@ -218,7 +226,13 @@ export type Action =
   | { type: "resume_signal_in_wizard_handled" }
   | { type: "wizard_step_changed"; step: number | null }
   | { type: "budget_help_shown" }
-  | { type: "wizard_random_remix" };
+  | { type: "wizard_random_remix" }
+  | { type: "catalog_open"; returnTo: CatalogReturnTo }
+  | { type: "catalog_close" }
+  | { type: "catalog_select"; scenarioId: string }
+  | { type: "selected_scenario_consumed" }
+  | { type: "campaign_launched"; id: string; timestamp: string }
+  | { type: "open_workflow"; campaign: { id: string; name: string }; launched: boolean };
 // PARALLEL-WORKTREE INSERTION POINT — survey actions (B), billing/signal-status actions (E).
 // Each worktree appends its own action variants to the union above; resolve merges by
 // keeping every appended line and adding the matching reducer case at the end of appReducer.
@@ -247,6 +261,8 @@ export const initialState: AppState = {
   budgetHelpShown: false,
   wizardRemixToken: 0,
   workflowNodeFieldPatch: null,
+  catalog: null,
+  selectedScenarioId: null,
 };
 
 export function appReducer(state: AppState, action: Action): AppState {
@@ -341,16 +357,15 @@ export function appReducer(state: AppState, action: Action): AppState {
     case "campaign_opened": {
       const c = state.campaigns.find((cc) => cc.id === action.id);
       if (!c) return state;
+      const launched =
+        c.status === "active" || c.status === "paused" || c.status === "completed";
+      // Launched campaigns route to the new campaign feed; draft/scheduled
+      // still go straight into the workflow editor (existing behaviour).
       return {
         ...state,
-        view: {
-          kind: "workflow",
-          campaign: { id: c.id, name: c.name },
-          launched:
-            c.status === "active" ||
-            c.status === "paused" ||
-            c.status === "completed",
-        },
+        view: launched
+          ? { kind: "campaign", campaign: { id: c.id, name: c.name } }
+          : { kind: "workflow", campaign: { id: c.id, name: c.name }, launched: false },
         activeSection: null,
         campaignFilter: [],
         campaignSort: "default",
@@ -498,7 +513,7 @@ export function appReducer(state: AppState, action: Action): AppState {
     case "workflow_node_selected":
       return {
         ...state,
-        selectedWorkflowNode: { id: action.id, label: action.label },
+        selectedWorkflowNode: { id: action.id, label: action.label, nodeType: action.nodeType },
       };
 
     case "workflow_node_deselected":
@@ -724,6 +739,61 @@ export function appReducer(state: AppState, action: Action): AppState {
         ...state,
         accountSettings: { ...state.accountSettings, ...action.patch },
       };
+
+    case "catalog_open":
+      return { ...state, catalog: { returnTo: action.returnTo }, launchFlyoutOpen: false };
+
+    case "catalog_close": {
+      if (state.catalog?.returnTo === "onboarding") {
+        return { ...state, catalog: null, view: { kind: "welcome" }, activeSection: null };
+      }
+      return { ...state, catalog: null };
+    }
+
+    case "catalog_select": {
+      const returnTo = state.catalog?.returnTo;
+      const base = { ...state, catalog: null, selectedScenarioId: action.scenarioId };
+      if (returnTo === "wizard-step-1") return base;
+      return {
+        ...base,
+        view: { kind: "guided-signal" as const },
+        activeSection: null,
+        resumingSignalId: undefined,
+        wizardSessionId: state.wizardSessionId + 1,
+      };
+    }
+
+    case "selected_scenario_consumed":
+      return { ...state, selectedScenarioId: null };
+
+    case "campaign_launched": {
+      const c = state.campaigns.find((cc) => cc.id === action.id);
+      if (!c) return state;
+      return {
+        ...state,
+        campaigns: state.campaigns.map((cc) =>
+          cc.id === action.id
+            ? {
+                ...cc,
+                status: "active",
+                launchedAt: cc.launchedAt ?? action.timestamp,
+              }
+            : cc
+        ),
+        view: { kind: "campaign", campaign: { id: c.id, name: c.name } },
+        activeSection: null,
+      };
+    }
+
+    case "open_workflow":
+      return {
+        ...state,
+        view: {
+          kind: "workflow",
+          campaign: action.campaign,
+          launched: action.launched,
+        },
+      };
     // PARALLEL-WORTREE INSERTION POINT — append survey/billing/signal-status cases
     // immediately above this comment to keep merges trivial.
   }
@@ -759,6 +829,11 @@ function rebuildViewFromAddress(addr: ViewAddress, campaigns: Campaign[]): View 
           c.status === "completed",
       };
     }
+    case "campaign": {
+      const c = campaigns.find((cc) => cc.id === addr.campaignId);
+      if (!c) return { kind: "section", name: "Кампании" };
+      return { kind: "campaign", campaign: { id: c.id, name: c.name } };
+    }
     case "section":
       return { kind: "section", name: addr.name, campaignId: addr.campaignId };
   }
@@ -780,6 +855,8 @@ export function viewToAddress(view: View): ViewAddress {
       return { kind: "campaign-select" };
     case "workflow":
       return { kind: "workflow", campaignId: view.campaign.id };
+    case "campaign":
+      return { kind: "campaign", campaignId: view.campaign.id };
     case "section":
       return { kind: "section", name: view.name, campaignId: view.campaignId };
   }

@@ -8,15 +8,11 @@ import { StepProps } from "@/types/campaign";
 import { useAppState } from "@/state/app-state-context";
 import { computeShortfall } from "@/sections/signals/top-up-modal";
 import { cn } from "@/lib/utils";
+import { SCENARIOS } from "@/data/scenarios";
 
-const SCENARIO_NAMES: Record<string, string> = {
-  registration: "Регистрация",
-  "first-deal": "Первая сделка",
-  upsell: "Апсейл",
-  retention: "Удержание",
-  return: "Возврат",
-  reactivation: "Реактивация",
-};
+const SCENARIO_NAMES: Record<string, string> = Object.fromEntries(
+  SCENARIOS.map((s) => [s.id, s.name])
+);
 
 const SEGMENT_NAMES: Record<string, string> = {
   max: "Максимальный (₽ 0.45 / сигнал)",

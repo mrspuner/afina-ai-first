@@ -8,6 +8,7 @@ import { ChatPanelHeader } from "./chat-panel-header";
 import { ChatHistoryList } from "./chat-history-list";
 import { ChatComposer } from "./chat-composer";
 import { useChatSubmit } from "./use-chat-submit";
+import { DraftQueueList } from "./draft-queue-list";
 
 const SIDEBAR_WIDTH_PX = 420;
 
@@ -55,6 +56,7 @@ export function ChatDrawer({ placeholder }: { placeholder: string }) {
             onOpenSidebar={chat.openSidebar}
             onCloseSidebar={chat.closeSidebar}
           />
+          <DraftQueueList variant="drawer" onTakeDraft={() => {}} />
           {chat.messages.length === 0 ? (
             <EmptyHistory />
           ) : (

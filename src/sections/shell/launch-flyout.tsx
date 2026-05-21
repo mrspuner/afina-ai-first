@@ -5,15 +5,13 @@ import { Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useAppDispatch, useAppState } from "@/state/app-state-context";
 import { SignalRow } from "./signal-row";
+import { baseScenarios, scenarioCount } from "@/data/scenarios";
 
-const SIGNAL_TEMPLATES = [
-  { id: "registration", title: "Регистрация",   description: "Возврат пользователей после незавершённой регистрации или брошенной корзины" },
-  { id: "first-deal",   title: "Первая сделка", description: "Обогащение данных о клиенте, оценка потенциала и рисков" },
-  { id: "upsell",       title: "Апсейл",        description: "Мониторинг интереса к конкурентам, предотвращение оттока" },
-  { id: "retention",    title: "Удержание",     description: "Мониторинг интереса к конкурентам и предотвращение оттока" },
-  { id: "return",       title: "Возврат",       description: "Определение оптимального момента для повторного контакта" },
-  { id: "reactivation", title: "Реактивация",   description: "Определение оптимального момента для повторного контакта" },
-];
+const SIGNAL_TEMPLATES = baseScenarios().map((s) => ({
+  id: s.id,
+  title: s.name,
+  description: s.description,
+}));
 
 interface LaunchFlyoutProps {
   open: boolean;
@@ -161,6 +159,13 @@ export function LaunchFlyout({ open, onClose }: LaunchFlyoutProps) {
                       </button>
                     ))}
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => dispatch({ type: "catalog_open", returnTo: "launcher" })}
+                    className="mt-3 w-full rounded-lg border border-dashed border-border p-3 text-left text-sm text-muted-foreground transition-colors hover:border-brand/50 hover:bg-accent hover:text-foreground"
+                  >
+                    Все {scenarioCount} сценариев →
+                  </button>
                 </section>
               )}
 

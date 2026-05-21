@@ -4,14 +4,17 @@ import { PromptInputProvider } from "@/components/ai-elements/prompt-input";
 import { PromptChipsProvider } from "@/state/prompt-chips-context";
 import { ChatProvider } from "@/state/chat-context";
 import { TriggerEditRegistryProvider } from "@/state/trigger-edit-context";
+import { DraftQueueProvider } from "@/state/draft-queue-context";
 import { ChatPanel } from "@/sections/shell/chat-panel";
 import { ChatDrawer } from "@/sections/shell/chat-drawer";
 import { useAppState, useAppDispatch } from "@/state/app-state-context";
 import { useChat } from "@/state/chat-context";
 import { AppSidebar } from "@/sections/shell/app-sidebar";
 import { LaunchFlyout } from "@/sections/shell/launch-flyout";
+import { ScenarioCatalogModal } from "@/sections/signals/scenario-catalog-modal";
 import { ShellBottomBar } from "@/sections/shell/shell-bottom-bar";
 import { WelcomeSection } from "@/sections/welcome/welcome-section";
+import { SurveySection } from "@/sections/survey/survey-section";
 import { WelcomeChatProvider } from "@/sections/welcome/welcome-chat-context";
 import { useOnboardingChat } from "@/sections/welcome/use-onboarding-chat";
 import { GuidedSignalSection } from "@/sections/signals/guided-signal-section";
@@ -19,6 +22,7 @@ import { SignalsSection } from "@/sections/signals/signals-section";
 import { CampaignsSection } from "@/sections/campaigns/campaigns-section";
 import { CampaignTypeView } from "@/sections/campaigns/campaign-type-view";
 import { WorkflowSection } from "@/sections/campaigns/workflow-section";
+import { CampaignScreen } from "@/sections/campaigns/campaign-screen";
 import { StatisticsSection } from "@/sections/statistics/statistics-section";
 import { SettingsSection } from "@/sections/settings/settings-section";
 import { DevPanel } from "@/components/dev/dev-panel";
@@ -36,12 +40,27 @@ function BottomBarSlot() {
 }
 
 export default function Home() {
-  const { view, launchFlyoutOpen, activeSection } = useAppState();
+  const { view, launchFlyoutOpen, activeSection, catalog, surveyStatus } = useAppState();
   const dispatch = useAppDispatch();
   const welcomeChat = useOnboardingChat();
 
   function renderMain() {
-    if (view.kind === "welcome") return <WelcomeSection />;
+    if (view.kind === "welcome") {
+      // First-entry 3-screen onboarding: site → enrich → interests →
+      // scenarios → catalog. Skippable; once completed or skipped,
+      // surveyStatus closes the gate and we render WelcomeSection.
+      if (surveyStatus === "not_started") {
+        return (
+          <SurveySection
+            skippable
+            withOnboardingScreens
+            onComplete={() => { /* catalog open routes the user from here */ }}
+            onSkip={() => { /* survey_skipped re-renders WelcomeSection */ }}
+          />
+        );
+      }
+      return <WelcomeSection />;
+    }
     if (view.kind === "guided-signal" || view.kind === "awaiting-campaign")
       return <GuidedSignalSection />;
     if (view.kind === "campaign-select")
@@ -53,6 +72,7 @@ export default function Home() {
         />
       );
     if (view.kind === "workflow") return <WorkflowSection />;
+    if (view.kind === "campaign") return <CampaignScreen />;
     if (view.kind === "section") {
       if (view.name === "Статистика") return <StatisticsSection />;
       if (view.name === "Сигналы") return <SignalsSection />;
@@ -67,6 +87,7 @@ export default function Home() {
       <PromptChipsProvider>
       <WelcomeChatProvider value={welcomeChat}>
         <ChatProvider>
+        <DraftQueueProvider>
         <TriggerEditRegistryProvider>
         <div className="flex h-screen overflow-hidden bg-background">
           <AppSidebar
@@ -80,6 +101,11 @@ export default function Home() {
             open={launchFlyoutOpen}
             onClose={() => dispatch({ type: "flyout_close" })}
           />
+          <ScenarioCatalogModal
+            open={catalog !== null}
+            onClose={() => dispatch({ type: "catalog_close" })}
+            onSelect={(scenarioId) => dispatch({ type: "catalog_select", scenarioId })}
+          />
           <div className="relative flex flex-1 flex-col overflow-hidden">
             {renderMain()}
             <BottomBarSlot />
@@ -88,6 +114,7 @@ export default function Home() {
           </div>
         </div>
         </TriggerEditRegistryProvider>
+        </DraftQueueProvider>
         </ChatProvider>
       </WelcomeChatProvider>
       </PromptChipsProvider>

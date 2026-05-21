@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { getNodeColor } from "@/sections/campaigns/node-visuals";
+import type { NodeTagPayload, PromptChip } from "@/state/prompt-chips-context";
 import { motion } from "motion/react";
 import Image from "next/image";
 import { Mic } from "lucide-react";
@@ -13,12 +15,13 @@ import {
   PromptInputSubmit,
   PromptInputTools,
   usePromptInputAttachments,
+  usePromptInputController,
 } from "@/components/ai-elements/prompt-input";
 import {
   ChipEditableInput,
   type ChipEditableInputHandle,
 } from "@/components/ai-elements/chip-editable-input";
-import { usePromptChips } from "@/state/prompt-chips-context";
+import { usePromptChips, isNodeTagPayload } from "@/state/prompt-chips-context";
 import { cn } from "@/lib/utils";
 import { useAppState, useAppDispatch } from "@/state/app-state-context";
 import {
@@ -28,11 +31,16 @@ import {
 } from "@/state/app-state";
 import { parseStructuralCommands } from "@/state/structural-commands";
 import { parseCampaignQuery } from "@/state/parse-campaign-filter";
+import { decideEnterAction, APPLY_ALL_COMMAND } from "@/state/prompt-bar-enter";
+import { applyDraftToNode } from "@/state/apply-draft";
+import { useDraftQueue } from "@/state/draft-queue-context";
 import { useWelcomeChat } from "@/sections/welcome/welcome-chat-context";
 import { OnboardingChatChips } from "@/sections/welcome/onboarding-chat-view";
 import { CampaignsPromptChips } from "@/sections/campaigns/campaigns-prompt-chips";
 import { PromptBar } from "./prompt-bar";
+import { SuggestionBar } from "./suggestion-bar";
 import { useChat } from "@/state/chat-context";
+import { DraftQueueList } from "./draft-queue-list";
 
 function AttachmentFileList() {
   const { files } = usePromptInputAttachments();
@@ -53,13 +61,14 @@ function AttachmentFileList() {
 
 /**
  * Mirrors the currently selected workflow node into a chip in the prompt-bar.
- * Backspace-removal of the chip dispatches `workflow_node_deselected` so the
- * canvas selection state stays in sync.
+ * The chip is colored by the node's kind via getNodeColor. Backspace-removal
+ * of the chip dispatches `workflow_node_deselected` so the canvas selection
+ * state stays in sync.
  */
 function SelectedNodeChipEffect({
   selected,
 }: {
-  selected: { id: string; label: string } | null;
+  selected: { id: string; label: string; nodeType?: string } | null;
 }) {
   const { pushChip } = usePromptChips();
 
@@ -70,11 +79,17 @@ function SelectedNodeChipEffect({
   // Re-clicking the same node is a no-op because pushChip dedups by id.
   useEffect(() => {
     if (!selected) return;
+    const nodeType = selected.nodeType ?? "default";
     pushChip({
       id: `node_${selected.id}`,
       kind: "node",
       label: selected.label,
-      payload: selected.id,
+      payload: {
+        nodeId: selected.id,
+        nodeType,
+        color: getNodeColor(nodeType),
+        // paramLabel absent → whole-node tag
+      } satisfies NodeTagPayload,
       removable: true,
     });
   }, [selected, pushChip]);
@@ -116,13 +131,47 @@ export function ShellBottomBar() {
   } = state;
   const welcomeChat = useWelcomeChat();
   const chipsApi = usePromptChips();
+  const { drafts: draftsRef, clearQueue } = useDraftQueue();
   const { openSidebar } = useChat();
+  // PromptInputProvider is mounted globally in page.tsx above ShellBottomBar,
+  // so usePromptInputController() resolves here — the controller context is
+  // created by PromptInputProvider, not by the <PromptInput> form below.
+  const { textInput } = usePromptInputController();
 
   const editorRef = useRef<ChipEditableInputHandle>(null);
+
+  // M6: mirror the editor's single active tag/text into local flags so the
+  // SuggestionBar (which picks welcome/context/apply-all) can react. The source
+  // is imperative DOM (getActiveSegment reads the contenteditable surface owned
+  // and synced by ChipEditableInput's own effect), so this external→internal
+  // sync must run in an effect — eslint-disable marks it intentional. Recomputed
+  // whenever chips or the controller text value change.
+  const [activeTag, setActiveTag] = useState<PromptChip | null>(null);
+  const [hasTypedText, setHasTypedText] = useState(false);
+  useEffect(() => {
+    const seg = editorRef.current?.getActiveSegment() ?? null;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setActiveTag(seg ? seg.chip : null);
+    setHasTypedText(seg ? seg.text.trim().length > 0 : false);
+  }, [chipsApi.chips, textInput.value]);
 
   function handlePromptSubmit(message: PromptInputMessage) {
     const rawText = message.text ?? "";
     const segments = editorRef.current?.getSegments() ?? [];
+
+    const decision = decideEnterAction({
+      hasActiveTag: segments.length > 0,
+      activeTagFromQueue: false,
+      activeText: rawText,
+      queueLength: draftsRef.length,
+    });
+    if (decision.kind === "apply-all") {
+      for (const d of draftsRef) applyDraftToNode(dispatch, d.chip, d.text);
+      clearQueue();
+      chipsApi.clearChips();
+      editorRef.current?.clear();
+      return;
+    }
 
     if (isOnWelcome(state)) {
       welcomeChat?.submitFreeText(rawText);
@@ -143,9 +192,19 @@ export function ShellBottomBar() {
     // Node commands now come from per-chip segments: each `node` chip pairs
     // with the free text typed *between* it and the next chip. Empty-text
     // segments are skipped so a chip without a command doesn't fire a noop.
+    // Node chips carry a NodeTagPayload with a reliable `nodeId` — pass it so
+    // the resolver matches by id. For a node-field chip `chip.label` is the
+    // field name (not a node label) and would never resolve; `nodeLabel` is
+    // still passed as a fallback for whole-node chips.
     const nodeCommands = segments
       .filter((s) => s.chip.kind === "node" && s.text.length > 0)
-      .map((s) => ({ nodeLabel: s.chip.label, text: s.text }));
+      .map((s) => ({
+        nodeLabel: s.chip.label,
+        nodeId: isNodeTagPayload(s.chip.payload)
+          ? s.chip.payload.nodeId
+          : undefined,
+        text: s.text,
+      }));
 
     if (structural.ops.length > 0) {
       dispatch({
@@ -191,33 +250,36 @@ export function ShellBottomBar() {
       <PromptBar
         onOpenDrawer={openSidebar}
         slot={
-          view.kind === "guided-signal" &&
-          wizardCurrentStep === 5 &&
-          budgetHelpShown ? (
-            <motion.div
-              key="budget-help-answer"
-              initial={{ y: 6, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ duration: 0.26, ease: [0.23, 1, 0.32, 1] }}
-              data-testid="budget-help-answer"
-              className="flex items-start gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/80"
-            >
-              <Image
-                src="/mascot-icon.svg"
-                alt=""
-                width={16}
-                height={16}
-                className="mt-0.5 shrink-0"
-                aria-hidden
-              />
-              <span className="leading-snug">
-                Рекомендуемая сумма рассчитана из размера вашей базы и средних
-                цен по сегментам. Мы заложили её так, чтобы хватило на полный
-                цикл сбора сигналов без перерасхода — обычно это 5–35% от
-                размера базы в рублях.
-              </span>
-            </motion.div>
-          ) : undefined
+          <>
+            <DraftQueueList variant="compact" onTakeDraft={() => {}} />
+            {view.kind === "guided-signal" &&
+            wizardCurrentStep === 5 &&
+            budgetHelpShown ? (
+              <motion.div
+                key="budget-help-answer"
+                initial={{ y: 6, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ duration: 0.26, ease: [0.23, 1, 0.32, 1] }}
+                data-testid="budget-help-answer"
+                className="flex items-start gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/80"
+              >
+                <Image
+                  src="/mascot-icon.svg"
+                  alt=""
+                  width={16}
+                  height={16}
+                  className="mt-0.5 shrink-0"
+                  aria-hidden
+                />
+                <span className="leading-snug">
+                  Рекомендуемая сумма рассчитана из размера вашей базы и средних
+                  цен по сегментам. Мы заложили её так, чтобы хватило на полный
+                  цикл сбора сигналов без перерасхода — обычно это 5–35% от
+                  размера базы в рублях.
+                </span>
+              </motion.div>
+            ) : undefined}
+          </>
         }
       >
         <PromptInput
@@ -247,22 +309,43 @@ export function ShellBottomBar() {
             <PromptInputSubmit />
           </PromptInputFooter>
         </PromptInput>
-        {onWelcome && welcomeChat && (
-          <OnboardingChatChips
-            chips={welcomeChat.chips}
-            onChipClick={welcomeChat.submitChip}
-          />
-        )}
-        {view.kind === "section" && view.name === "Кампании" && campaigns.length > 0 && (
-          <CampaignsPromptChips
-            onChipClick={(text) => {
-              const { statuses, sort } = parseCampaignQuery(text);
-              if (statuses.length > 0 || sort !== "default") {
-                dispatch({ type: "campaigns_query_set", statuses, sort });
-              }
-            }}
-          />
-        )}
+        <SuggestionBar
+          activeTag={activeTag}
+          hasTypedText={hasTypedText}
+          isWelcome={
+            onWelcome || (view.kind === "section" && view.name === "Кампании")
+          }
+          welcomeSlot={
+            onWelcome && welcomeChat ? (
+              <OnboardingChatChips
+                chips={welcomeChat.chips}
+                onChipClick={welcomeChat.submitChip}
+              />
+            ) : view.kind === "section" &&
+              view.name === "Кампании" &&
+              campaigns.length > 0 ? (
+              <CampaignsPromptChips
+                onChipClick={(text) => {
+                  const { statuses, sort } = parseCampaignQuery(text);
+                  if (statuses.length > 0 || sort !== "default") {
+                    dispatch({ type: "campaigns_query_set", statuses, sort });
+                  }
+                }}
+              />
+            ) : null
+          }
+          onPickSuggestion={(fullText) => {
+            textInput.insertAtCursor(fullText, {
+              separator: "smart",
+              preserveTags: true,
+            });
+          }}
+          onPickApplyAll={() => {
+            chipsApi.clearChips();
+            editorRef.current?.clear();
+            textInput.insertAtCursor(APPLY_ALL_COMMAND, { separator: "none" });
+          }}
+        />
         {view.kind === "guided-signal" &&
           wizardCurrentStep === 5 &&
           !budgetHelpShown && (

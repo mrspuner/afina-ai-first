@@ -21,6 +21,12 @@ import { cn } from "@/lib/utils";
 interface ChipEditableInputProps {
   placeholder?: string;
   className?: string;
+  /**
+   * Вызывается, когда в инпут добавляется НОВЫЙ тег при уже существующем —
+   * M5: предыдущий тег нужно запарковать в очередь. Срабатывает в эффекте
+   * sync chips→DOM до фактической вставки нового чипа.
+   */
+  onTagSwap?: () => void;
 }
 
 export interface ChipEditableInputHandle {
@@ -32,6 +38,11 @@ export interface ChipEditableInputHandle {
    * chip is dropped — there is no target it could belong to.
    */
   getSegments(): ChipSegment[];
+  /**
+   * Возвращает единственный активный сегмент (тег + текст после него), либо
+   * null если в инпуте нет тега. M5: инпут держит один активный тег.
+   */
+  getActiveSegment(): ChipSegment | null;
   /** Removes all chips and text from the editor. Used after successful submit. */
   clear(): void;
 }
@@ -54,7 +65,7 @@ export interface ChipEditableInputHandle {
 export const ChipEditableInput = forwardRef<
   ChipEditableInputHandle,
   ChipEditableInputProps
->(function ChipEditableInput({ placeholder, className }, ref) {
+>(function ChipEditableInput({ placeholder, className, onTagSwap }, ref) {
   const editorRef = useRef<HTMLDivElement>(null);
   const { chips, removeChip } = usePromptChips();
   const controller = usePromptInputController();
@@ -224,6 +235,10 @@ export const ChipEditableInput = forwardRef<
     for (const chip of chips) {
       const selector = `[data-chip-id="${cssEscape(chip.id)}"]`;
       if (ed.querySelector(selector)) continue;
+      // M5: a NEW chip arriving while a chip already exists means the user
+      // is switching tags — the composer parks the previous tag's draft.
+      const hadChip = ed.querySelector("[data-chip-id]") !== null;
+      if (hadChip) onTagSwap?.();
       const el = createChipElement(chip);
       insertChipAtRange(el, ed, lastRangeRef.current);
       // Refresh the saved range so subsequent chip pushes append after the
@@ -236,7 +251,7 @@ export const ChipEditableInput = forwardRef<
 
     // Re-flush text into controller so external readers see the latest.
     setInput(readText());
-  }, [chips, readText, setInput]);
+  }, [chips, readText, setInput, onTagSwap]);
 
   // External setInput("") (form-submit clear) should also clear DOM text and
   // chips. Other external value changes (rare now) sync into the editor end.
@@ -296,6 +311,27 @@ export const ChipEditableInput = forwardRef<
         });
         flush();
         return segments;
+      },
+      getActiveSegment() {
+        const ed = editorRef.current;
+        if (!ed) return null;
+        const stateById = new Map(chips.map((c) => [c.id, c] as const));
+        let currentChip: PromptChip | null = null;
+        let buffer = "";
+        ed.childNodes.forEach((node) => {
+          if (
+            node instanceof HTMLElement &&
+            node.dataset.chipId &&
+            stateById.has(node.dataset.chipId)
+          ) {
+            currentChip = stateById.get(node.dataset.chipId)!;
+          } else if (node.nodeType === Node.TEXT_NODE) {
+            buffer += node.textContent ?? "";
+          } else if (node instanceof HTMLElement && node.tagName === "BR") {
+            buffer += "\n";
+          }
+        });
+        return currentChip ? { chip: currentChip, text: buffer.trim() } : null;
       },
       clear() {
         const ed = editorRef.current;
@@ -397,7 +433,17 @@ function createChipElement(chip: PromptChip): HTMLElement {
   el.setAttribute("data-chip-id", chip.id);
   el.setAttribute("data-chip-kind", chip.kind);
   el.className =
-    "mx-0.5 inline-flex select-none items-center rounded-md border px-2 py-0.5 align-baseline text-xs font-medium border-white/15 bg-white/10 text-white";
+    "mx-0.5 inline-flex select-none items-center gap-1 rounded-md border px-2 py-0.5 align-baseline text-xs font-medium";
+  // Окраска по цвету узла (NodeTagPayload). Прочие чипы — нейтральный стиль.
+  const payload = chip.payload as { color?: string } | null;
+  const color = payload && typeof payload.color === "string" ? payload.color : null;
+  if (color) {
+    el.style.borderColor = `${color}66`;
+    el.style.backgroundColor = `${color}1f`;
+    el.style.color = color;
+  } else {
+    el.classList.add("border-white/15", "bg-white/10", "text-white");
+  }
   el.textContent = chip.label;
   return el;
 }

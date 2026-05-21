@@ -415,20 +415,24 @@ describe("appReducer — campaign_opened", () => {
     });
   });
 
-  it("opens active campaign with launched=true", () => {
+  it("opens active campaign in the campaign feed view", () => {
     const c = makeCampaign({ id: "cmp_A", name: "Running", status: "active" });
     const state: AppState = { ...initialState, campaigns: [c] };
     const next = appReducer(state, { type: "campaign_opened", id: "cmp_A" });
-    if (next.view.kind !== "workflow") throw new Error("unreachable");
-    expect(next.view.launched).toBe(true);
+    expect(next.view).toEqual({
+      kind: "campaign",
+      campaign: { id: "cmp_A", name: "Running" },
+    });
   });
 
-  it("opens completed campaign with launched=true", () => {
+  it("opens completed campaign in the campaign feed view", () => {
     const c = makeCampaign({ id: "cmp_A", name: "Done", status: "completed" });
     const state: AppState = { ...initialState, campaigns: [c] };
     const next = appReducer(state, { type: "campaign_opened", id: "cmp_A" });
-    if (next.view.kind !== "workflow") throw new Error("unreachable");
-    expect(next.view.launched).toBe(true);
+    expect(next.view).toEqual({
+      kind: "campaign",
+      campaign: { id: "cmp_A", name: "Done" },
+    });
   });
 
   it("opens scheduled campaign with launched=false", () => {
@@ -454,6 +458,55 @@ describe("appReducer — campaign_opened", () => {
     };
     const next = appReducer(state, { type: "campaign_opened", id: "cmp_A" });
     expect(next.activeSection).toBeNull();
+  });
+});
+
+describe("appReducer — launched campaign screen", () => {
+  it("campaign_launched sets active + launchedAt and navigates to campaign view", () => {
+    const c = makeCampaign({ id: "cmp_A", name: "C", status: "draft" });
+    const state: AppState = { ...initialState, campaigns: [c] };
+    const next = appReducer(state, {
+      type: "campaign_launched",
+      id: "cmp_A",
+      timestamp: "2026-05-20T00:00:00.000Z",
+    });
+    const updated = next.campaigns.find((x) => x.id === "cmp_A");
+    expect(updated?.status).toBe("active");
+    expect(updated?.launchedAt).toBe("2026-05-20T00:00:00.000Z");
+    expect(next.view).toEqual({
+      kind: "campaign",
+      campaign: { id: "cmp_A", name: "C" },
+    });
+  });
+
+  it("campaign_launched is a no-op for unknown id", () => {
+    const state: AppState = {
+      ...initialState,
+      campaigns: [makeCampaign({ id: "cmp_A" })],
+    };
+    const next = appReducer(state, {
+      type: "campaign_launched",
+      id: "cmp_unknown",
+      timestamp: "t",
+    });
+    expect(next).toBe(state);
+  });
+
+  it("open_workflow switches the view to a launched workflow", () => {
+    const state: AppState = {
+      ...initialState,
+      view: { kind: "campaign", campaign: { id: "cmp_A", name: "C" } },
+    };
+    const next = appReducer(state, {
+      type: "open_workflow",
+      campaign: { id: "cmp_A", name: "C" },
+      launched: true,
+    });
+    expect(next.view).toEqual({
+      kind: "workflow",
+      campaign: { id: "cmp_A", name: "C" },
+      launched: true,
+    });
   });
 });
 
@@ -1002,6 +1055,37 @@ describe("workflow_node_field_set", () => {
       nodeId: "email",
       patch: { subject: "second" },
     });
+  });
+});
+
+describe("appReducer — scenario catalog", () => {
+  it("catalog_open stores returnTo and closes the launch flyout", () => {
+    const state = { ...initialState, launchFlyoutOpen: true };
+    const next = appReducer(state, { type: "catalog_open", returnTo: "launcher" });
+    expect(next.catalog).toEqual({ returnTo: "launcher" });
+    expect(next.launchFlyoutOpen).toBe(false);
+  });
+  it("catalog_close clears the catalog", () => {
+    const state = { ...initialState, catalog: { returnTo: "wizard-step-1" as const } };
+    expect(appReducer(state, { type: "catalog_close" }).catalog).toBeNull();
+  });
+  it("catalog_select from wizard-step-1 stores scenario and stays on guided-signal", () => {
+    const state = {
+      ...initialState,
+      view: { kind: "guided-signal" as const },
+      catalog: { returnTo: "wizard-step-1" as const },
+    };
+    const next = appReducer(state, { type: "catalog_select", scenarioId: "cat-seasonal" });
+    expect(next.catalog).toBeNull();
+    expect(next.selectedScenarioId).toBe("cat-seasonal");
+    expect(next.view.kind).toBe("guided-signal");
+  });
+  it("catalog_select from onboarding starts the signal flow on guided-signal", () => {
+    const state = { ...initialState, catalog: { returnTo: "onboarding" as const } };
+    const next = appReducer(state, { type: "catalog_select", scenarioId: "cat-seasonal" });
+    expect(next.catalog).toBeNull();
+    expect(next.selectedScenarioId).toBe("cat-seasonal");
+    expect(next.view.kind).toBe("guided-signal");
   });
 });
 

@@ -23,7 +23,7 @@ interface WorkflowGraphProps {
   nodes: WorkflowNode[];
   edges: WorkflowEdge[];
   compact?: boolean;
-  onNodeClick?: (id: string, label: string) => void;
+  onNodeClick?: (id: string, label: string, nodeType?: string) => void;
   onPaneClick?: () => void;
 }
 
@@ -101,8 +101,10 @@ function GraphInner({
         nodesConnectable={false}
         elementsSelectable={true}
         onNodeClick={(_, node) => {
-          const label = (node.data as { label?: string } | undefined)?.label ?? node.id;
-          onNodeClick?.(node.id, label);
+          const data = node.data as { label?: string; nodeType?: string } | undefined;
+          const label = data?.label ?? node.id;
+          const nodeType = data?.nodeType;
+          onNodeClick?.(node.id, label, nodeType);
         }}
         onPaneClick={onPaneClick}
         onViewportChange={updateFades}

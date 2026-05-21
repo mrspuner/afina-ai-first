@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { X } from "lucide-react";
+import { ArrowLeft, X } from "lucide-react";
 import Image from "next/image";
+import { Button } from "@/components/ui/button";
 import { useAppState, useAppDispatch } from "@/state/app-state-context";
 import { CanvasHeader, type CanvasHeaderToast } from "./canvas-header";
 import { WorkflowView } from "./workflow-view";
@@ -80,8 +81,8 @@ export function WorkflowSection() {
   }, []);
 
   const handleNodeClick = useCallback(
-    (id: string, label: string) => {
-      dispatch({ type: "workflow_node_selected", id, label });
+    (id: string, label: string, nodeType?: string) => {
+      dispatch({ type: "workflow_node_selected", id, label, nodeType });
     },
     [dispatch]
   );
@@ -112,19 +113,29 @@ export function WorkflowSection() {
     };
   }, [aiReply, dispatch]);
 
-  // Resolve node-command labels → ids via the current graph snapshot.
-  // Tags pointing to unknown labels are silently skipped.
+  // Resolve node-commands to node ids via the current graph snapshot. A command
+  // may carry an explicit `nodeId` (node-field/whole-node tag chips from the
+  // prompt bar — the field-name label is NOT a node label and would never
+  // match) or only a `nodeLabel` (ShellBottomBar segment path). Prefer an exact
+  // `nodeId` match; fall back to label resolution otherwise. Commands that
+  // resolve to no node are silently skipped.
   const resolvedNodeCommands = useMemo(() => {
     if (!workflowNodeCommand) return null;
     const g = graphRef.current;
     if (!g) return null;
     const resolved: Array<{ nodeId: string; text: string }> = [];
     for (const cmd of workflowNodeCommand.commands) {
-      const target = normalizeNodeRef(cmd.nodeLabel);
-      const node = g.nodes.find(
-        (n) =>
-          normalizeNodeRef((n.data as WorkflowNodeData).label) === target
-      );
+      let node: WorkflowNode | undefined;
+      if (cmd.nodeId) {
+        node = g.nodes.find((n) => n.id === cmd.nodeId);
+      }
+      if (!node && cmd.nodeLabel) {
+        const target = normalizeNodeRef(cmd.nodeLabel);
+        node = g.nodes.find(
+          (n) =>
+            normalizeNodeRef((n.data as WorkflowNodeData).label) === target
+        );
+      }
       if (node) resolved.push({ nodeId: node.id, text: cmd.text });
     }
     return resolved.length > 0 ? resolved : null;
@@ -170,9 +181,8 @@ export function WorkflowSection() {
       return;
     }
     dispatch({
-      type: "campaign_status_changed",
+      type: "campaign_launched",
       id: currentCampaign.id,
-      status: "active",
       timestamp: new Date().toISOString(),
     });
   }
@@ -181,9 +191,8 @@ export function WorkflowSection() {
     if (!currentCampaign) return;
     dispatch({ type: "balance_topup", amount });
     dispatch({
-      type: "campaign_status_changed",
+      type: "campaign_launched",
       id: currentCampaign.id,
-      status: "active",
       timestamp: new Date().toISOString(),
     });
     setTopUpOpen(false);
@@ -244,21 +253,30 @@ export function WorkflowSection() {
 
   return (
     <div className="relative flex flex-1 flex-col">
-      <CanvasHeader
-        campaign={currentCampaign}
-        signal={currentSignal}
-        onRename={handleRename}
-        onSaveDraft={handleSaveDraft}
-        onLaunch={handleLaunch}
-        onSchedule={handleSchedule}
-        onPause={handlePause}
-        onResume={handleResume}
-        onDuplicate={handleDuplicate}
-        onGoToStats={handleGoToStats}
-        onCancelSchedule={handleCancelSchedule}
-        toast={toast}
-        onDismissToast={dismissToast}
-      />
+      {view.launched ? (
+        <ReadOnlyWorkflowHeader
+          campaignName={currentCampaign.name}
+          onBack={() =>
+            dispatch({ type: "campaign_opened", id: currentCampaign.id })
+          }
+        />
+      ) : (
+        <CanvasHeader
+          campaign={currentCampaign}
+          signal={currentSignal}
+          onRename={handleRename}
+          onSaveDraft={handleSaveDraft}
+          onLaunch={handleLaunch}
+          onSchedule={handleSchedule}
+          onPause={handlePause}
+          onResume={handleResume}
+          onDuplicate={handleDuplicate}
+          onGoToStats={handleGoToStats}
+          onCancelSchedule={handleCancelSchedule}
+          toast={toast}
+          onDismissToast={dismissToast}
+        />
+      )}
       <div className="relative flex flex-1 flex-col overflow-hidden">
         <WorkflowView
           key={currentCampaign.id}
@@ -275,8 +293,9 @@ export function WorkflowSection() {
           signalType={currentSignal?.type}
           signal={currentSignal ?? undefined}
           onGraphChange={handleGraphChange}
-          onNodeClick={handleNodeClick}
-          onPaneClick={handlePaneClick}
+          // Read-only for launched campaigns — kill node interactions.
+          onNodeClick={view.launched ? undefined : handleNodeClick}
+          onPaneClick={view.launched ? undefined : handlePaneClick}
         />
       </div>
 
@@ -326,6 +345,27 @@ export function WorkflowSection() {
           </motion.div>
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+function ReadOnlyWorkflowHeader({
+  campaignName,
+  onBack,
+}: {
+  campaignName: string;
+  onBack: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-3 border-b border-border px-8 py-4">
+      <Button variant="ghost" size="sm" onClick={onBack} aria-label="Назад">
+        <ArrowLeft className="h-4 w-4" />
+        Назад
+      </Button>
+      <span className="text-sm font-medium text-foreground">{campaignName}</span>
+      <span className="text-xs uppercase tracking-widest text-muted-foreground">
+        · workflow · просмотр
+      </span>
     </div>
   );
 }
