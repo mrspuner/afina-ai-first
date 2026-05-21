@@ -41,6 +41,7 @@ import { PromptBar } from "./prompt-bar";
 import { SuggestionBar } from "./suggestion-bar";
 import { useChat } from "@/state/chat-context";
 import { DraftQueueList } from "./draft-queue-list";
+import { useChatSubmit } from "./use-chat-submit";
 
 function AttachmentFileList() {
   const { files } = usePromptInputAttachments();
@@ -122,6 +123,7 @@ function ClearChipsOnViewChangeEffect({
 export function ShellBottomBar() {
   const state = useAppState();
   const dispatch = useAppDispatch();
+  const { submit: chatSubmit } = useChatSubmit();
   const {
     view,
     selectedWorkflowNode,
@@ -183,6 +185,15 @@ export function ShellBottomBar() {
       if (statuses.length > 0 || sort !== "default") {
         dispatch({ type: "campaigns_query_set", statuses, sort });
       }
+      return;
+    }
+
+    if (view.kind === "section" && view.name === "Статистика") {
+      if (rawText.trim()) {
+        chatSubmit({ text: rawText, segments });
+      }
+      editorRef.current?.clear();
+      chipsApi.clearChips();
       return;
     }
 
