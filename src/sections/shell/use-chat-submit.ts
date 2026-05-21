@@ -3,12 +3,22 @@
 import { useEffect, useRef } from "react";
 import { useChat } from "@/state/chat-context";
 import { useTriggerEdit } from "@/state/trigger-edit-context";
+import { useAppState, useAppDispatch } from "@/state/app-state-context";
+import { isOnStatisticsSection } from "@/state/app-state";
 import { mockReplyFor, mockReplyForFreeText } from "@/lib/mock-ai-reply";
 import { parseTriggerCommand } from "@/lib/trigger-edit-parser";
 import {
   COMPLEX_THINKING_FINAL_REPLY_SIGNAL,
+  COMPLEX_THINKING_FINAL_REPLY_STATS,
   COMPLEX_THINKING_STEPS_SIGNAL,
+  COMPLEX_THINKING_STEPS_STATS,
+  type ComplexThinkingStep,
 } from "@/lib/complex-thinking-demo";
+import {
+  matchStatsQuery,
+  STATS_DEMO_YEAR,
+  type StatsQueryId,
+} from "@/lib/stats-query-matcher";
 import type { ChatComposerSubmitPayload } from "./chat-composer";
 
 const LIGHT_QUERY = "лёгкий запрос";
@@ -18,6 +28,8 @@ const HEAVY_QUERY = "сложный запрос";
 export function useChatSubmit(): { submit: (payload: ChatComposerSubmitPayload) => void } {
   const chat = useChat();
   const triggerEdit = useTriggerEdit();
+  const appState = useAppState();
+  const appDispatch = useAppDispatch();
   const timersRef = useRef<number[]>([]);
 
   useEffect(() => {
@@ -36,15 +48,18 @@ export function useChatSubmit(): { submit: (payload: ChatComposerSubmitPayload) 
     timersRef.current.push(id);
   }
 
-  function playComplexThinking() {
+  function playComplexThinking(opts: {
+    steps: ComplexThinkingStep[];
+    finalReply: string;
+  }) {
     chat.openSidebar();
     let cursor = 0;
     function nextStep() {
-      if (cursor >= COMPLEX_THINKING_STEPS_SIGNAL.length) {
-        chat.append({ role: "assistant", text: COMPLEX_THINKING_FINAL_REPLY_SIGNAL });
+      if (cursor >= opts.steps.length) {
+        chat.append({ role: "assistant", text: opts.finalReply });
         return;
       }
-      const step = COMPLEX_THINKING_STEPS_SIGNAL[cursor++];
+      const step = opts.steps[cursor++];
       const id = chat.append({ role: "assistant", text: "", pending: true });
       schedule(() => {
         chat.updatePending(id, step.reasoning);
@@ -54,9 +69,63 @@ export function useChatSubmit(): { submit: (payload: ChatComposerSubmitPayload) 
     nextStep();
   }
 
+  function runStatsQuery(id: StatsQueryId, userText: string) {
+    switch (id) {
+      case "group-by-campaigns": {
+        chat.append({ role: "user", text: userText });
+        appDispatch({ type: "stats_set_rows", rows: "campaigns" });
+        const replyId = chat.append({ role: "assistant", text: "", pending: true });
+        schedule(() => {
+          chat.updatePending(replyId, "Перегруппировал по кампаниям.");
+        }, 400);
+        return;
+      }
+      case "top-campaigns-income-june": {
+        chat.append({ role: "user", text: userText });
+        appDispatch({
+          type: "stats_apply_patch",
+          patch: {
+            rows: "campaigns",
+            sort: { column: "income", direction: "desc" },
+            period: {
+              preset: "custom",
+              from: `${STATS_DEMO_YEAR}-06-01`,
+              to: `${STATS_DEMO_YEAR}-06-30`,
+            },
+            rowCount: 10,
+          },
+        });
+        const replyId = chat.append({ role: "assistant", text: "", pending: true });
+        schedule(() => {
+          chat.updatePending(replyId, "Топ-10 кампаний по доходу за июнь.");
+        }, 400);
+        return;
+      }
+      case "compare-channels": {
+        chat.append({ role: "user", text: userText });
+        playComplexThinking({
+          steps: COMPLEX_THINKING_STEPS_STATS,
+          finalReply: COMPLEX_THINKING_FINAL_REPLY_STATS,
+        });
+        return;
+      }
+    }
+  }
+
   function submit(payload: ChatComposerSubmitPayload) {
     const { text, segments } = payload;
     const normalized = text.trim().toLowerCase();
+
+    // Statistics-only hard-coded queries (looser matching). Скоупинг по
+    // секции — фразы не должны срабатывать вне Статистики, даже если их
+    // случайно ввели в drawer-композиторе.
+    if (isOnStatisticsSection(appState)) {
+      const match = matchStatsQuery(text);
+      if (match) {
+        runStatsQuery(match.id, text);
+        return;
+      }
+    }
 
     if (normalized === LIGHT_QUERY) {
       chat.append({ role: "user", text });
@@ -72,7 +141,10 @@ export function useChatSubmit(): { submit: (payload: ChatComposerSubmitPayload) 
     }
     if (normalized === HEAVY_QUERY) {
       chat.append({ role: "user", text });
-      playComplexThinking();
+      playComplexThinking({
+        steps: COMPLEX_THINKING_STEPS_SIGNAL,
+        finalReply: COMPLEX_THINKING_FINAL_REPLY_SIGNAL,
+      });
       return;
     }
 
