@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { StepContent } from "@/sections/signals/steps/step-content";
 import { StepProps } from "@/types/campaign";
 import { useAppState, useAppDispatch } from "@/state/app-state-context";
+import { Button } from "@/components/ui/button";
 import { ScenarioCard } from "@/sections/signals/scenario-card";
 import {
   baseScenarios,
@@ -60,7 +61,7 @@ export function Step1Scenario({ data, onNext }: StepProps) {
           <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-foreground">
             Базовые сценарии
           </p>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid auto-rows-fr grid-cols-3 gap-3">
             {base.map((s) => (
               <ScenarioCard
                 key={s.id}
@@ -76,7 +77,7 @@ export function Step1Scenario({ data, onNext }: StepProps) {
           <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-foreground">
             Подобрано для вас
           </p>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid auto-rows-fr grid-cols-3 gap-3">
             {curatedDisplay.map((s) => (
               <ScenarioCard
                 key={s.id}
@@ -88,13 +89,14 @@ export function Step1Scenario({ data, onNext }: StepProps) {
           </div>
         </section>
 
-        <button
-          type="button"
+        <Button
+          variant="outline"
+          size="default"
           onClick={handleOpenCatalog}
-          className="self-start rounded-lg border border-border bg-card px-4 py-2 text-sm text-foreground transition-colors hover:bg-accent"
+          className="self-start"
         >
           Все {scenarioCount} сценариев →
-        </button>
+        </Button>
       </div>
     </StepContent>
   );
