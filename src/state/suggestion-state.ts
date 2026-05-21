@@ -12,6 +12,8 @@ export interface SuggestionStateInput {
   queueLength: number;
   /** Текущий экран — welcome (общие подсказки доступны). */
   isWelcome: boolean;
+  /** Пользователь на странице «Статистика». */
+  isStatistics: boolean;
 }
 
 export type SuggestionState =
@@ -21,17 +23,20 @@ export type SuggestionState =
   | { kind: "context" }
   /** Подсказка «Применить все изменения» (состояние 3). */
   | { kind: "apply-all" }
+  /** Чипы 3 зашитых stats-запросов (состояние 4). */
+  | { kind: "stats" }
   /** Подсказки скрыты. */
   | { kind: "hidden" };
 
 /**
  * Выбирает состояние зоны подсказок.
- * Приоритет (спека M6.1):
- *  1. начал печатать после тега → hidden (всё скрыто);
- *  2. активный тег → context (тег выигрывает у apply-all);
+ * Приоритет:
+ *  1. начал печатать после тега → hidden;
+ *  2. активный тег → context;
  *  3. непустая очередь без тега → apply-all;
  *  4. welcome-экран → welcome;
- *  5. иначе → hidden.
+ *  5. на странице Статистики → stats;
+ *  6. иначе → hidden.
  */
 export function selectSuggestionState(
   input: SuggestionStateInput
@@ -47,6 +52,9 @@ export function selectSuggestionState(
   }
   if (input.isWelcome) {
     return { kind: "welcome" };
+  }
+  if (input.isStatistics) {
+    return { kind: "stats" };
   }
   return { kind: "hidden" };
 }
