@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, Pencil } from "lucide-react";
+import { ArrowLeft, ChevronDown, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
 import {
@@ -44,6 +44,22 @@ interface CanvasHeaderProps {
   onCancelSchedule: () => void;
   toast?: CanvasHeaderToast | null;
   onDismissToast?: () => void;
+  /**
+   * Visual mode of the header.
+   * - "edit" (default) — full editable canvas header used while a campaign
+   *   is a draft; no back arrow, signal line as subtitle.
+   * - "read-only" — used when the workflow is opened in launched/preview
+   *   mode. Adds a large «Back» arrow to the left of the title and replaces
+   *   the signal-line subtitle with a static «Просмотр workflow» label.
+   *   Pencil-edit of the campaign name and the right-side action buttons
+   *   are preserved — renaming a launched campaign is allowed.
+   */
+  mode?: "edit" | "read-only";
+  /**
+   * Required when `mode === "read-only"`. Invoked when the user clicks the
+   * back arrow. Ignored in edit mode.
+   */
+  onBack?: () => void;
 }
 
 function formatDate(iso: string): string {
@@ -105,7 +121,10 @@ export function CanvasHeader({
   onCancelSchedule,
   toast,
   onDismissToast,
+  mode = "edit",
+  onBack,
 }: CanvasHeaderProps) {
+  const isReadOnly = mode === "read-only";
   const [editing, setEditing] = useState(false);
   const [draftName, setDraftName] = useState(campaign.name);
   const [confirm, setConfirm] = useState<ConfirmKind | null>(null);
@@ -153,7 +172,19 @@ export function CanvasHeader({
   return (
     <div className="sticky top-0 z-20 border-b border-border bg-background/90 px-6 py-3 backdrop-blur">
       <div className="flex items-start justify-between gap-4">
-        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <div className="flex min-w-0 flex-1 items-start gap-3">
+          {isReadOnly && onBack && (
+            <Button
+              variant="ghost"
+              size="icon-lg"
+              onClick={onBack}
+              aria-label="Назад"
+              className="shrink-0"
+            >
+              <ArrowLeft className="size-5" />
+            </Button>
+          )}
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           {editing ? (
             <Input
               ref={inputRef}
@@ -178,20 +209,27 @@ export function CanvasHeader({
               <Pencil className="h-3.5 w-3.5 opacity-0 transition-opacity group-hover:opacity-60" />
             </button>
           )}
-          <p
-            className={
-              signal
-                ? "text-xs text-muted-foreground"
-                : "text-xs font-medium text-destructive"
-            }
-          >
-            {signalLine}
-          </p>
+          {isReadOnly ? (
+            <p className="text-xs uppercase tracking-widest text-muted-foreground">
+              Просмотр workflow
+            </p>
+          ) : (
+            <p
+              className={
+                signal
+                  ? "text-xs text-muted-foreground"
+                  : "text-xs font-medium text-destructive"
+              }
+            >
+              {signalLine}
+            </p>
+          )}
           <div className="mt-1 flex flex-wrap items-center gap-2">
             <StatusBadge status={campaign.status} />
             <span className="text-xs text-muted-foreground">
               {statusDescription(campaign)}
             </span>
+          </div>
           </div>
         </div>
 
