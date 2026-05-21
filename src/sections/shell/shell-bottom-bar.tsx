@@ -26,6 +26,7 @@ import { cn } from "@/lib/utils";
 import { useAppState, useAppDispatch } from "@/state/app-state-context";
 import {
   isOnWelcome,
+  isOnStatisticsSection,
   isWorkflowView,
   type View,
 } from "@/state/app-state";
@@ -326,6 +327,7 @@ export function ShellBottomBar() {
           isWelcome={
             onWelcome || (view.kind === "section" && view.name === "Кампании")
           }
+          isStatistics={isOnStatisticsSection(state)}
           welcomeSlot={
             onWelcome && welcomeChat ? (
               <OnboardingChatChips
@@ -355,6 +357,13 @@ export function ShellBottomBar() {
             chipsApi.clearChips();
             editorRef.current?.clear();
             textInput.insertAtCursor(APPLY_ALL_COMMAND, { separator: "none" });
+          }}
+          onPickStatsQuery={(phrase) => {
+            // Вставить фразу и тут же отправить через тот же путь, что Enter.
+            // chatSubmit маршрутизирует stats-запросы через useChatSubmit.
+            chatSubmit({ text: phrase, segments: [] });
+            editorRef.current?.clear();
+            chipsApi.clearChips();
           }}
         />
         {view.kind === "guided-signal" &&
