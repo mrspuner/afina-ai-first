@@ -163,8 +163,6 @@ export function NodeCardBody({ id, data }: NodeCardBodyProps) {
   );
 
   function handleAiField(rowLabel: string) {
-    const template = templateByLabel.get(rowLabel);
-    if (template) insertPrompt(template);
     const nodeType = data.nodeType;
     const payload: NodeTagPayload = {
       nodeId: id,

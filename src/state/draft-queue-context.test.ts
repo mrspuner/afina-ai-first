@@ -74,3 +74,71 @@ describe("draftQueueReducer", () => {
     expect(draftQueueReducer(empty, { type: "clear" })).toBe(empty);
   });
 });
+
+describe("draftQueueReducer — A → B sequence (block-E semantics)", () => {
+  it("A with text → B: A is parked (one draft), order preserved", () => {
+    // Парковка А с текстом перед добавлением B (B-парковка не вызывается —
+    // у B ещё нет текста). Очередь: 1 черновик A.
+    const s = draftQueueReducer(empty, {
+      type: "park",
+      id: "d1",
+      chip: chip("nodefield_A_Текст"),
+      text: "сделай дружелюбнее",
+    });
+    expect(s.drafts).toHaveLength(1);
+    expect(s.drafts[0].chip.id).toBe("nodefield_A_Текст");
+    expect(s.drafts[0].text).toBe("сделай дружелюбнее");
+  });
+
+  it("A without text → B: parkDraft is a no-op, queue stays empty", () => {
+    // Если у А не было текста, парковщик вызывает parkDraft со строкой "".
+    // Reducer должен вернуть тот же state (no-op) — A не сохраняется в очереди.
+    const s = draftQueueReducer(empty, {
+      type: "park",
+      id: "d1",
+      chip: chip("nodefield_A_Текст"),
+      text: "",
+    });
+    expect(s).toBe(empty);
+    expect(s.drafts).toEqual([]);
+  });
+
+  it("A with text, B with text → both parked in order", () => {
+    let s = draftQueueReducer(empty, {
+      type: "park",
+      id: "d1",
+      chip: chip("nodefield_A_Текст"),
+      text: "первый",
+    });
+    s = draftQueueReducer(s, {
+      type: "park",
+      id: "d2",
+      chip: chip("nodefield_B_Тема"),
+      text: "второй",
+    });
+    expect(s.drafts.map((d) => d.chip.id)).toEqual([
+      "nodefield_A_Текст",
+      "nodefield_B_Тема",
+    ]);
+    expect(s.drafts.map((d) => d.text)).toEqual(["первый", "второй"]);
+  });
+
+  it("A with text then A re-parked with empty text: original draft stays", () => {
+    // Edge case: defensive guard. Re-park с пустым текстом — no-op,
+    // существующий draft A не должен быть стёрт.
+    let s = draftQueueReducer(empty, {
+      type: "park",
+      id: "d1",
+      chip: chip("nodefield_A_Текст"),
+      text: "сохрани меня",
+    });
+    s = draftQueueReducer(s, {
+      type: "park",
+      id: "d2",
+      chip: chip("nodefield_A_Текст"),
+      text: "",
+    });
+    expect(s.drafts).toHaveLength(1);
+    expect(s.drafts[0].text).toBe("сохрани меня");
+  });
+});

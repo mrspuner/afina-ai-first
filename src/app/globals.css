@@ -180,3 +180,16 @@
     @apply font-sans;
   }
 }
+
+/* PromptBar chip hover — full-pill brightness boost.
+   Применяется к контенту, который рендерит ChipEditableInput императивно;
+   inline-style цвет узла + Tailwind-классы для нейтральных чипов одинаково
+   реагируют на `filter: brightness(...)`. Используем статичный CSS-класс,
+   а не Tailwind-utility, потому что JIT не всегда подхватывает классы
+   внутри contentEditable'а. */
+.chip-hover {
+  cursor: pointer;
+}
+.chip-hover:hover {
+  filter: brightness(1.18);
+}

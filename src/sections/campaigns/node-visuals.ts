@@ -15,6 +15,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { WorkflowNodeType } from "@/types/workflow";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 
 export interface NodeStyle {
   border: string;
@@ -73,4 +75,33 @@ export function getNodeColor(nodeType: string): string {
 /** Иконка узла по kind, либо undefined (узел без иконки). */
 export function getNodeIcon(nodeType: string): LucideIcon | undefined {
   return NODE_ICON[nodeType as WorkflowNodeType];
+}
+
+/**
+ * Pre-rendered SVG-строки для иконок типов узлов. Рендер происходит один
+ * раз при импорте модуля (React DOM Server работает и на сервере, и в
+ * браузере). Используется в чипах PromptBar — там React не управляет
+ * содержимым (contentEditable + императивный DOM), поэтому Lucide-компонент
+ * нельзя смонтировать обычным путём, а строку — можно: вставляем через
+ * `innerHTML` в нейтральный <span aria-hidden>.
+ *
+ * Lucide SVG задают `stroke="currentColor"` — цвет наследуется от родителя.
+ */
+const NODE_ICON_SVG: Partial<Record<WorkflowNodeType, string>> =
+  Object.fromEntries(
+    Object.entries(NODE_ICON).map(([nodeType, Icon]) => [
+      nodeType,
+      renderToStaticMarkup(
+        createElement(Icon, {
+          size: 14,
+          strokeWidth: 2,
+          "aria-hidden": true,
+        })
+      ),
+    ])
+  ) as Partial<Record<WorkflowNodeType, string>>;
+
+/** SVG-строка иконки узла или null, если для типа иконки нет. */
+export function getNodeIconSvg(nodeType: string): string | null {
+  return NODE_ICON_SVG[nodeType as WorkflowNodeType] ?? null;
 }
