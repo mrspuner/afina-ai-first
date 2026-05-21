@@ -1,9 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion } from "motion/react";
-import { X } from "lucide-react";
-import Image from "next/image";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useAppState, useAppDispatch } from "@/state/app-state-context";
 import { CanvasHeader, type CanvasHeaderToast } from "./canvas-header";
 import { WorkflowView } from "./workflow-view";
@@ -24,7 +21,6 @@ const ERROR_TEXT: Record<string, string> = {
 };
 
 const TOAST_TIMEOUT_MS = 3000;
-const AI_REPLY_TIMEOUT_MS = 5000;
 
 export function WorkflowSection() {
   const {
@@ -34,7 +30,6 @@ export function WorkflowSection() {
     workflowStructuralCommands,
     workflowNodeFieldPatch,
     selectedWorkflowNode,
-    aiReply,
     signals,
     campaigns,
   } = useAppState();
@@ -44,7 +39,6 @@ export function WorkflowSection() {
   const [graphTick, setGraphTick] = useState(0);
   const [toast, setToast] = useState<CanvasHeaderToast | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const aiReplyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleCommandHandled = useCallback(
     () => dispatch({ type: "workflow_command_handled" }),
@@ -92,17 +86,6 @@ export function WorkflowSection() {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToast(null);
   }, []);
-
-  useEffect(() => {
-    if (!aiReply) return;
-    if (aiReplyTimerRef.current) clearTimeout(aiReplyTimerRef.current);
-    aiReplyTimerRef.current = setTimeout(() => {
-      dispatch({ type: "ai_reply_dismissed" });
-    }, AI_REPLY_TIMEOUT_MS);
-    return () => {
-      if (aiReplyTimerRef.current) clearTimeout(aiReplyTimerRef.current);
-    };
-  }, [aiReply, dispatch]);
 
   // Resolve node-commands to node ids via the current graph snapshot. A command
   // may carry an explicit `nodeId` (node-field/whole-node tag chips from the
@@ -274,43 +257,6 @@ export function WorkflowSection() {
         />
       </div>
 
-      <AnimatePresence>
-        {aiReply && (
-          <motion.div
-            key="ai-reply"
-            initial={{ y: 10, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 10, opacity: 0 }}
-            transition={{ duration: 0.25, ease: [0.32, 0.72, 0, 1] }}
-            className="pointer-events-auto fixed left-[120px] right-0 z-30 px-8"
-            style={{ bottom: "calc(var(--promptbar-height, 140px) + 8px)" }}
-          >
-            <div
-              role="status"
-              aria-live="polite"
-              className="mx-auto flex w-full max-w-2xl items-start gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/80 backdrop-blur-sm"
-            >
-              <Image
-                src="/mascot-icon.svg"
-                alt=""
-                width={16}
-                height={16}
-                className="mt-0.5 shrink-0"
-                aria-hidden
-              />
-              <span className="min-w-0 flex-1 leading-snug">{aiReply}</span>
-              <button
-                type="button"
-                aria-label="Закрыть ответ AI"
-                onClick={() => dispatch({ type: "ai_reply_dismissed" })}
-                className="-mr-1 rounded-md p-1 text-white/50 transition-colors hover:bg-white/10 hover:text-white/80"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }
