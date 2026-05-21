@@ -11,7 +11,7 @@ import {
   Search,
   SlidersHorizontal,
 } from "lucide-react";
-import { Fragment, useMemo, useReducer, useState } from "react";
+import { Fragment, useEffect, useMemo, useReducer, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
-import { useAppState } from "@/state/app-state-context";
+import { useAppState, useAppDispatch } from "@/state/app-state-context";
 
 import { PeriodField } from "./fields/period-field";
 import {
@@ -47,7 +47,6 @@ import {
   filtersEqual,
   statisticsReducer,
   type ColumnKey,
-  type StatisticsFilters,
 } from "./statistics-state";
 
 function DataCells({
@@ -129,13 +128,18 @@ export function StatisticsView({ campaignId }: { campaignId?: string } = {}) {
   const activeTemplate =
     templates.find((t) => t.id === activeTemplateId) ?? templates[0];
 
-  const [applied, setApplied] = useState<StatisticsFilters>(
-    activeTemplate.filters,
-  );
+  const appDispatch = useAppDispatch();
+  const applied = useAppState().stats;
   const [draft, dispatch] = useReducer(
     statisticsReducer,
-    activeTemplate.filters,
+    applied,
   );
+
+  // Re-sync local draft when applied changes externally (e.g. from PromptBar).
+  // Keeps DrillInPopover state consistent with whatever the table now shows.
+  useEffect(() => {
+    dispatch({ type: "RESET", filters: applied });
+  }, [applied]);
 
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
@@ -175,14 +179,14 @@ export function StatisticsView({ campaignId }: { campaignId?: string } = {}) {
     const tpl = templates.find((t) => t.id === id);
     if (!tpl) return;
     setActiveTemplateId(id);
-    setApplied(tpl.filters);
-    dispatch({ type: "RESET", filters: tpl.filters });
+    appDispatch({ type: "stats_reset", filters: tpl.filters });
+    // Local draft will resync via useEffect once applied updates.
     setExpandedKeys(new Set());
     setTemplatePickerOpen(false);
   }
 
   function handleSave() {
-    setApplied(draft);
+    appDispatch({ type: "stats_reset", filters: draft });
     setExpandedKeys(new Set());
   }
 
@@ -200,7 +204,7 @@ export function StatisticsView({ campaignId }: { campaignId?: string } = {}) {
     };
     setTemplates((prev) => [...prev, tpl]);
     setActiveTemplateId(id);
-    setApplied(draft);
+    appDispatch({ type: "stats_reset", filters: draft });
     setExpandedKeys(new Set());
   }
 
@@ -316,9 +320,8 @@ export function StatisticsView({ campaignId }: { campaignId?: string } = {}) {
         <PeriodField
           value={applied.period}
           onChange={(period) => {
-            const next = { ...applied, period };
-            setApplied(next);
-            dispatch({ type: "SET_PERIOD", period });
+            appDispatch({ type: "stats_set_period", period });
+            // Local draft resyncs via useEffect.
             setExpandedKeys(new Set());
           }}
           triggerVariant="chip"
