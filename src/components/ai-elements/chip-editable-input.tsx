@@ -17,6 +17,7 @@ import {
   type PromptChip,
 } from "@/state/prompt-chips-context";
 import { cn } from "@/lib/utils";
+import { getNodeIconSvg } from "@/sections/campaigns/node-visuals";
 
 interface ChipEditableInputProps {
   placeholder?: string;
@@ -222,10 +223,21 @@ export const ChipEditableInput = forwardRef<
       if (!stateById.has(id)) {
         el.remove();
       } else {
-        // Update label if it changed.
+        // Update label if it changed. Trailing text node carries the label;
+        // we mutate it in place so the leading <span aria-hidden> icon
+        // (if any) survives the update. createChipElement always appends
+        // the text as the last child via document.createTextNode().
         const target = stateById.get(id)!;
-        if (el.textContent !== target.label) {
-          el.textContent = target.label;
+        const last = el.lastChild;
+        if (
+          last &&
+          last.nodeType === Node.TEXT_NODE &&
+          last.textContent !== target.label
+        ) {
+          last.textContent = target.label;
+        } else if (!last || last.nodeType !== Node.TEXT_NODE) {
+          // No text node (shouldn't happen, but fail-safe): append one.
+          el.appendChild(document.createTextNode(target.label));
         }
       }
     });
@@ -433,10 +445,14 @@ function createChipElement(chip: PromptChip): HTMLElement {
   el.setAttribute("data-chip-id", chip.id);
   el.setAttribute("data-chip-kind", chip.kind);
   el.className =
-    "mx-0.5 inline-flex select-none items-center gap-1 rounded-md border px-2 py-0.5 align-baseline text-xs font-medium";
+    "chip-hover mx-0.5 inline-flex select-none items-center gap-1 rounded-md border px-2 py-0.5 align-baseline text-xs font-medium transition-all duration-150";
+
   // Окраска по цвету узла (NodeTagPayload). Прочие чипы — нейтральный стиль.
-  const payload = chip.payload as { color?: string } | null;
-  const color = payload && typeof payload.color === "string" ? payload.color : null;
+  const payload = chip.payload as
+    | { color?: string; nodeType?: string }
+    | null;
+  const color =
+    payload && typeof payload.color === "string" ? payload.color : null;
   if (color) {
     el.style.borderColor = `${color}66`;
     el.style.backgroundColor = `${color}1f`;
@@ -444,7 +460,24 @@ function createChipElement(chip: PromptChip): HTMLElement {
   } else {
     el.classList.add("border-white/15", "bg-white/10", "text-white");
   }
-  el.textContent = chip.label;
+
+  // Иконка узла (или узла-родителя для тега параметра). Цвет тега уже
+  // указывает на узел; иконка усиливает это сходство. Lucide SVG имеет
+  // stroke="currentColor" — цвет наследуется от родительского color.
+  const nodeType =
+    payload && typeof payload.nodeType === "string" ? payload.nodeType : null;
+  if (nodeType) {
+    const iconSvg = getNodeIconSvg(nodeType);
+    if (iconSvg) {
+      const iconWrap = document.createElement("span");
+      iconWrap.setAttribute("aria-hidden", "true");
+      iconWrap.className = "inline-flex shrink-0 items-center";
+      iconWrap.innerHTML = iconSvg;
+      el.appendChild(iconWrap);
+    }
+  }
+
+  el.appendChild(document.createTextNode(chip.label));
   return el;
 }
 
