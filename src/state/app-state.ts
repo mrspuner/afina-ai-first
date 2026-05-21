@@ -116,6 +116,7 @@ export type ViewAddress =
   | { kind: "awaiting-campaign" }
   | { kind: "campaign-select" }
   | { kind: "workflow"; campaignId: string }
+  | { kind: "campaign-payment"; campaignId: string }
   | { kind: "campaign"; campaignId: string }
   | { kind: "section"; name: SectionName; campaignId?: string };
 
@@ -894,6 +895,17 @@ function rebuildViewFromAddress(addr: ViewAddress, campaigns: Campaign[]): View 
           c.status === "completed",
       };
     }
+    case "campaign-payment": {
+      const c = campaigns.find((cc) => cc.id === addr.campaignId);
+      // Mirror the existing "workflow"/"campaign" fallback: if the campaign
+      // disappeared (e.g. preset was reapplied), drop to the campaigns list
+      // rather than rendering an empty payment screen.
+      if (!c) return { kind: "section", name: "Кампании" };
+      return {
+        kind: "campaign-payment",
+        campaign: { id: c.id, name: c.name },
+      };
+    }
     case "campaign": {
       const c = campaigns.find((cc) => cc.id === addr.campaignId);
       if (!c) return { kind: "section", name: "Кампании" };
@@ -920,6 +932,8 @@ export function viewToAddress(view: View): ViewAddress {
       return { kind: "campaign-select" };
     case "workflow":
       return { kind: "workflow", campaignId: view.campaign.id };
+    case "campaign-payment":
+      return { kind: "campaign-payment", campaignId: view.campaign.id };
     case "campaign":
       return { kind: "campaign", campaignId: view.campaign.id };
     case "section":

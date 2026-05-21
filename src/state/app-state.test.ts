@@ -4,9 +4,11 @@ import {
   initialState,
   isCampaignDone,
   isOnboarding,
+  viewToAddress,
   type AppState,
   type Signal,
   type Campaign,
+  type View,
 } from "./app-state";
 import {
   DEMO_ACCOUNT_SETTINGS,
@@ -1385,5 +1387,40 @@ describe("appReducer — open_campaign_payment", () => {
     });
     expect(next.campaigns).toBe(state.campaigns);
     expect(next.signals).toBe(state.signals);
+  });
+});
+
+describe("ViewAddress — campaign-payment round-trip", () => {
+  it("viewToAddress maps campaign-payment view to address", () => {
+    const view: View = {
+      kind: "campaign-payment",
+      campaign: { id: "cmp_A", name: "C" },
+    };
+    expect(viewToAddress(view)).toEqual({
+      kind: "campaign-payment",
+      campaignId: "cmp_A",
+    });
+  });
+
+  it("restore_address rebuilds campaign-payment view from address", () => {
+    const c = makeCampaign({ id: "cmp_A", name: "C" });
+    const state: AppState = { ...initialState, campaigns: [c] };
+    const next = appReducer(state, {
+      type: "restore_address",
+      address: { kind: "campaign-payment", campaignId: "cmp_A" },
+    });
+    expect(next.view).toEqual({
+      kind: "campaign-payment",
+      campaign: { id: "cmp_A", name: "C" },
+    });
+  });
+
+  it("restore_address falls back to Кампании when campaign id is gone", () => {
+    const state: AppState = { ...initialState, campaigns: [] };
+    const next = appReducer(state, {
+      type: "restore_address",
+      address: { kind: "campaign-payment", campaignId: "cmp_missing" },
+    });
+    expect(next.view).toEqual({ kind: "section", name: "Кампании" });
   });
 });
