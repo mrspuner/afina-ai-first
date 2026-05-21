@@ -95,13 +95,23 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(
       });
     }, [chips, textInput.value, onActiveTagChange]);
 
-    /** Паркует предыдущий активный тег при смене тега (вызов из onTagSwap). */
+    /**
+     * Паркует предыдущий активный тег при смене тега (вызов из onTagSwap).
+     * Старый чип убираем ВСЕГДА: либо запаркован (если в нём был текст),
+     * либо затёрт (текста не было — нечего сохранять). Без unconditional-
+     * remove новый чип ляжет рядом со старым (ТЗ §7.2 «без текста → A
+     * затирается → в инпуте появляется B»).
+     */
     function parkPreviousIfNeeded() {
       const prev = prevActiveRef.current;
-      if (prev && prev.text.trim().length > 0) {
-        parkDraft(prev.chip, prev.text);
-        removeChip(prev.chip.id);
+      if (!prev) {
+        setFromQueueChipId(null);
+        return;
       }
+      if (prev.text.trim().length > 0) {
+        parkDraft(prev.chip, prev.text);
+      }
+      removeChip(prev.chip.id);
       setFromQueueChipId(null);
     }
 
