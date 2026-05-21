@@ -50,7 +50,7 @@ export function OnboardingInterestsScreen({ onContinue }: OnboardingInterestsScr
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, ease: [0.23, 1, 0.32, 1] }}
-      className="mx-auto flex w-full max-w-xl flex-col gap-6"
+      className="mx-auto flex w-full max-w-2xl flex-col gap-6"
     >
       <header className="flex flex-col gap-2">
         <h1 className="text-[28px] font-semibold leading-tight tracking-tight">Уточним детали</h1>
