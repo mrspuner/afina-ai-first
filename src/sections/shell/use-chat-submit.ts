@@ -6,8 +6,8 @@ import { useTriggerEdit } from "@/state/trigger-edit-context";
 import { mockReplyFor, mockReplyForFreeText } from "@/lib/mock-ai-reply";
 import { parseTriggerCommand } from "@/lib/trigger-edit-parser";
 import {
-  COMPLEX_THINKING_FINAL_REPLY,
-  COMPLEX_THINKING_STEPS,
+  COMPLEX_THINKING_FINAL_REPLY_SIGNAL,
+  COMPLEX_THINKING_STEPS_SIGNAL,
 } from "@/lib/complex-thinking-demo";
 import type { ChatComposerSubmitPayload } from "./chat-composer";
 
@@ -40,11 +40,11 @@ export function useChatSubmit(): { submit: (payload: ChatComposerSubmitPayload) 
     chat.openSidebar();
     let cursor = 0;
     function nextStep() {
-      if (cursor >= COMPLEX_THINKING_STEPS.length) {
-        chat.append({ role: "assistant", text: COMPLEX_THINKING_FINAL_REPLY });
+      if (cursor >= COMPLEX_THINKING_STEPS_SIGNAL.length) {
+        chat.append({ role: "assistant", text: COMPLEX_THINKING_FINAL_REPLY_SIGNAL });
         return;
       }
-      const step = COMPLEX_THINKING_STEPS[cursor++];
+      const step = COMPLEX_THINKING_STEPS_SIGNAL[cursor++];
       const id = chat.append({ role: "assistant", text: "", pending: true });
       schedule(() => {
         chat.updatePending(id, step.reasoning);
