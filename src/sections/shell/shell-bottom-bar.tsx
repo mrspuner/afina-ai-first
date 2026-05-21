@@ -21,7 +21,11 @@ import {
   ChipEditableInput,
   type ChipEditableInputHandle,
 } from "@/components/ai-elements/chip-editable-input";
-import { usePromptChips, isNodeTagPayload } from "@/state/prompt-chips-context";
+import {
+  usePromptChips,
+  isNodeTagPayload,
+  type ChipSegment,
+} from "@/state/prompt-chips-context";
 import { cn } from "@/lib/utils";
 import { useAppState, useAppDispatch } from "@/state/app-state-context";
 import {
@@ -134,7 +138,7 @@ export function ShellBottomBar() {
   } = state;
   const welcomeChat = useWelcomeChat();
   const chipsApi = usePromptChips();
-  const { drafts: draftsRef, clearQueue } = useDraftQueue();
+  const { drafts: draftsRef, clearQueue, parkDraft } = useDraftQueue();
   const { openSidebar } = useChat();
   // PromptInputProvider is mounted globally in page.tsx above ShellBottomBar,
   // so usePromptInputController() resolves here — the controller context is
@@ -142,6 +146,10 @@ export function ShellBottomBar() {
   const { textInput } = usePromptInputController();
 
   const editorRef = useRef<ChipEditableInputHandle>(null);
+
+  // Snapshot активного сегмента (тег + текст) — обновляется при изменении
+  // chips, нужен для парковки предыдущего тега при смене (M5/ТЗ §7.2).
+  const prevActiveRef = useRef<ChipSegment | null>(null);
 
   // M6: mirror the editor's single active tag/text into local flags so the
   // SuggestionBar (which picks welcome/context/apply-all) can react. The source
@@ -156,7 +164,25 @@ export function ShellBottomBar() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setActiveTag(seg ? seg.chip : null);
     setHasTypedText(seg ? seg.text.trim().length > 0 : false);
+    // Keep prevActiveRef snapshot fresh so parkPreviousIfNeeded picks up the
+    // latest (chip + currently-typed text) when the user switches tags.
+    if (seg) prevActiveRef.current = seg;
   }, [chipsApi.chips, textInput.value]);
+
+  /**
+   * Паркует предыдущий активный тег при смене тега (вызов из onTagSwap
+   * ChipEditableInput'а). Старый чип убираем ВСЕГДА: либо запаркован, либо
+   * затёрт. См. ТЗ §7.2 и `ChatComposer.parkPreviousIfNeeded`.
+   */
+  function parkPreviousIfNeeded() {
+    const prev = prevActiveRef.current;
+    if (!prev) return;
+    if (prev.text.trim().length > 0) {
+      parkDraft(prev.chip, prev.text);
+    }
+    chipsApi.removeChip(prev.chip.id);
+    prevActiveRef.current = null;
+  }
 
   function handlePromptSubmit(message: PromptInputMessage) {
     const rawText = message.text ?? "";
@@ -173,6 +199,7 @@ export function ShellBottomBar() {
       clearQueue();
       chipsApi.clearChips();
       editorRef.current?.clear();
+      prevActiveRef.current = null;
       return;
     }
 
@@ -231,6 +258,7 @@ export function ShellBottomBar() {
       });
       chipsApi.clearChips();
       editorRef.current?.clear();
+      prevActiveRef.current = null;
     }
     if (
       structural.ops.length === 0 &&
@@ -311,6 +339,7 @@ export function ShellBottomBar() {
             ref={editorRef}
             className="px-3 py-2"
             placeholder={chatPlaceholder}
+            onTagSwap={parkPreviousIfNeeded}
           />
           <PromptInputFooter>
             <PromptInputTools>
