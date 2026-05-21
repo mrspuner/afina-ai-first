@@ -65,7 +65,7 @@ export default function Home() {
           <SurveySection
             skippable
             withOnboardingScreens
-            onComplete={() => { /* catalog open routes the user from here */ }}
+            onComplete={() => { /* survey_completed re-renders WelcomeSection */ }}
             onSkip={() => { /* survey_skipped re-renders WelcomeSection */ }}
           />
         );

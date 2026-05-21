@@ -37,7 +37,7 @@ export function OnboardingScenariosScreen({ onChooseScenario }: OnboardingScenar
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.45, delay: 0.25, ease: [0.23, 1, 0.32, 1] }}
       >
-        <Button onClick={onChooseScenario}>Выбрать сценарий →</Button>
+        <Button onClick={onChooseScenario}>Далее</Button>
       </motion.div>
     </motion.div>
   );
