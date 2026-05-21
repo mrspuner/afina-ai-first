@@ -70,21 +70,31 @@ case "stats_apply_patch":
   return { ...state, stats: { ...state.stats, ...action.patch } };
 ```
 
-### 2. `StatisticsView` читает из `AppState`
+### 2. `StatisticsView` читает из `AppState` (с сохранением draft/apply-механики)
+
+В `StatisticsView` сейчас две копии фильтров:
+- `applied: StatisticsFilters` — видимое состояние, источник истины для таблицы и CSV-выгрузки.
+- `draft: StatisticsFilters` (через локальный `useReducer(statisticsReducer)`) — редактируется в DrillInPopover'ах «Настройка вида» / «Условия поиска». Коммитится в `applied` по кнопке «Сохранить» через `setApplied(draft)`. Это даёт dirty-индикатор и возможность отменить незакоммиченные правки.
+
+**Поднимаем только `applied` в AppState.** Локальный `draft` + `useReducer(statisticsReducer)` сохраняются — иначе ломается механика попапов (живые правки вместо commit-on-save).
 
 Файл `src/sections/statistics/statistics-view.tsx`:
 
-- Удаляется `useReducer(statisticsReducer, ...)`
-- Фильтры читаются как `useAppState().stats`
-- Диспатч идёт через `useAppDispatch()`
-- Передача `dispatch` в DrillInPopover-builder'ы (`view-settings-levels`, `search-settings-levels`) обновляется — они теперь принимают `Dispatch<Action>` глобального стора и пользуются префиксированными action-типами
+- `applied` теперь читается из `useAppState().stats` (вместо локального `useState`)
+- `draft` остаётся как локальный `useReducer(statisticsReducer, applied)`
+- Добавляется `useEffect`, который при изменении `applied` (внешний апдейт от PromptBar) делает `dispatch({ type: "RESET", filters: applied })` — пересинхронизирует draft, чтобы при открытии попапа пользователь видел актуальное состояние
+- `handleSave` вместо `setApplied(draft)` диспатчит в AppState: `appDispatch({ type: "stats_reset", filters: draft })`
+- `handleTemplateSelect` аналогично: вместо `setApplied(tpl.filters)` диспатчит `stats_reset` с filters шаблона
+- `PeriodField.onChange` (живой апдейт, не draft): диспатчит `stats_set_period` (apllied меняется → useEffect ресинкнет draft)
 
 Файл `src/sections/statistics/statistics-state.ts`:
 
 - Типы (`StatisticsFilters`, `RowKind`, `ColumnKey`, `SortState` и т.д.) остаются
-- `statisticsReducer` удаляется (логика мигрирует в `appReducer`)
+- `statisticsReducer` **остаётся** — продолжает обслуживать локальный `draft`
 - `DEFAULT_FILTERS` остаётся (используется как начальное значение в AppState)
-- `filtersEqual` остаётся (может пригодиться для опциональной оптимизации)
+- `filtersEqual` остаётся (используется для dirty-индикатора)
+
+DrillInPopover-билдеры (`view-settings-levels`, `search-settings-levels`) **не трогаем** — они принимают локальный `dispatch` (от draft-reducer) и продолжают работать как раньше.
 
 ### 3. Скоупинг submit-обработчика по секции
 
@@ -339,10 +349,10 @@ case "compare-channels": {
 **Изменяются:**
 
 - `src/state/app-state.ts` — добавить `stats` slice + 12 action-кейсов в `appReducer`
-- `src/sections/statistics/statistics-view.tsx` — убрать `useReducer`, читать/диспатчить через AppState
-- `src/sections/statistics/statistics-state.ts` — оставить типы, удалить `statisticsReducer`
-- `src/sections/statistics/view-settings-levels.tsx` — обновить тип `dispatch`
-- `src/sections/statistics/search-settings-levels.tsx` — обновить тип `dispatch`
+- `src/sections/statistics/statistics-view.tsx` — `applied` читать из AppState, локальный `draft` оставить, добавить `useEffect`-ресинк, `handleSave`/`handleTemplateSelect`/`PeriodField.onChange` диспатчить в AppState
+- `src/sections/statistics/statistics-state.ts` — без изменений (типы + `statisticsReducer` для локального draft остаются)
+- `src/sections/statistics/view-settings-levels.tsx` — без изменений
+- `src/sections/statistics/search-settings-levels.tsx` — без изменений
 - `src/lib/complex-thinking-demo.ts` — разбить на `_SIGNAL` и `_STATS` константы
 - `src/sections/shell/use-chat-submit.ts` — параметризовать `playComplexThinking`, добавить ветку Statistics-матчинга со скоупингом
 - `src/state/suggestion-state.ts` — добавить параметр `isStatistics` + state `stats`
