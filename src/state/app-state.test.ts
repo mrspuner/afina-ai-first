@@ -1089,6 +1089,160 @@ describe("appReducer — scenario catalog", () => {
   });
 });
 
+import {
+  DEFAULT_FILTERS,
+  type StatisticsFilters,
+} from "@/sections/statistics/statistics-state";
+import { isOnStatisticsSection } from "./app-state";
+
+describe("appReducer — stats slice", () => {
+  it("initialState.stats equals DEFAULT_FILTERS", () => {
+    expect(initialState.stats).toEqual(DEFAULT_FILTERS);
+  });
+
+  it("stats_set_period replaces period", () => {
+    const next = appReducer(initialState, {
+      type: "stats_set_period",
+      period: { preset: "custom", from: "2026-06-01", to: "2026-06-30" },
+    });
+    expect(next.stats.period).toEqual({
+      preset: "custom",
+      from: "2026-06-01",
+      to: "2026-06-30",
+    });
+  });
+
+  it("stats_set_calc_method changes calcMethod", () => {
+    const next = appReducer(initialState, {
+      type: "stats_set_calc_method",
+      method: "cohort",
+    });
+    expect(next.stats.calcMethod).toBe("cohort");
+  });
+
+  it("stats_set_currency changes currency", () => {
+    const next = appReducer(initialState, {
+      type: "stats_set_currency",
+      currency: "usd",
+    });
+    expect(next.stats.currency).toBe("usd");
+  });
+
+  it("stats_set_rows changes rows", () => {
+    const next = appReducer(initialState, {
+      type: "stats_set_rows",
+      rows: "campaigns",
+    });
+    expect(next.stats.rows).toBe("campaigns");
+  });
+
+  it("stats_set_row_count changes rowCount", () => {
+    const next = appReducer(initialState, {
+      type: "stats_set_row_count",
+      count: 10,
+    });
+    expect(next.stats.rowCount).toBe(10);
+  });
+
+  it("stats_set_sub_rows changes subRows", () => {
+    const next = appReducer(initialState, {
+      type: "stats_set_sub_rows",
+      subRows: "none",
+    });
+    expect(next.stats.subRows).toBe("none");
+  });
+
+  it("stats_toggle_column removes existing column", () => {
+    const next = appReducer(initialState, {
+      type: "stats_toggle_column",
+      column: "income",
+    });
+    expect(next.stats.columns).not.toContain("income");
+  });
+
+  it("stats_toggle_column adds missing column", () => {
+    const state: AppState = {
+      ...initialState,
+      stats: { ...initialState.stats, columns: ["approves"] },
+    };
+    const next = appReducer(state, { type: "stats_toggle_column", column: "ar" });
+    expect(next.stats.columns).toContain("ar");
+  });
+
+  it("stats_reorder_columns replaces columns array", () => {
+    const next = appReducer(initialState, {
+      type: "stats_reorder_columns",
+      columns: ["ar", "rr"],
+    });
+    expect(next.stats.columns).toEqual(["ar", "rr"]);
+  });
+
+  it("stats_set_condition sets include scope", () => {
+    const next = appReducer(initialState, {
+      type: "stats_set_condition",
+      scope: "include",
+      entity: "campaigns",
+      values: ["cmp_1", "cmp_2"],
+    });
+    expect(next.stats.conditions.include.campaigns).toEqual(["cmp_1", "cmp_2"]);
+  });
+
+  it("stats_set_sort sets sort", () => {
+    const next = appReducer(initialState, {
+      type: "stats_set_sort",
+      sort: { column: "income", direction: "desc" },
+    });
+    expect(next.stats.sort).toEqual({ column: "income", direction: "desc" });
+  });
+
+  it("stats_reset replaces entire filters", () => {
+    const custom: StatisticsFilters = {
+      ...DEFAULT_FILTERS,
+      rows: "campaigns",
+      rowCount: 5,
+    };
+    const next = appReducer(initialState, { type: "stats_reset", filters: custom });
+    expect(next.stats).toEqual(custom);
+  });
+
+  it("stats_apply_patch merges multiple fields at once", () => {
+    const next = appReducer(initialState, {
+      type: "stats_apply_patch",
+      patch: {
+        rows: "campaigns",
+        sort: { column: "income", direction: "desc" },
+        rowCount: 10,
+      },
+    });
+    expect(next.stats.rows).toBe("campaigns");
+    expect(next.stats.sort).toEqual({ column: "income", direction: "desc" });
+    expect(next.stats.rowCount).toBe(10);
+    expect(next.stats.currency).toBe(DEFAULT_FILTERS.currency);
+  });
+});
+
+describe("isOnStatisticsSection", () => {
+  it("true when view is section Статистика", () => {
+    const state: AppState = {
+      ...initialState,
+      view: { kind: "section", name: "Статистика" },
+    };
+    expect(isOnStatisticsSection(state)).toBe(true);
+  });
+
+  it("false for other sections", () => {
+    const state: AppState = {
+      ...initialState,
+      view: { kind: "section", name: "Сигналы" },
+    };
+    expect(isOnStatisticsSection(state)).toBe(false);
+  });
+
+  it("false for non-section views", () => {
+    expect(isOnStatisticsSection(initialState)).toBe(false);
+  });
+});
+
 describe("appReducer — settings actions", () => {
   it("initialState carries the demo account settings", () => {
     expect(initialState.accountSettings).toEqual(DEMO_ACCOUNT_SETTINGS);

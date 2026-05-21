@@ -12,6 +12,17 @@ import {
 } from "@/data/business-directions";
 import type { AccountSettings } from "@/types/account-settings";
 import { DEMO_ACCOUNT_SETTINGS } from "@/types/account-settings";
+import {
+  DEFAULT_FILTERS,
+  statisticsReducer,
+  type StatisticsFilters,
+  type Period,
+  type CalcMethod,
+  type Currency,
+  type RowKind,
+  type ColumnKey,
+  type SortState,
+} from "@/sections/statistics/statistics-state";
 
 export type SignalType =
   | "Регистрация"
@@ -171,6 +182,8 @@ export type AppState = {
   catalog: { returnTo: CatalogReturnTo } | null;
   /** The scenario id chosen in the catalog; read by the wizard on mount. */
   selectedScenarioId: string | null;
+  // Owned by stats-promptbar-queries: filters for the Statistics view
+  stats: StatisticsFilters;
 };
 
 export type Action =
@@ -232,7 +245,19 @@ export type Action =
   | { type: "catalog_select"; scenarioId: string }
   | { type: "selected_scenario_consumed" }
   | { type: "campaign_launched"; id: string; timestamp: string }
-  | { type: "open_workflow"; campaign: { id: string; name: string }; launched: boolean };
+  | { type: "open_workflow"; campaign: { id: string; name: string }; launched: boolean }
+  | { type: "stats_set_period"; period: Period }
+  | { type: "stats_set_calc_method"; method: CalcMethod }
+  | { type: "stats_set_currency"; currency: Currency }
+  | { type: "stats_set_rows"; rows: RowKind }
+  | { type: "stats_set_row_count"; count: number }
+  | { type: "stats_set_sub_rows"; subRows: RowKind | "none" }
+  | { type: "stats_toggle_column"; column: ColumnKey }
+  | { type: "stats_reorder_columns"; columns: ColumnKey[] }
+  | { type: "stats_set_condition"; scope: "include" | "exclude"; entity: string; values: string[] }
+  | { type: "stats_set_sort"; sort: SortState | null }
+  | { type: "stats_reset"; filters: StatisticsFilters }
+  | { type: "stats_apply_patch"; patch: Partial<StatisticsFilters> };
 // PARALLEL-WORKTREE INSERTION POINT — survey actions (B), billing/signal-status actions (E).
 // Each worktree appends its own action variants to the union above; resolve merges by
 // keeping every appended line and adding the matching reducer case at the end of appReducer.
@@ -263,6 +288,7 @@ export const initialState: AppState = {
   workflowNodeFieldPatch: null,
   catalog: null,
   selectedScenarioId: null,
+  stats: DEFAULT_FILTERS,
 };
 
 export function appReducer(state: AppState, action: Action): AppState {
@@ -794,6 +820,31 @@ export function appReducer(state: AppState, action: Action): AppState {
           launched: action.launched,
         },
       };
+
+    case "stats_set_period":
+      return { ...state, stats: statisticsReducer(state.stats, { type: "SET_PERIOD", period: action.period }) };
+    case "stats_set_calc_method":
+      return { ...state, stats: statisticsReducer(state.stats, { type: "SET_CALC_METHOD", method: action.method }) };
+    case "stats_set_currency":
+      return { ...state, stats: statisticsReducer(state.stats, { type: "SET_CURRENCY", currency: action.currency }) };
+    case "stats_set_rows":
+      return { ...state, stats: statisticsReducer(state.stats, { type: "SET_ROWS", rows: action.rows }) };
+    case "stats_set_row_count":
+      return { ...state, stats: statisticsReducer(state.stats, { type: "SET_ROW_COUNT", count: action.count }) };
+    case "stats_set_sub_rows":
+      return { ...state, stats: statisticsReducer(state.stats, { type: "SET_SUB_ROWS", subRows: action.subRows }) };
+    case "stats_toggle_column":
+      return { ...state, stats: statisticsReducer(state.stats, { type: "TOGGLE_COLUMN", column: action.column }) };
+    case "stats_reorder_columns":
+      return { ...state, stats: statisticsReducer(state.stats, { type: "REORDER_COLUMNS", columns: action.columns }) };
+    case "stats_set_condition":
+      return { ...state, stats: statisticsReducer(state.stats, { type: "SET_CONDITION", scope: action.scope, entity: action.entity, values: action.values }) };
+    case "stats_set_sort":
+      return { ...state, stats: statisticsReducer(state.stats, { type: "SET_SORT", sort: action.sort }) };
+    case "stats_reset":
+      return { ...state, stats: statisticsReducer(state.stats, { type: "RESET", filters: action.filters }) };
+    case "stats_apply_patch":
+      return { ...state, stats: { ...state.stats, ...action.patch } };
     // PARALLEL-WORTREE INSERTION POINT — append survey/billing/signal-status cases
     // immediately above this comment to keep merges trivial.
   }
@@ -875,3 +926,5 @@ export const isStep2Active = (s: AppState) => isSignalDone(s) && !isCampaignDone
 export const isStep3Active = (s: AppState) => isCampaignDone(s);
 export const isWorkflowView = (s: AppState) => s.view.kind === "workflow";
 export const isOnWelcome = (s: AppState) => s.view.kind === "welcome";
+export const isOnStatisticsSection = (s: AppState): boolean =>
+  s.view.kind === "section" && s.view.name === "Статистика";
