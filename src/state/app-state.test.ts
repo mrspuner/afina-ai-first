@@ -472,6 +472,7 @@ describe("appReducer — launched campaign screen", () => {
       type: "campaign_launched",
       id: "cmp_A",
       timestamp: "2026-05-20T00:00:00.000Z",
+      budget: 500,
     });
     const updated = next.campaigns.find((x) => x.id === "cmp_A");
     expect(updated?.status).toBe("active");
@@ -491,8 +492,39 @@ describe("appReducer — launched campaign screen", () => {
       type: "campaign_launched",
       id: "cmp_unknown",
       timestamp: "t",
+      budget: 500,
     });
     expect(next).toBe(state);
+  });
+
+  it("campaign_launched stores the provided budget on the campaign", () => {
+    const c = makeCampaign({ id: "cmp_A", name: "C", status: "draft" });
+    const state: AppState = { ...initialState, campaigns: [c] };
+    const next = appReducer(state, {
+      type: "campaign_launched",
+      id: "cmp_A",
+      timestamp: "2026-05-20T00:00:00.000Z",
+      budget: 1234.56,
+    });
+    const updated = next.campaigns.find((x) => x.id === "cmp_A");
+    expect(updated?.budget).toBe(1234.56);
+    expect(updated?.status).toBe("active");
+  });
+
+  it("campaign_launched preserves an existing budget if none is provided", () => {
+    // Action shape requires budget after this change — but if a future caller
+    // passes 0 or omits it via TS, we don't erase a previously-stored value.
+    const c = makeCampaign({ id: "cmp_A", name: "C", status: "draft", budget: 999 });
+    const state: AppState = { ...initialState, campaigns: [c] };
+    const next = appReducer(state, {
+      type: "campaign_launched",
+      id: "cmp_A",
+      timestamp: "2026-05-20T00:00:00.000Z",
+      budget: 0,
+    });
+    const updated = next.campaigns.find((x) => x.id === "cmp_A");
+    // Zero-budget launches keep the previously-stored value.
+    expect(updated?.budget).toBe(999);
   });
 
   it("open_workflow switches the view to a launched workflow", () => {

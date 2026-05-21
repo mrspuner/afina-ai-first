@@ -184,6 +184,7 @@ export function WorkflowSection() {
       type: "campaign_launched",
       id: currentCampaign.id,
       timestamp: new Date().toISOString(),
+      budget: 0, // TODO: replaced when handleLaunch routes to payment screen
     });
   }
 
@@ -194,6 +195,7 @@ export function WorkflowSection() {
       type: "campaign_launched",
       id: currentCampaign.id,
       timestamp: new Date().toISOString(),
+      budget: 0, // TODO: replaced when handleLaunch routes to payment screen
     });
     setTopUpOpen(false);
   }

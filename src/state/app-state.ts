@@ -85,6 +85,12 @@ export type Campaign = {
   pausedAt?: string;
   completedAt?: string;
   scheduledFor?: string;
+  /**
+   * Set by `campaign_launched` from the payment screen. Older preset
+   * campaigns and never-launched drafts may not carry it. Display fallbacks
+   * (campaign-screen) keep working when the field is absent.
+   */
+  budget?: number;
 };
 
 export type Preset = {
@@ -246,7 +252,7 @@ export type Action =
   | { type: "catalog_close" }
   | { type: "catalog_select"; scenarioId: string }
   | { type: "selected_scenario_consumed" }
-  | { type: "campaign_launched"; id: string; timestamp: string }
+  | { type: "campaign_launched"; id: string; timestamp: string; budget: number }
   | { type: "open_workflow"; campaign: { id: string; name: string }; launched: boolean }
   | { type: "open_campaign_payment"; campaignId: string }
   | { type: "stats_set_period"; period: Period }
@@ -806,6 +812,9 @@ export function appReducer(state: AppState, action: Action): AppState {
                 ...cc,
                 status: "active",
                 launchedAt: cc.launchedAt ?? action.timestamp,
+                // A real budget overwrites; a 0 (e.g. weird re-dispatch) keeps
+                // the previously-stored value.
+                budget: action.budget > 0 ? action.budget : cc.budget,
               }
             : cc
         ),
