@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { getNodeColor } from "@/sections/campaigns/node-visuals";
 import type { NodeTagPayload, PromptChip } from "@/state/prompt-chips-context";
-import { motion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import Image from "next/image";
 import { Mic } from "lucide-react";
 import type { PromptInputMessage } from "@/components/ai-elements/prompt-input";
@@ -47,6 +47,7 @@ import { SuggestionBar } from "./suggestion-bar";
 import { useChat } from "@/state/chat-context";
 import { DraftQueueList } from "./draft-queue-list";
 import { useChatSubmit } from "./use-chat-submit";
+import { useAiReplyAutoDismiss } from "./use-ai-reply-auto-dismiss";
 
 function AttachmentFileList() {
   const { files } = usePromptInputAttachments();
@@ -135,7 +136,9 @@ export function ShellBottomBar() {
     campaigns,
     wizardCurrentStep,
     budgetHelpShown,
+    aiReply,
   } = state;
+  useAiReplyAutoDismiss(aiReply, dispatch);
   const welcomeChat = useWelcomeChat();
   const chipsApi = usePromptChips();
   const { drafts: draftsRef, clearQueue, parkDraft } = useDraftQueue();
@@ -292,6 +295,31 @@ export function ShellBottomBar() {
         slot={
           <>
             <DraftQueueList variant="compact" onTakeDraft={() => {}} />
+            <AnimatePresence initial={false}>
+              {aiReply ? (
+                <motion.div
+                  key="ai-reply"
+                  initial={{ y: 6, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  exit={{ y: 6, opacity: 0 }}
+                  transition={{ duration: 0.26, ease: [0.23, 1, 0.32, 1] }}
+                  role="status"
+                  aria-live="polite"
+                  data-testid="ai-reply-slot"
+                  className="flex items-start gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/80"
+                >
+                  <Image
+                    src="/mascot-icon.svg"
+                    alt=""
+                    width={16}
+                    height={16}
+                    className="mt-0.5 shrink-0"
+                    aria-hidden
+                  />
+                  <span className="min-w-0 flex-1 leading-snug">{aiReply}</span>
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
             {view.kind === "guided-signal" &&
             wizardCurrentStep === 5 &&
             budgetHelpShown ? (
