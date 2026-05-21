@@ -85,6 +85,12 @@ export type Campaign = {
   pausedAt?: string;
   completedAt?: string;
   scheduledFor?: string;
+  /**
+   * Set by `campaign_launched` from the payment screen. Older preset
+   * campaigns and never-launched drafts may not carry it. Display fallbacks
+   * (campaign-screen) keep working when the field is absent.
+   */
+  budget?: number;
 };
 
 export type Preset = {
@@ -102,6 +108,7 @@ export type View =
   | { kind: "awaiting-campaign" }
   | { kind: "campaign-select" }
   | { kind: "workflow"; campaign: { id: string; name: string }; launched: boolean }
+  | { kind: "campaign-payment"; campaign: { id: string; name: string } }
   | { kind: "campaign"; campaign: { id: string; name: string } }
   | { kind: "section"; name: SectionName; campaignId?: string };
 
@@ -115,6 +122,7 @@ export type ViewAddress =
   | { kind: "awaiting-campaign" }
   | { kind: "campaign-select" }
   | { kind: "workflow"; campaignId: string }
+  | { kind: "campaign-payment"; campaignId: string }
   | { kind: "campaign"; campaignId: string }
   | { kind: "section"; name: SectionName; campaignId?: string };
 
@@ -244,8 +252,9 @@ export type Action =
   | { type: "catalog_close" }
   | { type: "catalog_select"; scenarioId: string }
   | { type: "selected_scenario_consumed" }
-  | { type: "campaign_launched"; id: string; timestamp: string }
+  | { type: "campaign_launched"; id: string; timestamp: string; budget: number }
   | { type: "open_workflow"; campaign: { id: string; name: string }; launched: boolean }
+  | { type: "open_campaign_payment"; campaignId: string }
   | { type: "stats_set_period"; period: Period }
   | { type: "stats_set_calc_method"; method: CalcMethod }
   | { type: "stats_set_currency"; currency: Currency }
@@ -803,6 +812,9 @@ export function appReducer(state: AppState, action: Action): AppState {
                 ...cc,
                 status: "active",
                 launchedAt: cc.launchedAt ?? action.timestamp,
+                // A real budget overwrites; a 0 (e.g. weird re-dispatch) keeps
+                // the previously-stored value.
+                budget: action.budget > 0 ? action.budget : cc.budget,
               }
             : cc
         ),
@@ -820,6 +832,18 @@ export function appReducer(state: AppState, action: Action): AppState {
           launched: action.launched,
         },
       };
+
+    case "open_campaign_payment": {
+      const c = state.campaigns.find((cc) => cc.id === action.campaignId);
+      if (!c) return state;
+      return {
+        ...state,
+        view: {
+          kind: "campaign-payment",
+          campaign: { id: c.id, name: c.name },
+        },
+      };
+    }
 
     case "stats_set_period":
       return { ...state, stats: statisticsReducer(state.stats, { type: "SET_PERIOD", period: action.period }) };
@@ -880,6 +904,17 @@ function rebuildViewFromAddress(addr: ViewAddress, campaigns: Campaign[]): View 
           c.status === "completed",
       };
     }
+    case "campaign-payment": {
+      const c = campaigns.find((cc) => cc.id === addr.campaignId);
+      // Mirror the existing "workflow"/"campaign" fallback: if the campaign
+      // disappeared (e.g. preset was reapplied), drop to the campaigns list
+      // rather than rendering an empty payment screen.
+      if (!c) return { kind: "section", name: "Кампании" };
+      return {
+        kind: "campaign-payment",
+        campaign: { id: c.id, name: c.name },
+      };
+    }
     case "campaign": {
       const c = campaigns.find((cc) => cc.id === addr.campaignId);
       if (!c) return { kind: "section", name: "Кампании" };
@@ -906,6 +941,8 @@ export function viewToAddress(view: View): ViewAddress {
       return { kind: "campaign-select" };
     case "workflow":
       return { kind: "workflow", campaignId: view.campaign.id };
+    case "campaign-payment":
+      return { kind: "campaign-payment", campaignId: view.campaign.id };
     case "campaign":
       return { kind: "campaign", campaignId: view.campaign.id };
     case "section":

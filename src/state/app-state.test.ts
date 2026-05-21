@@ -4,9 +4,11 @@ import {
   initialState,
   isCampaignDone,
   isOnboarding,
+  viewToAddress,
   type AppState,
   type Signal,
   type Campaign,
+  type View,
 } from "./app-state";
 import {
   DEMO_ACCOUNT_SETTINGS,
@@ -470,6 +472,7 @@ describe("appReducer — launched campaign screen", () => {
       type: "campaign_launched",
       id: "cmp_A",
       timestamp: "2026-05-20T00:00:00.000Z",
+      budget: 500,
     });
     const updated = next.campaigns.find((x) => x.id === "cmp_A");
     expect(updated?.status).toBe("active");
@@ -489,8 +492,39 @@ describe("appReducer — launched campaign screen", () => {
       type: "campaign_launched",
       id: "cmp_unknown",
       timestamp: "t",
+      budget: 500,
     });
     expect(next).toBe(state);
+  });
+
+  it("campaign_launched stores the provided budget on the campaign", () => {
+    const c = makeCampaign({ id: "cmp_A", name: "C", status: "draft" });
+    const state: AppState = { ...initialState, campaigns: [c] };
+    const next = appReducer(state, {
+      type: "campaign_launched",
+      id: "cmp_A",
+      timestamp: "2026-05-20T00:00:00.000Z",
+      budget: 1234.56,
+    });
+    const updated = next.campaigns.find((x) => x.id === "cmp_A");
+    expect(updated?.budget).toBe(1234.56);
+    expect(updated?.status).toBe("active");
+  });
+
+  it("campaign_launched preserves an existing budget if none is provided", () => {
+    // Action shape requires budget after this change — but if a future caller
+    // passes 0 or omits it via TS, we don't erase a previously-stored value.
+    const c = makeCampaign({ id: "cmp_A", name: "C", status: "draft", budget: 999 });
+    const state: AppState = { ...initialState, campaigns: [c] };
+    const next = appReducer(state, {
+      type: "campaign_launched",
+      id: "cmp_A",
+      timestamp: "2026-05-20T00:00:00.000Z",
+      budget: 0,
+    });
+    const updated = next.campaigns.find((x) => x.id === "cmp_A");
+    // Zero-budget launches keep the previously-stored value.
+    expect(updated?.budget).toBe(999);
   });
 
   it("open_workflow switches the view to a launched workflow", () => {
@@ -1342,5 +1376,83 @@ describe("isOnboarding", () => {
       surveyStatus: "not_started",
     };
     expect(isOnboarding(state)).toBe(false);
+  });
+});
+
+describe("appReducer — open_campaign_payment", () => {
+  it("switches view to campaign-payment for an existing campaign", () => {
+    const c = makeCampaign({ id: "cmp_A", name: "C" });
+    const state: AppState = { ...initialState, campaigns: [c] };
+    const next = appReducer(state, {
+      type: "open_campaign_payment",
+      campaignId: "cmp_A",
+    });
+    expect(next.view).toEqual({
+      kind: "campaign-payment",
+      campaign: { id: "cmp_A", name: "C" },
+    });
+  });
+
+  it("is a no-op for unknown campaignId", () => {
+    const state: AppState = {
+      ...initialState,
+      campaigns: [makeCampaign({ id: "cmp_A" })],
+    };
+    const next = appReducer(state, {
+      type: "open_campaign_payment",
+      campaignId: "cmp_unknown",
+    });
+    expect(next).toBe(state);
+  });
+
+  it("preserves campaigns and signals arrays untouched", () => {
+    const c = makeCampaign({ id: "cmp_A", name: "C" });
+    const s = makeSignal({ id: "sig_1" });
+    const state: AppState = {
+      ...initialState,
+      campaigns: [c],
+      signals: [s],
+    };
+    const next = appReducer(state, {
+      type: "open_campaign_payment",
+      campaignId: "cmp_A",
+    });
+    expect(next.campaigns).toBe(state.campaigns);
+    expect(next.signals).toBe(state.signals);
+  });
+});
+
+describe("ViewAddress — campaign-payment round-trip", () => {
+  it("viewToAddress maps campaign-payment view to address", () => {
+    const view: View = {
+      kind: "campaign-payment",
+      campaign: { id: "cmp_A", name: "C" },
+    };
+    expect(viewToAddress(view)).toEqual({
+      kind: "campaign-payment",
+      campaignId: "cmp_A",
+    });
+  });
+
+  it("restore_address rebuilds campaign-payment view from address", () => {
+    const c = makeCampaign({ id: "cmp_A", name: "C" });
+    const state: AppState = { ...initialState, campaigns: [c] };
+    const next = appReducer(state, {
+      type: "restore_address",
+      address: { kind: "campaign-payment", campaignId: "cmp_A" },
+    });
+    expect(next.view).toEqual({
+      kind: "campaign-payment",
+      campaign: { id: "cmp_A", name: "C" },
+    });
+  });
+
+  it("restore_address falls back to Кампании when campaign id is gone", () => {
+    const state: AppState = { ...initialState, campaigns: [] };
+    const next = appReducer(state, {
+      type: "restore_address",
+      address: { kind: "campaign-payment", campaignId: "cmp_missing" },
+    });
+    expect(next.view).toEqual({ kind: "section", name: "Кампании" });
   });
 });

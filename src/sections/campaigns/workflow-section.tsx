@@ -7,7 +7,6 @@ import Image from "next/image";
 import { useAppState, useAppDispatch } from "@/state/app-state-context";
 import { CanvasHeader, type CanvasHeaderToast } from "./canvas-header";
 import { WorkflowView } from "./workflow-view";
-import { TopUpModal, computeShortfall } from "@/sections/signals/top-up-modal";
 import { validateWorkflow } from "@/state/workflow-validation";
 import { normalizeNodeRef } from "@/state/structural-commands";
 import type {
@@ -38,7 +37,6 @@ export function WorkflowSection() {
     aiReply,
     signals,
     campaigns,
-    balance,
   } = useAppState();
   const dispatch = useAppDispatch();
 
@@ -47,12 +45,6 @@ export function WorkflowSection() {
   const [toast, setToast] = useState<CanvasHeaderToast | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const aiReplyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [topUpOpen, setTopUpOpen] = useState(false);
-
-  // Flat prototype cost for launching a campaign — keeps the create-entity →
-  // balance-check → top-up → launch mechanic identical between signals and
-  // campaigns, per spec.
-  const CAMPAIGN_LAUNCH_COST = 500;
 
   const handleCommandHandled = useCallback(
     () => dispatch({ type: "workflow_command_handled" }),
@@ -174,27 +166,13 @@ export function WorkflowSection() {
       });
       return;
     }
-    // Reuse signal-flow mechanic: balance check → top-up modal → launch.
-    if (computeShortfall(balance, CAMPAIGN_LAUNCH_COST) > 0) {
-      setTopUpOpen(true);
-      return;
-    }
+    // Validation passed — payment (budget + balance) now happens on the
+    // dedicated CampaignPaymentScreen. canvas-header "Запустить" becomes a
+    // routing hop, not a launch.
     dispatch({
-      type: "campaign_launched",
-      id: currentCampaign.id,
-      timestamp: new Date().toISOString(),
+      type: "open_campaign_payment",
+      campaignId: currentCampaign.id,
     });
-  }
-
-  function handleCampaignTopUpSuccess(amount: number) {
-    if (!currentCampaign) return;
-    dispatch({ type: "balance_topup", amount });
-    dispatch({
-      type: "campaign_launched",
-      id: currentCampaign.id,
-      timestamp: new Date().toISOString(),
-    });
-    setTopUpOpen(false);
   }
 
   function handleSchedule(iso: string) {
@@ -295,15 +273,6 @@ export function WorkflowSection() {
           onPaneClick={view.launched ? undefined : handlePaneClick}
         />
       </div>
-
-      <TopUpModal
-        open={topUpOpen}
-        onOpenChange={setTopUpOpen}
-        balance={balance}
-        cost={CAMPAIGN_LAUNCH_COST}
-        entityLabel={currentCampaign ? currentCampaign.name : undefined}
-        onPaymentSuccess={handleCampaignTopUpSuccess}
-      />
 
       <AnimatePresence>
         {aiReply && (
