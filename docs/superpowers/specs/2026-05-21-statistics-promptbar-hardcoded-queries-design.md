@@ -96,17 +96,36 @@ case "stats_apply_patch":
 
 DrillInPopover-билдеры (`view-settings-levels`, `search-settings-levels`) **не трогаем** — они принимают локальный `dispatch` (от draft-reducer) и продолжают работать как раньше.
 
-### 3. Скоупинг submit-обработчика по секции
+### 3. Скоупинг submit-обработчика по секции и подключение из глобального бара
 
-В `src/sections/shell/use-chat-submit.ts` в начале `submit` добавляется проверка текущей секции. Имя поля в `AppState`, описывающее текущую секцию, уточнить при имплементации (вероятно, `view.kind` или `section`). Скрыть точное имя за helper'ом:
+`ShellBottomBar.handlePromptSubmit` сейчас сам рутит submit по `view.kind`: welcome → welcomeChat, Кампании → парсер фильтра, workflow → команды узлов. **Для Статистики обработчика нет — ввод молча проглатывается** (ранний `return` на check `view.kind !== "workflow"`). Drawer-вой композитор использует `useChatSubmit` отдельно.
+
+Делаем так:
+1. В `use-chat-submit.ts` в начале `submit` добавляется проверка `isOnStatisticsSection(appState)` и Statistics-матчер.
+2. В `ShellBottomBar.handlePromptSubmit` добавляется новая ветка **перед** workflow-guard'ом:
+
+   ```ts
+   if (view.kind === "section" && view.name === "Статистика") {
+     chatSubmit.submit({ text: rawText, segments });
+     editorRef.current?.clear();
+     chipsApi.clearChips();
+     return;
+   }
+   ```
+
+   где `chatSubmit = useChatSubmit()` объявлен на верху компонента рядом с другими хуками.
+
+Этим достигается:
+- Ввод из глобального бара на Statistics → routes через `useChatSubmit` → матчер срабатывает.
+- Ввод из drawer-композитора всегда уже идёт через `useChatSubmit` → матчер срабатывает (но только когда `currentSection === "Статистика"` благодаря скоупингу внутри).
+
+Имя поля в `AppState`, описывающее текущую секцию — `view.kind === "section" && view.name === "Статистика"` (или `activeSection === "Статистика"` — оба пишутся в AppState синхронно через `goto_stats`/`sidebar_nav`). Helper:
 
 ```ts
 function isOnStatisticsSection(state: AppState): boolean {
-  // одна строка, читает соответствующее поле AppState
+  return state.view.kind === "section" && state.view.name === "Статистика";
 }
 ```
-
-Это убирает зависимость от конкретного имени и упрощает будущий рефакторинг.
 
 ## Матчинг и нормализация
 
@@ -357,7 +376,7 @@ case "compare-channels": {
 - `src/sections/shell/use-chat-submit.ts` — параметризовать `playComplexThinking`, добавить ветку Statistics-матчинга со скоупингом
 - `src/state/suggestion-state.ts` — добавить параметр `isStatistics` + state `stats`
 - `src/sections/shell/suggestion-bar.tsx` — добавить ветку `state.kind === "stats"` с 3 чипами + проп `onPickStatsQuery`
-- `src/sections/shell/shell-bottom-bar.tsx` — пробросить `isStatistics`, реализовать `onPickStatsQuery` (set + autosubmit)
+- `src/sections/shell/shell-bottom-bar.tsx` — подключить `useChatSubmit` для Statistics-ветки в `handlePromptSubmit`, пробросить `isStatistics` в SuggestionBar, реализовать `onPickStatsQuery` (set + autosubmit)
 
 **Новые:**
 
