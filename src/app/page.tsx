@@ -8,6 +8,8 @@ import { DraftQueueProvider } from "@/state/draft-queue-context";
 import { ChatPanel } from "@/sections/shell/chat-panel";
 import { ChatDrawer } from "@/sections/shell/chat-drawer";
 import { useAppState, useAppDispatch } from "@/state/app-state-context";
+import { isOnboarding } from "@/state/app-state";
+import { AnimatePresence, motion } from "motion/react";
 import { useChat } from "@/state/chat-context";
 import { AppSidebar } from "@/sections/shell/app-sidebar";
 import { LaunchFlyout } from "@/sections/shell/launch-flyout";
@@ -27,6 +29,13 @@ import { StatisticsSection } from "@/sections/statistics/statistics-section";
 import { SettingsSection } from "@/sections/settings/settings-section";
 import { DevPanel } from "@/components/dev/dev-panel";
 
+/**
+ * Same exponential curve as HERO_EASE in welcome-view.tsx — exit/enter the
+ * chrome with no bounce and a duration that matches the welcome hero swap.
+ */
+const CHROME_EASE = [0.32, 0.72, 0, 1] as const;
+const CHROME_DURATION = 0.42;
+
 function BottomBarSlot() {
   const { view } = useAppState();
   const { mode } = useChat();
@@ -40,7 +49,9 @@ function BottomBarSlot() {
 }
 
 export default function Home() {
-  const { view, launchFlyoutOpen, activeSection, catalog, surveyStatus } = useAppState();
+  const state = useAppState();
+  const { view, launchFlyoutOpen, activeSection, catalog, surveyStatus } = state;
+  const onboarding = isOnboarding(state);
   const dispatch = useAppDispatch();
   const welcomeChat = useOnboardingChat();
 
@@ -54,7 +65,7 @@ export default function Home() {
           <SurveySection
             skippable
             withOnboardingScreens
-            onComplete={() => { /* catalog open routes the user from here */ }}
+            onComplete={() => { /* survey_completed re-renders WelcomeSection */ }}
             onSkip={() => { /* survey_skipped re-renders WelcomeSection */ }}
           />
         );
@@ -90,17 +101,31 @@ export default function Home() {
         <DraftQueueProvider>
         <TriggerEditRegistryProvider>
         <div className="flex h-screen overflow-hidden bg-background">
-          <AppSidebar
-            activeNav={activeSection ?? undefined}
-            onNavChange={(nav) => dispatch({ type: "sidebar_nav", section: nav })}
-            onLaunchOpen={() => dispatch({ type: "flyout_open" })}
-            onLogoClick={() => dispatch({ type: "go_welcome" })}
-            flyoutOpen={launchFlyoutOpen}
-          />
-          <LaunchFlyout
-            open={launchFlyoutOpen}
-            onClose={() => dispatch({ type: "flyout_close" })}
-          />
+          <AnimatePresence initial={false}>
+            {!onboarding && (
+              <motion.div
+                key="app-sidebar"
+                initial={{ opacity: 0, x: -24 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -24 }}
+                transition={{ duration: CHROME_DURATION, ease: CHROME_EASE }}
+              >
+                <AppSidebar
+                  activeNav={activeSection ?? undefined}
+                  onNavChange={(nav) => dispatch({ type: "sidebar_nav", section: nav })}
+                  onLaunchOpen={() => dispatch({ type: "flyout_open" })}
+                  onLogoClick={() => dispatch({ type: "go_welcome" })}
+                  flyoutOpen={launchFlyoutOpen}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+          {!onboarding && (
+            <LaunchFlyout
+              open={launchFlyoutOpen}
+              onClose={() => dispatch({ type: "flyout_close" })}
+            />
+          )}
           <ScenarioCatalogModal
             open={catalog !== null}
             onClose={() => dispatch({ type: "catalog_close" })}
@@ -108,7 +133,19 @@ export default function Home() {
           />
           <div className="relative flex flex-1 flex-col overflow-hidden">
             {renderMain()}
-            <BottomBarSlot />
+            <AnimatePresence initial={false}>
+              {!onboarding && (
+                <motion.div
+                  key="bottom-bar"
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 16 }}
+                  transition={{ duration: CHROME_DURATION, ease: CHROME_EASE }}
+                >
+                  <BottomBarSlot />
+                </motion.div>
+              )}
+            </AnimatePresence>
             <ChatDrawer placeholder="Введите ваши параметры или задайте вопрос" />
             <DevPanel />
           </div>

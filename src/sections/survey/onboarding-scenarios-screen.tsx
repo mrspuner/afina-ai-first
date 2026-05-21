@@ -14,7 +14,7 @@ export function OnboardingScenariosScreen({ onChooseScenario }: OnboardingScenar
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
-      className="mx-auto flex w-full max-w-xl flex-col items-start gap-6"
+      className="mx-auto flex w-full max-w-2xl flex-col items-start gap-6"
     >
       <motion.h1
         initial={{ opacity: 0, y: 8 }}
@@ -37,7 +37,7 @@ export function OnboardingScenariosScreen({ onChooseScenario }: OnboardingScenar
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.45, delay: 0.25, ease: [0.23, 1, 0.32, 1] }}
       >
-        <Button onClick={onChooseScenario}>Выбрать сценарий →</Button>
+        <Button onClick={onChooseScenario}>Далее</Button>
       </motion.div>
     </motion.div>
   );
