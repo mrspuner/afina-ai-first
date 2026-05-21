@@ -3,6 +3,7 @@ import {
   appReducer,
   initialState,
   isCampaignDone,
+  isOnboarding,
   type AppState,
   type Signal,
   type Campaign,
@@ -1140,5 +1141,52 @@ describe("appReducer — settings actions", () => {
     expect(EMPTY_ACCOUNT_SETTINGS.interests).toEqual([]);
     expect(EMPTY_ACCOUNT_SETTINGS.suggestedInterests).toEqual([]);
     expect(EMPTY_ACCOUNT_SETTINGS.domainBlocklist).toEqual([]);
+  });
+});
+
+describe("isOnboarding", () => {
+  it("returns true when welcome view + surveyStatus 'not_started'", () => {
+    const state: AppState = {
+      ...initialState,
+      view: { kind: "welcome" },
+      surveyStatus: "not_started",
+    };
+    expect(isOnboarding(state)).toBe(true);
+  });
+
+  it("returns false when surveyStatus is 'completed'", () => {
+    const state: AppState = {
+      ...initialState,
+      view: { kind: "welcome" },
+      surveyStatus: "completed",
+    };
+    expect(isOnboarding(state)).toBe(false);
+  });
+
+  it("returns false when surveyStatus is 'skipped'", () => {
+    const state: AppState = {
+      ...initialState,
+      view: { kind: "welcome" },
+      surveyStatus: "skipped",
+    };
+    expect(isOnboarding(state)).toBe(false);
+  });
+
+  it("returns false when view is guided-signal even with surveyStatus 'not_started'", () => {
+    const state: AppState = {
+      ...initialState,
+      view: { kind: "guided-signal" },
+      surveyStatus: "not_started",
+    };
+    expect(isOnboarding(state)).toBe(false);
+  });
+
+  it("returns false when view is a section even with surveyStatus 'not_started'", () => {
+    const state: AppState = {
+      ...initialState,
+      view: { kind: "section", name: "Сигналы" },
+      surveyStatus: "not_started",
+    };
+    expect(isOnboarding(state)).toBe(false);
   });
 });

@@ -875,3 +875,15 @@ export const isStep2Active = (s: AppState) => isSignalDone(s) && !isCampaignDone
 export const isStep3Active = (s: AppState) => isCampaignDone(s);
 export const isWorkflowView = (s: AppState) => s.view.kind === "workflow";
 export const isOnWelcome = (s: AppState) => s.view.kind === "welcome";
+
+/**
+ * True while the first-entry onboarding (survey → interests → scenarios) is
+ * in flight. Sidebar and PromptBar are hidden during this window; once the
+ * user completes or skips, surveyStatus moves off "not_started" and the
+ * predicate flips to false.
+ *
+ * Mirrors the implicit gate in `src/app/page.tsx` that picks between
+ * `SurveySection` and `WelcomeSection`; keep them in sync.
+ */
+export const isOnboarding = (s: AppState): boolean =>
+  s.view.kind === "welcome" && s.surveyStatus === "not_started";
