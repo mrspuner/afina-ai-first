@@ -78,30 +78,31 @@ export function getNodeIcon(nodeType: string): LucideIcon | undefined {
 }
 
 /**
- * Pre-rendered SVG-строки для иконок типов узлов. Рендер происходит один
- * раз при импорте модуля (React DOM Server работает и на сервере, и в
- * браузере). Используется в чипах PromptBar — там React не управляет
- * содержимым (contentEditable + императивный DOM), поэтому Lucide-компонент
- * нельзя смонтировать обычным путём, а строку — можно: вставляем через
- * `innerHTML` в нейтральный <span aria-hidden>.
+ * Кэш SVG-строк иконок узлов. Заполняется ЛЕНИВО при первом обращении к
+ * `getNodeIconSvg`, не при импорте модуля. Это критично: `renderToStaticMarkup`
+ * запускает вложенный React-рендерер, и если бы он выполнялся на module-level,
+ * импорт модуля во время SSR страницы обнулял бы hooks dispatcher и ронял
+ * рендер ("Invalid hook call" / useContext of null). Единственный вызов
+ * `getNodeIconSvg` — из императивного DOM-билдера чипа (client-only), поэтому
+ * рендер строки всегда происходит вне серверного рендера.
  *
  * Lucide SVG задают `stroke="currentColor"` — цвет наследуется от родителя.
  */
-const NODE_ICON_SVG: Partial<Record<WorkflowNodeType, string>> =
-  Object.fromEntries(
-    Object.entries(NODE_ICON).map(([nodeType, Icon]) => [
-      nodeType,
-      renderToStaticMarkup(
-        createElement(Icon, {
-          size: 14,
-          strokeWidth: 2,
-          "aria-hidden": true,
-        })
-      ),
-    ])
-  ) as Partial<Record<WorkflowNodeType, string>>;
+const NODE_ICON_SVG_CACHE: Partial<Record<WorkflowNodeType, string>> = {};
 
 /** SVG-строка иконки узла или null, если для типа иконки нет. */
 export function getNodeIconSvg(nodeType: string): string | null {
-  return NODE_ICON_SVG[nodeType as WorkflowNodeType] ?? null;
+  const key = nodeType as WorkflowNodeType;
+  const Icon = NODE_ICON[key];
+  if (!Icon) return null;
+  if (NODE_ICON_SVG_CACHE[key] === undefined) {
+    NODE_ICON_SVG_CACHE[key] = renderToStaticMarkup(
+      createElement(Icon, {
+        size: 14,
+        strokeWidth: 2,
+        "aria-hidden": true,
+      })
+    );
+  }
+  return NODE_ICON_SVG_CACHE[key] ?? null;
 }
