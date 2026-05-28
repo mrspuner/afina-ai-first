@@ -117,16 +117,19 @@ export function Step1Scenario({ data, onNext }: StepProps) {
             onScroll={updateScrollFlags}
             className={cn(
               "max-h-[420px] overflow-y-auto pr-2",
+              // Firefox / standard
               "[scrollbar-width:thin]",
-              "[scrollbar-color:var(--scrollbar-thumb)_transparent]",
-              "[&::-webkit-scrollbar]:w-1",
+              "[scrollbar-color:rgb(255_255_255_/_0.18)_transparent]",
+              // WebKit (Safari, Chrome)
+              "[&::-webkit-scrollbar]:w-1.5",
               "[&::-webkit-scrollbar]:bg-transparent",
               "[&::-webkit-scrollbar-track]:bg-transparent",
+              "[&::-webkit-scrollbar-track]:border-0",
               "[&::-webkit-scrollbar-thumb]:rounded-full",
-              "[&::-webkit-scrollbar-thumb]:bg-foreground/15",
-              "hover:[&::-webkit-scrollbar-thumb]:bg-foreground/30"
+              "[&::-webkit-scrollbar-thumb]:bg-white/15",
+              "[&::-webkit-scrollbar-thumb]:border-0",
+              "hover:[&::-webkit-scrollbar-thumb]:bg-white/30"
             )}
-            style={{ ["--scrollbar-thumb" as string]: "color-mix(in oklch, var(--foreground) 18%, transparent)" }}
           >
             {filtered.length === 0 ? (
               <p className="py-10 text-center text-sm text-muted-foreground">
