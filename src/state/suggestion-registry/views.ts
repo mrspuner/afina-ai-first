@@ -29,7 +29,6 @@ const CAMPAIGN_SELECT: SuggestionItem[] = [
 const FEED_DRAFT: SuggestionItem[] = [
   ask("view-feed-draft-launch", "Запустить", "запусти эту кампанию"),
   ask("view-feed-draft-edit", "Изменить сценарий", "хочу поправить сценарий кампании"),
-  ask("view-feed-draft-schedule", "Запланировать", "запланируй запуск на завтра"),
 ];
 
 const FEED_ACTIVE: SuggestionItem[] = [
