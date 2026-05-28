@@ -110,11 +110,7 @@ export function SignalsSection() {
                 onDownload={handleDownload}
                 onResumeAwaiting={handleResumeAwaiting}
                 onResumeEdit={handleResumeEdit}
-                onOpen={
-                  s.wizardData && (s.status ?? "ready") === "ready"
-                    ? handleOpen
-                    : undefined
-                }
+                onOpen={(s.status ?? "ready") === "ready" ? handleOpen : undefined}
                 onDelete={handleDelete}
               />
             ))}
