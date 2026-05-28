@@ -17,7 +17,7 @@ function defaultInterestLabels(direction: string): string[] {
   const vertical = VERTICALS.find((v) => v.id === direction) ?? VERTICALS[0];
   // Take up to 4 interest names from the matched vertical — the screen is a
   // chip picker, not a serious data step.
-  return vertical?.interests.slice(0, 4).map((i) => i.name) ?? [];
+  return vertical?.interests.slice(0, 4).map((i) => i.label) ?? [];
 }
 
 export function OnboardingInterestsScreen({ onContinue }: OnboardingInterestsScreenProps) {
