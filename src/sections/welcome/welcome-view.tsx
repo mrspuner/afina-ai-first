@@ -82,13 +82,13 @@ function FirstTimeHero({ onOpenSurvey }: { onOpenSurvey: () => void }) {
         <h1 className="text-[28px] font-bold leading-8 text-foreground">
           Добро пожаловать в афина
         </h1>
-        <p className="text-[16px] leading-[22px] text-muted-foreground">
+        <p className="text-[18px] leading-[26px] text-muted-foreground">
           афина работает сценариями — готовыми планами работы с вашей
           аудиторией. Сценарий делится на три составляющие:
         </p>
       </div>
 
-      <div className="flex w-full flex-col items-start gap-3">
+      <div className="flex w-full flex-col items-start gap-7">
         <OnboardingStepCards />
 
         <div className="flex w-full flex-row items-center gap-4 rounded-lg border border-brand/30 bg-brand-muted p-6">
