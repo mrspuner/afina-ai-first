@@ -3,6 +3,7 @@ import {
   parseCampaignFilter,
   parseCampaignQuery,
 } from "./parse-campaign-filter";
+import { STATUS_LABELS } from "@/sections/campaigns/status-badge";
 
 describe("parseCampaignFilter", () => {
   it("parses two statuses separated by comma", () => {
@@ -63,10 +64,10 @@ describe("parseCampaignFilter", () => {
   });
 
   it("recognizes every StatusBadge label as its own status", () => {
-    expect(parseCampaignFilter("Активно")).toEqual(["active"]);
-    expect(parseCampaignFilter("Не запущено")).toEqual(["draft"]);
-    expect(parseCampaignFilter("Приостановлена")).toEqual(["paused"]);
-    expect(parseCampaignFilter("Завершено")).toEqual(["completed"]);
+    expect(parseCampaignFilter(STATUS_LABELS.active)).toEqual(["active"]);
+    expect(parseCampaignFilter(STATUS_LABELS.draft)).toEqual(["draft"]);
+    expect(parseCampaignFilter(STATUS_LABELS.paused)).toEqual(["paused"]);
+    expect(parseCampaignFilter(STATUS_LABELS.completed)).toEqual(["completed"]);
   });
 });
 
