@@ -15,9 +15,21 @@ import type { SignalStatus } from "@/types/signal-status";
 import type { PeriodPreset, RowKind } from "@/sections/statistics/statistics-state";
 import type { CampaignSort } from "@/state/parse-campaign-filter";
 
-/** Дискриминированное действие чипа. */
+/**
+ * Дискриминированное действие чипа.
+ *
+ * - `ask` — главная семантика для нефункциональных чипов: чип задаёт вопрос
+ *   в чат-историю текущего раздела. Открывается sidebar, в истории появляется
+ *   user-сообщение `prompt`, затем assistant-fallback. Чат-история привязана
+ *   к разделу и очищается при смене раздела.
+ * - `submit` — отправляет `phrase` в `chatSubmit` (Статистика —
+ *   `stats-query-matcher` распознаёт фразы и перестраивает UI).
+ * - `dispatch` — прямой dispatch в reducer (мгновенное изменение AppState).
+ * - `chat-submit` — передаёт `chip` в `welcomeChat.submitChip` (граф welcome).
+ * - `command` — системные команды (сейчас одна — `apply-all`).
+ */
 export type SuggestionAction =
-  | { kind: "insert-text"; fullText: string }
+  | { kind: "ask"; prompt: string }
   | { kind: "submit"; phrase: string }
   | { kind: "dispatch"; action: AppAction }
   | { kind: "chat-submit"; chip: WelcomeChip }
@@ -70,17 +82,17 @@ export type SectionSub = CampaignsSub | StatisticsSub | SignalsSub | SettingsSub
 export type WizardStep = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
 /**
- * Под-состояния шагов wizard'а, к которым реестр реагирует:
- * - step 2: интересы и домены могут быть пустыми/заполненными, можно ремикснуть;
- * - step 5: уже знакомый budgetHelpShown;
- * - step 6: имя сигнала введено или нет.
+ * Под-состояния шагов wizard'а. В новой модели «wizard = только вопросы»
+ * ветви меняют **формулировку** вопроса, не само действие — все чипы wizard
+ * имеют `action.kind = "ask"`. Step 5 потерял ветку `budgetHelpShown` — нет
+ * dispatch на маскота, вопрос идёт через общий ask-pipeline.
  */
 export type WizardSub =
   | { step: 1 }
   | { step: 2; hasInterests: boolean; hasDomains: boolean }
   | { step: 3 }
   | { step: 4 }
-  | { step: 5; budgetHelpShown: boolean }
+  | { step: 5 }
   | { step: 6; nameSet: boolean }
   | { step: 7 }
   | { step: 8 };

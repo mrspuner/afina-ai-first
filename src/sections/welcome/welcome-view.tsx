@@ -99,10 +99,10 @@ function FirstTimeHero({ onOpenSurvey }: { onOpenSurvey: () => void }) {
         <div className="flex w-full flex-row items-center gap-4 rounded-lg border border-brand/30 bg-brand-muted p-6">
           <div className="flex flex-1 flex-col gap-2">
             <h2 className="text-base font-medium text-foreground">
-              Расскажите о кампании — автоматически подберём сценарии
+              Расскажите о вашей задаче — подберём сценарии
             </h2>
             <p className="text-sm leading-relaxed text-foreground/70">
-              За минуту афина предложит сценарии под вашу кампанию.
+              За минуту афина предложит подходящие варианты.
             </p>
           </div>
           <Button onClick={onOpenSurvey} className="shrink-0">

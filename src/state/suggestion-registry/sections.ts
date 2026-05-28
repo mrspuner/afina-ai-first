@@ -15,8 +15,8 @@ import type {
 } from "./types";
 import type { CampaignStatus } from "@/state/app-state";
 
-function ins(id: string, label: string, fullText: string): SuggestionItem {
-  return { id, label, action: { kind: "insert-text", fullText } };
+function ask(id: string, label: string, prompt: string): SuggestionItem {
+  return { id, label, action: { kind: "ask", prompt } };
 }
 
 function sub(id: string, label: string, phrase: string): SuggestionItem {
@@ -98,7 +98,7 @@ const CAMPAIGNS_EMPTY: SuggestionItem[] = [
     label: "Создать первую кампанию",
     action: { kind: "dispatch", action: { type: "start_signal_flow" } },
   },
-  ins(
+  ask(
     "sec-camp-onboard-tour",
     "Как устроены кампании?",
     "расскажи, как устроены кампании в Афине"
@@ -200,16 +200,54 @@ function resolveStatistics(s: StatisticsSub): SuggestionItem[] {
 // ─── Сигналы ────────────────────────────────────────────────────────────────
 
 const SIGNALS_EMPTY: SuggestionItem[] = [
+  ask(
+    "sec-sig-empty-what",
+    "Что такое сигналы?",
+    "Что такое сигналы и зачем они нужны?"
+  ),
   {
-    id: "sec-sig-onboard-create",
-    label: "Создать первый сигнал",
+    id: "sec-sig-empty-create",
+    label: "Создать сигнал",
     action: { kind: "dispatch", action: { type: "start_signal_flow" } },
   },
-  ins(
-    "sec-sig-onboard-explain",
-    "Что такое сигнал?",
-    "расскажи, что такое сигнал и как он устроен"
-  ),
+];
+
+/**
+ * Чипы для непустого раздела: фильтры по статусу. Реестр приоритезирует те
+ * статусы, по которым реально есть сигналы — пустые подсказки не показываем.
+ */
+const SIGNAL_FILTER_CHIPS: Array<{
+  status: keyof SignalsSub["statusCounts"];
+  chip: SuggestionItem;
+}> = [
+  {
+    status: "ready",
+    chip: ask("sec-sig-filter-ready", "Готовые", "Покажи готовые сигналы"),
+  },
+  {
+    status: "processing",
+    chip: ask("sec-sig-filter-processing", "В обработке", "Покажи сигналы в обработке"),
+  },
+  {
+    status: "awaiting_payment",
+    chip: ask(
+      "sec-sig-filter-awaiting",
+      "Ожидают оплаты",
+      "Покажи сигналы, ожидающие оплаты"
+    ),
+  },
+  {
+    status: "draft",
+    chip: ask("sec-sig-filter-draft", "Черновики", "Покажи сигналы-черновики"),
+  },
+  {
+    status: "expired",
+    chip: ask("sec-sig-filter-expired", "Устаревшие", "Покажи устаревшие сигналы"),
+  },
+  {
+    status: "error",
+    chip: ask("sec-sig-filter-error", "С ошибкой", "Покажи сигналы с ошибкой"),
+  },
 ];
 
 function resolveSignals(s: SignalsSub): SuggestionItem[] {
@@ -217,42 +255,10 @@ function resolveSignals(s: SignalsSub): SuggestionItem[] {
   const total = c.draft + c.awaiting_payment + c.processing + c.ready + c.expired + c.error;
   if (total === 0) return SIGNALS_EMPTY;
 
-  const items: SuggestionItem[] = [];
-
-  // Приоритезируем по «требует действия».
-  if (c.awaiting_payment > 0) {
-    items.push(
-      ins("sec-sig-pay", "Оплатить ожидающие", "оплати все сигналы, ожидающие оплаты")
-    );
-  }
-  if (c.error > 0) {
-    items.push(ins("sec-sig-errors", "Показать ошибки", "покажи сигналы с ошибкой"));
-  }
-  if (c.processing > 0) {
-    items.push(ins("sec-sig-processing", "В обработке", "покажи сигналы в обработке"));
-  }
-  if (c.ready > 0) {
-    items.push(
-      ins("sec-sig-launch-ready", "Запустить готовые", "создай кампании на готовых сигналах")
-    );
-  }
-  if (c.expired > 0) {
-    items.push(ins("sec-sig-expired", "Скрыть устаревшие", "скрой устаревшие сигналы"));
-  }
-
-  // Если ничего срочного — generic-набор.
-  if (items.length === 0) {
-    items.push(
-      {
-        id: "sec-sig-new",
-        label: "Новый сигнал",
-        action: { kind: "dispatch", action: { type: "start_signal_flow" } },
-      },
-      ins("sec-sig-active2", "Активные сигналы", "покажи только активные сигналы")
-    );
-  }
-
-  return items.slice(0, 3);
+  // Берём чипы только для статусов, в которых есть сигналы.
+  return SIGNAL_FILTER_CHIPS.filter(({ status }) => c[status] > 0)
+    .slice(0, 3)
+    .map(({ chip }) => chip);
 }
 
 // ─── Настройки ──────────────────────────────────────────────────────────────
@@ -261,22 +267,22 @@ function resolveSettings(s: SettingsSub): SuggestionItem[] {
   const items: SuggestionItem[] = [];
 
   if (s.isBasicTariff) {
-    items.push(ins("sec-set-tariff-up", "Расширить тариф", "хочу расширить тарифный план"));
+    items.push(ask("sec-set-tariff-up", "Расширить тариф", "хочу расширить тарифный план"));
   } else {
-    items.push(ins("sec-set-tariff-info", "Текущий тариф", "покажи детали моего тарифа"));
+    items.push(ask("sec-set-tariff-info", "Текущий тариф", "покажи детали моего тарифа"));
   }
 
   if (!s.hasIntegrations) {
     items.push(
-      ins("sec-set-integrations-add", "Подключить интеграции", "покажи доступные интеграции и помоги подключить")
+      ask("sec-set-integrations-add", "Подключить интеграции", "покажи доступные интеграции и помоги подключить")
     );
   } else {
     items.push(
-      ins("sec-set-integrations-manage", "Управлять интеграциями", "покажи мои подключённые интеграции")
+      ask("sec-set-integrations-manage", "Управлять интеграциями", "покажи мои подключённые интеграции")
     );
   }
 
-  items.push(ins("sec-set-notify", "Настроить уведомления", "настрой уведомления о новых сигналах и кампаниях"));
+  items.push(ask("sec-set-notify", "Настроить уведомления", "настрой уведомления о новых сигналах и кампаниях"));
 
   return items;
 }

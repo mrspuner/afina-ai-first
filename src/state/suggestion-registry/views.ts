@@ -10,50 +10,50 @@
 import type { CampaignStatus } from "@/state/app-state";
 import type { SuggestionItem } from "./types";
 
-function ins(id: string, label: string, fullText: string): SuggestionItem {
-  return { id, label, action: { kind: "insert-text", fullText } };
+function ask(id: string, label: string, prompt: string): SuggestionItem {
+  return { id, label, action: { kind: "ask", prompt } };
 }
 
 const AWAITING_CAMPAIGN: SuggestionItem[] = [
-  ins("view-await-campaign-from-signal", "Кампанию из сигнала", "создай кампанию на основе этого сигнала"),
-  ins("view-await-campaign-template", "Из шаблона", "хочу выбрать шаблон кампании"),
-  ins("view-await-campaign-skip", "Пока без кампании", "сохрани сигнал, кампанию настрою позже"),
+  ask("view-await-campaign-from-signal", "Кампанию из сигнала", "создай кампанию на основе этого сигнала"),
+  ask("view-await-campaign-template", "Из шаблона", "хочу выбрать шаблон кампании"),
+  ask("view-await-campaign-skip", "Пока без кампании", "сохрани сигнал, кампанию настрою позже"),
 ];
 
 const CAMPAIGN_SELECT: SuggestionItem[] = [
-  ins("view-camp-select-recent", "Последние", "покажи самые свежие сигналы"),
-  ins("view-camp-select-hot", "Только горячие", "оставь только самые горячие сигналы"),
-  ins("view-camp-select-new", "Создать новый", "создай новый сигнал с нуля"),
+  ask("view-camp-select-recent", "Последние", "покажи самые свежие сигналы"),
+  ask("view-camp-select-hot", "Только горячие", "оставь только самые горячие сигналы"),
+  ask("view-camp-select-new", "Создать новый", "создай новый сигнал с нуля"),
 ];
 
 const FEED_DRAFT: SuggestionItem[] = [
-  ins("view-feed-draft-launch", "Запустить", "запусти эту кампанию"),
-  ins("view-feed-draft-edit", "Изменить сценарий", "хочу поправить сценарий кампании"),
-  ins("view-feed-draft-schedule", "Запланировать", "запланируй запуск на завтра"),
+  ask("view-feed-draft-launch", "Запустить", "запусти эту кампанию"),
+  ask("view-feed-draft-edit", "Изменить сценарий", "хочу поправить сценарий кампании"),
+  ask("view-feed-draft-schedule", "Запланировать", "запланируй запуск на завтра"),
 ];
 
 const FEED_SCHEDULED: SuggestionItem[] = [
-  ins("view-feed-sched-launch-now", "Запустить сейчас", "запусти кампанию прямо сейчас, не жди расписание"),
-  ins("view-feed-sched-cancel", "Отменить расписание", "отмени запланированный запуск"),
-  ins("view-feed-sched-reschedule", "Перенести запуск", "перенеси запуск на другое время"),
+  ask("view-feed-sched-launch-now", "Запустить сейчас", "запусти кампанию прямо сейчас, не жди расписание"),
+  ask("view-feed-sched-cancel", "Отменить расписание", "отмени запланированный запуск"),
+  ask("view-feed-sched-reschedule", "Перенести запуск", "перенеси запуск на другое время"),
 ];
 
 const FEED_ACTIVE: SuggestionItem[] = [
-  ins("view-feed-active-stats", "Открыть статистику", "покажи статистику этой кампании"),
-  ins("view-feed-active-pause", "Поставить на паузу", "поставь кампанию на паузу"),
-  ins("view-feed-active-edit", "Доправить сценарий", "хочу поправить сценарий по ходу"),
+  ask("view-feed-active-stats", "Открыть статистику", "покажи статистику этой кампании"),
+  ask("view-feed-active-pause", "Поставить на паузу", "поставь кампанию на паузу"),
+  ask("view-feed-active-edit", "Доправить сценарий", "хочу поправить сценарий по ходу"),
 ];
 
 const FEED_PAUSED: SuggestionItem[] = [
-  ins("view-feed-paused-resume", "Возобновить", "возобнови кампанию"),
-  ins("view-feed-paused-complete", "Завершить", "заверши эту кампанию"),
-  ins("view-feed-paused-stats", "Что произошло?", "покажи, почему я поставил кампанию на паузу"),
+  ask("view-feed-paused-resume", "Возобновить", "возобнови кампанию"),
+  ask("view-feed-paused-complete", "Завершить", "заверши эту кампанию"),
+  ask("view-feed-paused-stats", "Что произошло?", "покажи, почему я поставил кампанию на паузу"),
 ];
 
 const FEED_COMPLETED: SuggestionItem[] = [
-  ins("view-feed-done-duplicate", "Запустить копию", "создай копию этой кампании и запусти"),
-  ins("view-feed-done-analysis", "Анализ результата", "разбери, что в кампании сработало, а что нет"),
-  ins("view-feed-done-export", "Выгрузить отчёт", "выгрузи итоговый отчёт по кампании"),
+  ask("view-feed-done-duplicate", "Запустить копию", "создай копию этой кампании и запусти"),
+  ask("view-feed-done-analysis", "Анализ результата", "разбери, что в кампании сработало, а что нет"),
+  ask("view-feed-done-export", "Выгрузить отчёт", "выгрузи итоговый отчёт по кампании"),
 ];
 
 export function resolveAwaitingCampaign(): SuggestionItem[] {

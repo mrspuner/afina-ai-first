@@ -25,13 +25,20 @@ export function Step1Scenario({ data, onNext }: StepProps) {
 
   const normalized = query.trim().toLocaleLowerCase("ru-RU");
 
+  // Базовые сценарии (isBase) одноимённы с категориями и поэтому всегда
+  // отсеиваются — пользователь выбирает категорию через chip'ы фильтра выше,
+  // а в карточках видит «настоящие» сценарии: подобранные и остальные.
   const filtered = useMemo(() => {
     return SCENARIOS.filter((s) => {
+      if (s.isBase) return false;
       if (!matchesQuery(s, normalized)) return false;
       if (activeCategories.size > 0 && !activeCategories.has(s.category)) return false;
       return true;
     });
   }, [normalized, activeCategories]);
+
+  const curated = useMemo(() => filtered.filter((s) => s.isCurated), [filtered]);
+  const others = useMemo(() => filtered.filter((s) => !s.isCurated), [filtered]);
 
   const selectedId =
     typeof data.scenario === "string" && data.scenario.length > 0 ? data.scenario : null;
@@ -71,7 +78,7 @@ export function Step1Scenario({ data, onNext }: StepProps) {
 
   return (
     <StepContent
-      title="Выберите сценарий"
+      title="Выберите сценарий для подбора сигналов"
       subtitle="Готовая связка сигнала и кампании под бизнес-цель"
     >
       <div className="flex flex-col gap-4">
@@ -136,15 +143,41 @@ export function Step1Scenario({ data, onNext }: StepProps) {
                 Ничего не нашлось. Измените запрос или сбросьте фильтр.
               </p>
             ) : (
-              <div className="grid grid-cols-3 gap-3 pb-1">
-                {filtered.map((s) => (
-                  <ScenarioCard
-                    key={s.id}
-                    scenario={s}
-                    selected={selectedId === s.id}
-                    onClick={handleSelect}
-                  />
-                ))}
+              <div className="flex flex-col gap-6 pb-1">
+                {curated.length > 0 && (
+                  <section className="flex flex-col gap-3">
+                    <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Подобрано для вас
+                    </h2>
+                    <div className="grid grid-cols-3 gap-3">
+                      {curated.map((s) => (
+                        <ScenarioCard
+                          key={s.id}
+                          scenario={s}
+                          selected={selectedId === s.id}
+                          onClick={handleSelect}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                )}
+                {others.length > 0 && (
+                  <section className="flex flex-col gap-3">
+                    <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Остальные сценарии
+                    </h2>
+                    <div className="grid grid-cols-3 gap-3">
+                      {others.map((s) => (
+                        <ScenarioCard
+                          key={s.id}
+                          scenario={s}
+                          selected={selectedId === s.id}
+                          onClick={handleSelect}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                )}
               </div>
             )}
           </div>

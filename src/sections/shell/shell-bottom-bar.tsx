@@ -45,7 +45,9 @@ import { PromptBar } from "./prompt-bar";
 import { SuggestionBar } from "./suggestion-bar";
 import { useChat } from "@/state/chat-context";
 import { DraftQueueList } from "./draft-queue-list";
+import { TransientReply } from "./transient-reply";
 import { useChatSubmit } from "./use-chat-submit";
+
 import { useAiReplyAutoDismiss } from "./use-ai-reply-auto-dismiss";
 
 function AttachmentFileList() {
@@ -132,15 +134,13 @@ export function ShellBottomBar() {
   const {
     view,
     selectedWorkflowNode,
-    wizardCurrentStep,
-    budgetHelpShown,
     aiReply,
   } = state;
   useAiReplyAutoDismiss(aiReply, dispatch);
   const welcomeChat = useWelcomeChat();
   const chipsApi = usePromptChips();
   const { drafts: draftsRef, clearQueue, parkDraft } = useDraftQueue();
-  const { openSidebar } = useChat();
+  const chat = useChat();
   // PromptInputProvider is mounted globally in page.tsx above ShellBottomBar,
   // so usePromptInputController() resolves here — the controller context is
   // created by PromptInputProvider, not by the <PromptInput> form below.
@@ -226,7 +226,19 @@ export function ShellBottomBar() {
       return;
     }
 
-    if (view.kind !== "workflow" || view.launched) return;
+    // Для всех остальных view — guided-signal, awaiting-campaign,
+    // campaign-select, campaign, sections Сигналы/Настройки, workflow с
+    // launched=true — фраза уходит в чат через useChatSubmit и получает
+    // mock-ответ из mockReplyForFreeText. Inline-ответ показывает
+    // TransientReply над инпутом; полную историю можно посмотреть в drawer.
+    if (view.kind !== "workflow" || view.launched) {
+      if (rawText.trim()) {
+        chatSubmit({ text: rawText, segments });
+      }
+      editorRef.current?.clear();
+      chipsApi.clearChips();
+      return;
+    }
 
     const structural = parseStructuralCommands(rawText);
     // Node commands now come from per-chip segments: each `node` chip pairs
@@ -276,8 +288,13 @@ export function ShellBottomBar() {
 
   function handlePickSuggestion(item: SuggestionItem) {
     switch (item.action.kind) {
-      case "insert-text":
-        textInput.insertAtCursor(item.action.fullText, {
+      case "ask":
+        // Клик по вопросу-чипу вставляет текст в инпут — пользователь видит
+        // его в PromptBar и решает, отправить как есть (Enter) или поправить.
+        // Сам Enter маршрутизируется в `handlePromptSubmit` ниже, где для
+        // разделов без специальной обработки фраза уходит в `chatSubmit` и
+        // получает inline-ответ через TransientReply.
+        textInput.insertAtCursor(item.action.prompt, {
           separator: "smart",
           preserveTags: true,
         });
@@ -316,10 +333,11 @@ export function ShellBottomBar() {
       <SelectedNodeChipEffect selected={selectedWorkflowNode} />
       <ClearChipsOnViewChangeEffect viewKind={view.kind} />
       <PromptBar
-        onOpenDrawer={openSidebar}
+        onOpenDrawer={chat.openSidebar}
         slot={
           <>
             <DraftQueueList variant="compact" onTakeDraft={() => {}} />
+            <TransientReply messages={chat.messages} />
             <AnimatePresence initial={false}>
               {aiReply ? (
                 <motion.div
@@ -345,33 +363,6 @@ export function ShellBottomBar() {
                 </motion.div>
               ) : null}
             </AnimatePresence>
-            {view.kind === "guided-signal" &&
-            wizardCurrentStep === 5 &&
-            budgetHelpShown ? (
-              <motion.div
-                key="budget-help-answer"
-                initial={{ y: 6, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ duration: 0.26, ease: [0.23, 1, 0.32, 1] }}
-                data-testid="budget-help-answer"
-                className="flex items-start gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/80"
-              >
-                <Image
-                  src="/mascot-icon.svg"
-                  alt=""
-                  width={16}
-                  height={16}
-                  className="mt-0.5 shrink-0"
-                  aria-hidden
-                />
-                <span className="leading-snug">
-                  Рекомендуемая сумма рассчитана из размера вашей базы и средних
-                  цен по сегментам. Мы заложили её так, чтобы хватило на полный
-                  цикл сбора сигналов без перерасхода — обычно это 5–35% от
-                  размера базы в рублях.
-                </span>
-              </motion.div>
-            ) : undefined}
           </>
         }
       >

@@ -41,7 +41,7 @@ function assertValid(items: SuggestionItem[], hint: string) {
     expect(item.label, `${hint}: label`).toBeTruthy();
     expect(ids.has(item.id), `${hint}: duplicate id ${item.id}`).toBe(false);
     ids.add(item.id);
-    expect(["insert-text", "submit", "dispatch", "chat-submit", "command"]).toContain(item.action.kind);
+    expect(["ask", "submit", "dispatch", "chat-submit", "command"]).toContain(item.action.kind);
   }
 }
 
@@ -157,37 +157,55 @@ describe("registry — section.statistics (period+rowKind)", () => {
 });
 
 describe("registry — section.signals (status-aware)", () => {
-  it("статусов нет → онбординг", () => {
+  it("статусов нет → ровно 2 чипа: вопрос и создание", () => {
     const items = resolveSuggestions({
       kind: "section",
       sub: { kind: "signals", statusCounts: EMPTY_SIGNAL_COUNTS },
     });
-    assertValid(items, "signals/empty");
-    expect(items.some((i) => i.label.includes("первый сигнал"))).toBe(true);
+    expect(items).toHaveLength(2);
+    expect(items.some((i) => i.id === "sec-sig-empty-what")).toBe(true);
+    expect(items.some((i) => i.id === "sec-sig-empty-create")).toBe(true);
+    const createChip = items.find((i) => i.id === "sec-sig-empty-create")!;
+    expect(createChip.action.kind).toBe("dispatch");
   });
 
-  it("awaiting_payment > 0 → 'Оплатить ожидающие' в топе", () => {
-    const items = resolveSuggestions({
-      kind: "section",
-      sub: { kind: "signals", statusCounts: { ...EMPTY_SIGNAL_COUNTS, awaiting_payment: 2 } },
-    });
-    expect(items[0].id).toBe("sec-sig-pay");
-  });
-
-  it("error > 0 → 'Показать ошибки' попадает", () => {
-    const items = resolveSuggestions({
-      kind: "section",
-      sub: { kind: "signals", statusCounts: { ...EMPTY_SIGNAL_COUNTS, error: 1 } },
-    });
-    expect(items.some((i) => i.id === "sec-sig-errors")).toBe(true);
-  });
-
-  it("только ready → 'Запустить готовые'", () => {
+  it("только ready → один чип 'Готовые'", () => {
     const items = resolveSuggestions({
       kind: "section",
       sub: { kind: "signals", statusCounts: { ...EMPTY_SIGNAL_COUNTS, ready: 3 } },
     });
-    expect(items.some((i) => i.id === "sec-sig-launch-ready")).toBe(true);
+    expect(items).toHaveLength(1);
+    expect(items[0].id).toBe("sec-sig-filter-ready");
+  });
+
+  it("есть несколько статусов → фильтры по каждому, max 3", () => {
+    const items = resolveSuggestions({
+      kind: "section",
+      sub: {
+        kind: "signals",
+        statusCounts: {
+          ...EMPTY_SIGNAL_COUNTS,
+          ready: 2,
+          processing: 1,
+          awaiting_payment: 5,
+          draft: 1,
+        },
+      },
+    });
+    expect(items).toHaveLength(3);
+    // Порядок: ready, processing, awaiting_payment (по объявлению в реестре).
+    expect(items[0].id).toBe("sec-sig-filter-ready");
+    expect(items[1].id).toBe("sec-sig-filter-processing");
+    expect(items[2].id).toBe("sec-sig-filter-awaiting");
+  });
+
+  it("статус есть, но счётчик 0 → чипа нет", () => {
+    const items = resolveSuggestions({
+      kind: "section",
+      sub: { kind: "signals", statusCounts: { ...EMPTY_SIGNAL_COUNTS, error: 1 } },
+    });
+    expect(items).toHaveLength(1);
+    expect(items[0].id).toBe("sec-sig-filter-error");
   });
 });
 
@@ -213,59 +231,60 @@ describe("registry — section.settings", () => {
 });
 
 describe("registry — wizard sub-states", () => {
-  it("step 1 → 6 сценариев", () => {
+  it("step 1 → 2 ask-вопроса (разница + что выбрать)", () => {
     const items = resolveSuggestions({ kind: "wizard-step", sub: { step: 1 } });
-    expect(items).toHaveLength(6);
-    for (const label of ["Реактивация", "Удержание", "Первая сделка", "Апсейл", "Возврат", "Регистрация"]) {
-      expect(items.some((i) => i.label === label)).toBe(true);
-    }
+    expect(items).toHaveLength(2);
+    expect(items.every((i) => i.action.kind === "ask")).toBe(true);
+    expect(items.some((i) => i.id === "wiz-1-diff")).toBe(true);
+    expect(items.some((i) => i.id === "wiz-1-which")).toBe(true);
   });
 
-  it("step 2 пусто-пусто → стартовый набор", () => {
+  it("step 2 пусто-пусто → 3 стартовых вопроса", () => {
     const items = resolveSuggestions({
       kind: "wizard-step",
       sub: { step: 2, hasInterests: false, hasDomains: false },
     });
-    expect(items.some((i) => i.label === "Подобрать по сайту")).toBe(true);
+    expect(items.every((i) => i.action.kind === "ask")).toBe(true);
+    expect(items.some((i) => i.id === "wiz-2-where-start")).toBe(true);
   });
 
-  it("step 2 интересы+домены → точечная подгонка", () => {
+  it("step 2 интересы+домены → вопросы про сужение/расширение", () => {
     const items = resolveSuggestions({
       kind: "wizard-step",
       sub: { step: 2, hasInterests: true, hasDomains: true },
     });
-    expect(items.some((i) => i.label === "Перегенерировать")).toBe(true);
+    expect(items.some((i) => i.id === "wiz-2-narrow-q")).toBe(true);
+    expect(items.some((i) => i.id === "wiz-2-widen-q")).toBe(true);
   });
 
-  it("step 2 только интересы → 'Добавить домен'", () => {
+  it("step 2 только интересы → 'Зачем триггеры?'", () => {
     const items = resolveSuggestions({
       kind: "wizard-step",
       sub: { step: 2, hasInterests: true, hasDomains: false },
     });
-    expect(items.some((i) => i.id === "wiz-2-add-domain")).toBe(true);
+    expect(items.some((i) => i.id === "wiz-2-need-trigger")).toBe(true);
   });
 
-  it("step 5 без помощи → бюджет-help (1 чип, dispatch)", () => {
+  it("step 5 → 3 вопроса про бюджет (без dispatch)", () => {
     const items = resolveSuggestions({
-      kind: "wizard-step", sub: { step: 5, budgetHelpShown: false },
+      kind: "wizard-step", sub: { step: 5 },
     });
-    expect(items).toHaveLength(1);
-    expect(items[0].action.kind).toBe("dispatch");
+    expect(items.every((i) => i.action.kind === "ask")).toBe(true);
+    expect(items.some((i) => i.id === "wiz-5-budget-why")).toBe(true);
   });
 
-  it("step 6 nameSet=true → переименовать + далее", () => {
+  it("step 6 nameSet=true → 'Поменять название?'", () => {
     const items = resolveSuggestions({
       kind: "wizard-step", sub: { step: 6, nameSet: true },
     });
-    expect(items.some((i) => i.id === "wiz-6-rename")).toBe(true);
-    expect(items.some((i) => i.id === "wiz-6-confirm")).toBe(true);
+    expect(items.some((i) => i.id === "wiz-6-rename-q")).toBe(true);
   });
 
-  it("step 6 nameSet=false → 'Придумать название'", () => {
+  it("step 6 nameSet=false → 'Как назвать сигнал?'", () => {
     const items = resolveSuggestions({
       kind: "wizard-step", sub: { step: 6, nameSet: false },
     });
-    expect(items.some((i) => i.id === "wiz-6-name")).toBe(true);
+    expect(items.some((i) => i.id === "wiz-6-name-q")).toBe(true);
   });
 });
 
@@ -281,6 +300,7 @@ describe("registry — views & commands", () => {
   it("campaign-feed paused → 'Возобновить'", () => {
     const items = resolveSuggestions({ kind: "campaign-feed", status: "paused" });
     expect(items.some((i) => i.label === "Возобновить")).toBe(true);
+    expect(items.every((i) => i.action.kind === "ask")).toBe(true);
   });
 
   it("campaign-feed completed → 'Запустить копию'", () => {
@@ -321,8 +341,7 @@ describe("registry — глобальная уникальность id", () => 
       { kind: "section", sub: { kind: "settings", hasIntegrations: true, isBasicTariff: false } },
       { kind: "wizard-step", sub: { step: 1 } },
       { kind: "wizard-step", sub: { step: 2, hasInterests: false, hasDomains: false } },
-      { kind: "wizard-step", sub: { step: 5, budgetHelpShown: false } },
-      { kind: "wizard-step", sub: { step: 5, budgetHelpShown: true } },
+      { kind: "wizard-step", sub: { step: 5 } },
       { kind: "awaiting-campaign" },
       { kind: "campaign-select" },
       { kind: "campaign-feed", status: "active" },

@@ -104,16 +104,18 @@ describe("selectPromptSuggestions — section.statistics", () => {
 });
 
 describe("selectPromptSuggestions — section.signals", () => {
-  it("пусто → онбординг", () => {
+  it("пусто → 2 чипа: вопрос + создание", () => {
     const r = selectPromptSuggestions(
       withView({ kind: "section", name: "Сигналы" }, { signals: [] }),
       ctx()
     );
     if (r.kind !== "items") throw new Error();
-    expect(r.items.some((i) => i.id === "sec-sig-onboard-create")).toBe(true);
+    expect(r.items).toHaveLength(2);
+    expect(r.items.some((i) => i.id === "sec-sig-empty-what")).toBe(true);
+    expect(r.items.some((i) => i.id === "sec-sig-empty-create")).toBe(true);
   });
 
-  it("есть awaiting_payment → 'Оплатить ожидающие' первым", () => {
+  it("есть awaiting_payment → ровно фильтр-чип по этому статусу", () => {
     const signal: Signal = {
       id: "s1",
       type: "Удержание",
@@ -128,7 +130,8 @@ describe("selectPromptSuggestions — section.signals", () => {
       ctx()
     );
     if (r.kind !== "items") throw new Error();
-    expect(r.items[0].id).toBe("sec-sig-pay");
+    expect(r.items).toHaveLength(1);
+    expect(r.items[0].id).toBe("sec-sig-filter-awaiting");
   });
 });
 
@@ -154,22 +157,23 @@ describe("selectPromptSuggestions — wizard", () => {
     expect(r.kind).toBe("hidden");
   });
 
-  it("step 1 → 6 сценариев", () => {
+  it("step 1 → 2 ask-вопроса", () => {
     const r = selectPromptSuggestions(
       withView({ kind: "guided-signal" }, { wizardCurrentStep: 1 }),
       ctx()
     );
     if (r.kind !== "items") throw new Error();
-    expect(r.items).toHaveLength(6);
+    expect(r.items).toHaveLength(2);
+    expect(r.items.every((i) => i.action.kind === "ask")).toBe(true);
   });
 
-  it("step 2 без snapshot → стартовый набор (как пусто-пусто)", () => {
+  it("step 2 без snapshot → стартовые вопросы", () => {
     const r = selectPromptSuggestions(
       withView({ kind: "guided-signal" }, { wizardCurrentStep: 2 }),
       ctx()
     );
     if (r.kind !== "items") throw new Error();
-    expect(r.items.some((i) => i.label === "Подобрать по сайту")).toBe(true);
+    expect(r.items.some((i) => i.id === "wiz-2-where-start")).toBe(true);
   });
 
   it("step 2 с snapshot.hasInterests → ветка 'есть интересы'", () => {
@@ -178,32 +182,26 @@ describe("selectPromptSuggestions — wizard", () => {
       ctx({ wizard: { hasInterests: true, hasDomains: false } })
     );
     if (r.kind !== "items") throw new Error();
-    expect(r.items.some((i) => i.id === "wiz-2-add-domain")).toBe(true);
+    expect(r.items.some((i) => i.id === "wiz-2-need-trigger")).toBe(true);
   });
 
-  it("step 5 — две ветки по budgetHelpShown", () => {
-    const noHelp = selectPromptSuggestions(
-      withView({ kind: "guided-signal" }, { wizardCurrentStep: 5, budgetHelpShown: false }),
+  it("step 5 → 3 вопроса про бюджет (без dispatch)", () => {
+    const r = selectPromptSuggestions(
+      withView({ kind: "guided-signal" }, { wizardCurrentStep: 5 }),
       ctx()
     );
-    if (noHelp.kind !== "items") throw new Error();
-    expect(noHelp.items).toHaveLength(1);
-
-    const afterHelp = selectPromptSuggestions(
-      withView({ kind: "guided-signal" }, { wizardCurrentStep: 5, budgetHelpShown: true }),
-      ctx()
-    );
-    if (afterHelp.kind !== "items") throw new Error();
-    expect(afterHelp.items.length).toBeGreaterThan(1);
+    if (r.kind !== "items") throw new Error();
+    expect(r.items.every((i) => i.action.kind === "ask")).toBe(true);
+    expect(r.items.some((i) => i.id === "wiz-5-budget-why")).toBe(true);
   });
 
-  it("step 6 snapshot.signalNameSet → 'Переименовать'", () => {
+  it("step 6 snapshot.signalNameSet → 'Поменять название?'", () => {
     const r = selectPromptSuggestions(
       withView({ kind: "guided-signal" }, { wizardCurrentStep: 6 }),
       ctx({ wizard: { signalNameSet: true } })
     );
     if (r.kind !== "items") throw new Error();
-    expect(r.items.some((i) => i.id === "wiz-6-rename")).toBe(true);
+    expect(r.items.some((i) => i.id === "wiz-6-rename-q")).toBe(true);
   });
 });
 

@@ -84,7 +84,6 @@ function countSignalStatuses(
 
 function wizardSubFor(
   step: number,
-  budgetHelpShown: boolean,
   snapshot: WizardSnapshot | undefined
 ): WizardSub | null {
   switch (step) {
@@ -97,7 +96,7 @@ function wizardSubFor(
       };
     case 3: return { step: 3 };
     case 4: return { step: 4 };
-    case 5: return { step: 5, budgetHelpShown };
+    case 5: return { step: 5 };
     case 6: return { step: 6, nameSet: snapshot?.signalNameSet ?? false };
     case 7: return { step: 7 };
     case 8: return { step: 8 };
@@ -167,7 +166,7 @@ export function selectPromptSuggestions(
     case "guided-signal": {
       const step = state.wizardCurrentStep;
       if (step === null) return { kind: "hidden" };
-      const sub = wizardSubFor(step, state.budgetHelpShown, ctx.wizard);
+      const sub = wizardSubFor(step, ctx.wizard);
       if (sub === null) return { kind: "hidden" };
       return resolved({ kind: "wizard-step", sub });
     }

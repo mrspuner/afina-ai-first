@@ -129,10 +129,6 @@ export function LaunchFlyout({ open, onClose }: LaunchFlyoutProps) {
 
   if (!open) return null;
 
-  function startNewScenario() {
-    dispatch({ type: "start_signal_flow" });
-  }
-
   function openSignal() {
     dispatch({ type: "sidebar_nav", section: "Сигналы" });
     onClose();
@@ -182,16 +178,6 @@ export function LaunchFlyout({ open, onClose }: LaunchFlyoutProps) {
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
-          {!normalized && (
-            <button
-              type="button"
-              onClick={startNewScenario}
-              className="mb-6 w-full rounded-lg border border-border bg-background px-3 py-3 text-left text-sm font-medium text-foreground transition-colors hover:border-brand/50 hover:bg-accent"
-            >
-              Запустить новый сценарий
-            </button>
-          )}
-
           {nothingFound ? (
             <p className="mt-8 text-center text-sm text-muted-foreground">
               Ничего не нашлось. Измените запрос.
@@ -207,6 +193,7 @@ export function LaunchFlyout({ open, onClose }: LaunchFlyoutProps) {
                   it.kind === "signal" ? (
                     <RecentRow
                       key={`s-${it.signal.id}`}
+                      kindLabel="Сигнал"
                       name={it.signal.type}
                       statusLabel={SIGNAL_STATUS_LABEL[it.signal.status ?? "ready"]}
                       statusDot={SIGNAL_DOT[it.signal.status ?? "ready"]}
@@ -215,6 +202,7 @@ export function LaunchFlyout({ open, onClose }: LaunchFlyoutProps) {
                   ) : (
                     <RecentRow
                       key={`c-${it.campaign.id}`}
+                      kindLabel="Кампания"
                       name={it.campaign.name}
                       statusLabel={STATUS_LABELS[it.campaign.status]}
                       statusDot={CAMPAIGN_DOT[it.campaign.status]}
@@ -232,20 +220,27 @@ export function LaunchFlyout({ open, onClose }: LaunchFlyoutProps) {
 }
 
 interface RecentRowProps {
+  /** Тип сущности — «Сигнал» или «Кампания», показывается над именем. */
+  kindLabel: string;
   name: string;
   statusLabel: string;
   statusDot: string;
   onClick: () => void;
 }
 
-function RecentRow({ name, statusLabel, statusDot, onClick }: RecentRowProps) {
+function RecentRow({ kindLabel, name, statusLabel, statusDot, onClick }: RecentRowProps) {
   return (
     <button
       type="button"
       onClick={onClick}
       className="flex w-full items-center justify-between gap-3 rounded-lg border border-border px-3 py-2 text-left transition-colors hover:bg-accent"
     >
-      <p className="truncate text-sm font-medium text-foreground">{name}</p>
+      <div className="flex min-w-0 flex-col">
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          {kindLabel}
+        </span>
+        <p className="truncate text-sm font-medium text-foreground">{name}</p>
+      </div>
       <span className="inline-flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
         <span className={cn("h-1.5 w-1.5 rounded-full", statusDot)} aria-hidden />
         {statusLabel}
