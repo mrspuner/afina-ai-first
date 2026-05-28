@@ -13,7 +13,6 @@ import { AnimatePresence, motion } from "motion/react";
 import { useChat } from "@/state/chat-context";
 import { AppSidebar } from "@/sections/shell/app-sidebar";
 import { LaunchFlyout } from "@/sections/shell/launch-flyout";
-import { ScenarioCatalogModal } from "@/sections/signals/scenario-catalog-modal";
 import { ShellBottomBar } from "@/sections/shell/shell-bottom-bar";
 import { WelcomeSection } from "@/sections/welcome/welcome-section";
 import { SurveySection } from "@/sections/survey/survey-section";
@@ -51,7 +50,7 @@ function BottomBarSlot() {
 
 export default function Home() {
   const state = useAppState();
-  const { view, launchFlyoutOpen, activeSection, catalog, surveyStatus } = state;
+  const { view, launchFlyoutOpen, activeSection, surveyStatus } = state;
   const onboarding = isOnboarding(state);
   const dispatch = useAppDispatch();
   const welcomeChat = useOnboardingChat();
@@ -59,14 +58,14 @@ export default function Home() {
   function renderMain() {
     if (view.kind === "welcome") {
       // First-entry 3-screen onboarding: site → enrich → interests →
-      // scenarios → catalog. Skippable; once completed or skipped,
+      // scenarios → wizard step-1. Skippable; once completed or skipped,
       // surveyStatus closes the gate and we render WelcomeSection.
       if (surveyStatus === "not_started") {
         return (
           <SurveySection
             skippable
             withOnboardingScreens
-            onComplete={() => { /* survey_completed re-renders WelcomeSection */ }}
+            onComplete={() => { /* start_signal_flow routes the user from here */ }}
             onSkip={() => { /* survey_skipped re-renders WelcomeSection */ }}
           />
         );
@@ -128,11 +127,6 @@ export default function Home() {
               onClose={() => dispatch({ type: "flyout_close" })}
             />
           )}
-          <ScenarioCatalogModal
-            open={catalog !== null}
-            onClose={() => dispatch({ type: "catalog_close" })}
-            onSelect={(scenarioId) => dispatch({ type: "catalog_select", scenarioId })}
-          />
           <div className="relative flex flex-1 flex-col overflow-hidden">
             {renderMain()}
             <AnimatePresence initial={false}>

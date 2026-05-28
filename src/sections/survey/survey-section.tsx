@@ -77,6 +77,7 @@ export function SurveySection({
   function handleChooseScenario() {
     if (phase.kind !== "scenarios") return;
     dispatch({ type: "survey_completed", survey: phase.survey });
+    dispatch({ type: "start_signal_flow" });
     onComplete();
   }
 

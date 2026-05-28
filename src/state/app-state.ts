@@ -32,8 +32,6 @@ export type SignalType =
   | "Возврат"
   | "Удержание";
 
-export type CatalogReturnTo = "onboarding" | "wizard-step-1" | "launcher";
-
 export const SIGNAL_TYPES = [
   "Регистрация",
   "Первая сделка",
@@ -186,10 +184,6 @@ export type AppState = {
   wizardRemixToken: number;
   /** Pending inline field edit dispatched from NodeCardBody; cleared by workflow-view after application. */
   workflowNodeFieldPatch: { nodeId: string; patch: Partial<NodeParams> } | null;
-  /** Non-null while the scenario catalog modal is open. */
-  catalog: { returnTo: CatalogReturnTo } | null;
-  /** The scenario id chosen in the catalog; read by the wizard on mount. */
-  selectedScenarioId: string | null;
   // Owned by stats-promptbar-queries: filters for the Statistics view
   stats: StatisticsFilters;
 };
@@ -248,10 +242,6 @@ export type Action =
   | { type: "wizard_step_changed"; step: number | null }
   | { type: "budget_help_shown" }
   | { type: "wizard_random_remix" }
-  | { type: "catalog_open"; returnTo: CatalogReturnTo }
-  | { type: "catalog_close" }
-  | { type: "catalog_select"; scenarioId: string }
-  | { type: "selected_scenario_consumed" }
   | { type: "campaign_launched"; id: string; timestamp: string; budget: number }
   | { type: "open_workflow"; campaign: { id: string; name: string }; launched: boolean }
   | { type: "open_campaign_payment"; campaignId: string }
@@ -295,8 +285,6 @@ export const initialState: AppState = {
   budgetHelpShown: false,
   wizardRemixToken: 0,
   workflowNodeFieldPatch: null,
-  catalog: null,
-  selectedScenarioId: null,
   stats: DEFAULT_FILTERS,
 };
 
@@ -774,32 +762,6 @@ export function appReducer(state: AppState, action: Action): AppState {
         ...state,
         accountSettings: { ...state.accountSettings, ...action.patch },
       };
-
-    case "catalog_open":
-      return { ...state, catalog: { returnTo: action.returnTo }, launchFlyoutOpen: false };
-
-    case "catalog_close": {
-      if (state.catalog?.returnTo === "onboarding") {
-        return { ...state, catalog: null, view: { kind: "welcome" }, activeSection: null };
-      }
-      return { ...state, catalog: null };
-    }
-
-    case "catalog_select": {
-      const returnTo = state.catalog?.returnTo;
-      const base = { ...state, catalog: null, selectedScenarioId: action.scenarioId };
-      if (returnTo === "wizard-step-1") return base;
-      return {
-        ...base,
-        view: { kind: "guided-signal" as const },
-        activeSection: null,
-        resumingSignalId: undefined,
-        wizardSessionId: state.wizardSessionId + 1,
-      };
-    }
-
-    case "selected_scenario_consumed":
-      return { ...state, selectedScenarioId: null };
 
     case "campaign_launched": {
       const c = state.campaigns.find((cc) => cc.id === action.id);
