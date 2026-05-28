@@ -128,12 +128,6 @@ export function WorkflowSection() {
     dispatch({ type: "campaign_renamed", id: currentCampaign.id, name });
   }
 
-  function handleSaveDraft() {
-    if (!currentCampaign) return;
-    dispatch({ type: "campaign_saved_draft", id: currentCampaign.id });
-    showToast({ kind: "info", text: "Черновик сохранён" });
-  }
-
   function handleLaunch() {
     if (!currentCampaign) return;
     const graph = graphRef.current;
@@ -202,7 +196,6 @@ export function WorkflowSection() {
         campaign={currentCampaign}
         signal={currentSignal}
         onRename={handleRename}
-        onSaveDraft={handleSaveDraft}
         onLaunch={handleLaunch}
         onPause={handlePause}
         onResume={handleResume}

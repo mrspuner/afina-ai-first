@@ -26,7 +26,6 @@ interface CanvasHeaderProps {
   campaign: Campaign;
   signal: Signal | null;
   onRename: (name: string) => void;
-  onSaveDraft: () => void;
   onLaunch: () => void;
   onPause: () => void;
   onResume: () => void;
@@ -99,7 +98,6 @@ export function CanvasHeader({
   campaign,
   signal,
   onRename,
-  onSaveDraft,
   onLaunch,
   onPause,
   onResume,
@@ -220,12 +218,7 @@ export function CanvasHeader({
 
         <div className="flex shrink-0 items-center gap-2">
           {campaign.status === "draft" && (
-            <>
-              <Button variant="outline" onClick={onSaveDraft}>
-                Сохранить черновик
-              </Button>
-              <Button onClick={onLaunch}>Запустить</Button>
-            </>
+            <Button onClick={onLaunch}>Запустить</Button>
           )}
           {campaign.status === "active" && (
             <>
