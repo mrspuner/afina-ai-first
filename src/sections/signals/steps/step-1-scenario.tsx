@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Search } from "lucide-react";
 import { StepContent } from "@/sections/signals/steps/step-content";
 import { StepProps } from "@/types/campaign";
@@ -49,6 +49,26 @@ export function Step1Scenario({ data, onNext }: StepProps) {
     onNext({ scenario: id });
   }
 
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [canScrollUp, setCanScrollUp] = useState(false);
+  const [canScrollDown, setCanScrollDown] = useState(false);
+
+  function updateScrollFlags() {
+    const el = scrollRef.current;
+    if (!el) return;
+    const slack = 2;
+    setCanScrollUp(el.scrollTop > slack);
+    setCanScrollDown(el.scrollTop + el.clientHeight < el.scrollHeight - slack);
+  }
+
+  useLayoutEffect(updateScrollFlags, [filtered]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.addEventListener("resize", updateScrollFlags);
+    return () => window.removeEventListener("resize", updateScrollFlags);
+  }, []);
+
   return (
     <StepContent
       title="Выберите сценарий"
@@ -93,15 +113,20 @@ export function Step1Scenario({ data, onNext }: StepProps) {
 
         <div className="relative">
           <div
+            ref={scrollRef}
+            onScroll={updateScrollFlags}
             className={cn(
               "max-h-[420px] overflow-y-auto pr-2",
               "[scrollbar-width:thin]",
-              "[&::-webkit-scrollbar]:w-1.5",
+              "[scrollbar-color:var(--scrollbar-thumb)_transparent]",
+              "[&::-webkit-scrollbar]:w-1",
+              "[&::-webkit-scrollbar]:bg-transparent",
               "[&::-webkit-scrollbar-track]:bg-transparent",
               "[&::-webkit-scrollbar-thumb]:rounded-full",
-              "[&::-webkit-scrollbar-thumb]:bg-border/60",
-              "hover:[&::-webkit-scrollbar-thumb]:bg-border"
+              "[&::-webkit-scrollbar-thumb]:bg-foreground/15",
+              "hover:[&::-webkit-scrollbar-thumb]:bg-foreground/30"
             )}
+            style={{ ["--scrollbar-thumb" as string]: "color-mix(in oklch, var(--foreground) 18%, transparent)" }}
           >
             {filtered.length === 0 ? (
               <p className="py-10 text-center text-sm text-muted-foreground">
@@ -122,11 +147,17 @@ export function Step1Scenario({ data, onNext }: StepProps) {
           </div>
           <div
             aria-hidden
-            className="pointer-events-none absolute inset-x-0 top-0 h-6 bg-gradient-to-b from-background to-transparent"
+            className={cn(
+              "pointer-events-none absolute inset-x-0 top-0 h-6 bg-gradient-to-b from-background to-transparent transition-opacity duration-150",
+              canScrollUp ? "opacity-100" : "opacity-0"
+            )}
           />
           <div
             aria-hidden
-            className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-background to-transparent"
+            className={cn(
+              "pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-background to-transparent transition-opacity duration-150",
+              canScrollDown ? "opacity-100" : "opacity-0"
+            )}
           />
         </div>
       </div>
