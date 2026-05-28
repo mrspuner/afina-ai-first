@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { useAppDispatch, useAppState } from "@/state/app-state-context";
 import { TopUpModal, computeShortfall } from "@/sections/signals/top-up-modal";
+import { getProcessingDuration } from "@/state/dev-config";
 import { cn } from "@/lib/utils";
 import {
   estimateTouches,
@@ -74,6 +75,30 @@ export function CampaignPaymentScreen() {
     });
   }
 
+  // After launch, hand the user back to wizard step 7 so they see the
+  // signal-processing animation as feedback for the launch. Replays the
+  // animation by flipping the linked signal to "processing" and scheduling
+  // its flip back to "ready"; step 7 auto-advances to step 8 on "ready".
+  function routeToProcessingAnimation() {
+    if (!signal) return;
+    dispatch({
+      type: "signal_status_changed",
+      id: signal.id,
+      status: "processing",
+    });
+    const duration = getProcessingDuration();
+    if (Number.isFinite(duration)) {
+      window.setTimeout(() => {
+        dispatch({
+          type: "signal_status_changed",
+          id: signal.id,
+          status: "ready",
+        });
+      }, duration);
+    }
+    dispatch({ type: "resume_signal_in_wizard", signalId: signal.id });
+  }
+
   function handleLaunch() {
     if (!campaign) return;
     if (activeBudget <= 0) return;
@@ -87,6 +112,7 @@ export function CampaignPaymentScreen() {
       timestamp: new Date().toISOString(),
       budget: activeBudget,
     });
+    routeToProcessingAnimation();
   }
 
   function handleTopUpSuccess(amount: number) {
@@ -99,6 +125,7 @@ export function CampaignPaymentScreen() {
       budget: activeBudget,
     });
     setTopUpOpen(false);
+    routeToProcessingAnimation();
   }
 
   function handleCustomChange(e: React.ChangeEvent<HTMLInputElement>) {
