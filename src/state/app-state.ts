@@ -69,7 +69,6 @@ export type Signal = {
 
 export type CampaignStatus =
   | "draft"
-  | "scheduled"
   | "active"
   | "paused"
   | "completed";
@@ -83,7 +82,6 @@ export type Campaign = {
   launchedAt?: string;
   pausedAt?: string;
   completedAt?: string;
-  scheduledFor?: string;
   /**
    * Set by `campaign_launched` from the payment screen. Older preset
    * campaigns and never-launched drafts may not carry it. Display fallbacks
@@ -203,7 +201,6 @@ export type Action =
   | { type: "campaign_created"; campaign: Campaign }
   | { type: "campaign_status_changed"; id: string; status: CampaignStatus; timestamp: string }
   | { type: "campaign_duplicated"; id: string }
-  | { type: "campaign_schedule_cancelled"; id: string }
   | { type: "campaigns_query_set"; statuses: CampaignStatus[]; sort: CampaignSort }
   | { type: "campaigns_filter_remove"; status: CampaignStatus }
   | { type: "campaigns_filter_clear" }
@@ -428,7 +425,7 @@ export function appReducer(state: AppState, action: Action): AppState {
       if (!c) return state;
       const launched =
         c.status === "active" || c.status === "paused" || c.status === "completed";
-      // Launched campaigns route to the new campaign feed; draft/scheduled
+      // Launched campaigns route to the new campaign feed; drafts
       // still go straight into the workflow editor (existing behaviour).
       return {
         ...state,
@@ -488,7 +485,6 @@ export function appReducer(state: AppState, action: Action): AppState {
             next.pausedAt = action.timestamp ?? new Date().toISOString();
           }
           if (action.status === "completed") next.completedAt = action.timestamp;
-          if (action.status === "scheduled") next.scheduledFor = action.timestamp;
           return next;
         }),
         view:
@@ -520,18 +516,6 @@ export function appReducer(state: AppState, action: Action): AppState {
         campaignSort: "default",
       };
     }
-
-    case "campaign_schedule_cancelled":
-      return {
-        ...state,
-        campaigns: state.campaigns.map((c) => {
-          if (c.id !== action.id) return c;
-          if (c.status !== "scheduled") return c;
-          const next: Campaign = { ...c, status: "draft" };
-          delete next.scheduledFor;
-          return next;
-        }),
-      };
 
     case "campaigns_query_set": {
       const seen = new Set<CampaignStatus>();

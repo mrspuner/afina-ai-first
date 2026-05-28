@@ -13,9 +13,9 @@ describe("parseCampaignFilter", () => {
   });
 
   it("parses statuses joined by 'и'", () => {
-    expect(parseCampaignFilter("черновик и запланировано")).toEqual([
+    expect(parseCampaignFilter("черновик и приостановлено")).toEqual([
       "draft",
-      "scheduled",
+      "paused",
     ]);
   });
 
@@ -46,9 +46,9 @@ describe("parseCampaignFilter", () => {
   });
 
   it("handles latin variants", () => {
-    expect(parseCampaignFilter("draft, scheduled")).toEqual([
+    expect(parseCampaignFilter("draft, paused")).toEqual([
       "draft",
-      "scheduled",
+      "paused",
     ]);
   });
 
@@ -64,7 +64,6 @@ describe("parseCampaignFilter", () => {
 
   it("recognizes every StatusBadge label as its own status", () => {
     expect(parseCampaignFilter("Активно")).toEqual(["active"]);
-    expect(parseCampaignFilter("Запланированно")).toEqual(["scheduled"]);
     expect(parseCampaignFilter("Не запущено")).toEqual(["draft"]);
     expect(parseCampaignFilter("Приостановлена")).toEqual(["paused"]);
     expect(parseCampaignFilter("Завершено")).toEqual(["completed"]);

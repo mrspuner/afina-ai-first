@@ -19,7 +19,6 @@ function formatNumber(n: number): string {
 
 function timestampLine(c: Campaign): string {
   if (c.status === "active" && c.launchedAt) return `Запущена ${formatDate(c.launchedAt)}`;
-  if (c.status === "scheduled" && c.scheduledFor) return `Запуск ${formatDate(c.scheduledFor)}`;
   if (c.status === "completed" && c.completedAt) return `Завершена ${formatDate(c.completedAt)}`;
   return `Черновик от ${formatDate(c.createdAt)}`;
 }

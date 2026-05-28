@@ -149,7 +149,7 @@ describe("appReducer — campaign_status_changed", () => {
     const next = appReducer(state, {
       type: "campaign_status_changed",
       id: "c1",
-      status: "scheduled",
+      status: "paused",
       timestamp: "2026-04-18T12:00:00.000Z",
     });
     expect(next.campaigns[1].status).toBe("draft");
@@ -437,14 +437,6 @@ describe("appReducer — campaign_opened", () => {
     });
   });
 
-  it("opens scheduled campaign with launched=false", () => {
-    const c = makeCampaign({ id: "cmp_A", name: "Plan", status: "scheduled" });
-    const state: AppState = { ...initialState, campaigns: [c] };
-    const next = appReducer(state, { type: "campaign_opened", id: "cmp_A" });
-    if (next.view.kind !== "workflow") throw new Error("unreachable");
-    expect(next.view.launched).toBe(false);
-  });
-
   it("is a no-op when id is unknown", () => {
     const state: AppState = { ...initialState, campaigns: [makeCampaign()] };
     const next = appReducer(state, { type: "campaign_opened", id: "cmp_missing" });
@@ -651,51 +643,6 @@ describe("appReducer — campaign_duplicated", () => {
   });
 });
 
-describe("appReducer — campaign_schedule_cancelled", () => {
-  it("returns scheduled campaign to draft and clears scheduledFor", () => {
-    const state: AppState = {
-      ...initialState,
-      campaigns: [
-        makeCampaign({
-          id: "c1",
-          status: "scheduled",
-          scheduledFor: "2026-05-01T00:00:00.000Z",
-        }),
-      ],
-    };
-    const next = appReducer(state, {
-      type: "campaign_schedule_cancelled",
-      id: "c1",
-    });
-    expect(next.campaigns[0].status).toBe("draft");
-    expect(next.campaigns[0].scheduledFor).toBeUndefined();
-  });
-
-  it("is a no-op when campaign is not in scheduled status", () => {
-    const state: AppState = {
-      ...initialState,
-      campaigns: [makeCampaign({ id: "c1", status: "active" })],
-    };
-    const next = appReducer(state, {
-      type: "campaign_schedule_cancelled",
-      id: "c1",
-    });
-    expect(next.campaigns[0].status).toBe("active");
-  });
-
-  it("is a no-op when id is unknown", () => {
-    const state: AppState = {
-      ...initialState,
-      campaigns: [makeCampaign({ id: "c1", status: "scheduled" })],
-    };
-    const next = appReducer(state, {
-      type: "campaign_schedule_cancelled",
-      id: "missing",
-    });
-    expect(next.campaigns[0].status).toBe("scheduled");
-  });
-});
-
 describe("appReducer — goto_stats with campaignId", () => {
   it("stores campaignId on the section view", () => {
     const next = appReducer(initialState, {
@@ -742,16 +689,15 @@ describe("isCampaignDone", () => {
     ).toBe(true);
   });
 
-  it("returns false for draft/scheduled only", () => {
-    expect(
-      isCampaignDone({
-        ...initialState,
-        campaigns: [
-          makeCampaign({ id: "c1", status: "draft" }),
-          makeCampaign({ id: "c2", status: "scheduled" }),
-        ],
-      })
-    ).toBe(false);
+  it("returns false for draft-only campaign lists", () => {
+    const state: AppState = {
+      ...initialState,
+      campaigns: [
+        makeCampaign({ id: "c1", status: "draft" }),
+        makeCampaign({ id: "c2", status: "draft" }),
+      ],
+    };
+    expect(isCampaignDone(state)).toBe(false);
   });
 });
 

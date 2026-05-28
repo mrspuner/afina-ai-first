@@ -158,16 +158,6 @@ export function WorkflowSection() {
     });
   }
 
-  function handleSchedule(iso: string) {
-    if (!currentCampaign) return;
-    dispatch({
-      type: "campaign_status_changed",
-      id: currentCampaign.id,
-      status: "scheduled",
-      timestamp: iso,
-    });
-  }
-
   function handlePause() {
     if (!currentCampaign) return;
     dispatch({
@@ -198,11 +188,6 @@ export function WorkflowSection() {
     dispatch({ type: "goto_stats", campaignId: currentCampaign.id });
   }
 
-  function handleCancelSchedule() {
-    if (!currentCampaign) return;
-    dispatch({ type: "campaign_schedule_cancelled", id: currentCampaign.id });
-  }
-
   if (!currentCampaign) {
     return (
       <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
@@ -219,12 +204,10 @@ export function WorkflowSection() {
         onRename={handleRename}
         onSaveDraft={handleSaveDraft}
         onLaunch={handleLaunch}
-        onSchedule={handleSchedule}
         onPause={handlePause}
         onResume={handleResume}
         onDuplicate={handleDuplicate}
         onGoToStats={handleGoToStats}
-        onCancelSchedule={handleCancelSchedule}
         toast={toast}
         onDismissToast={dismissToast}
         mode={view.launched ? "read-only" : "edit"}

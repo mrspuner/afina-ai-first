@@ -9,7 +9,6 @@ export interface CampaignQuery {
 
 const STATUS_ROOTS: Array<{ status: CampaignStatus; roots: string[] }> = [
   { status: "draft", roots: ["черновик", "драфт", "draft"] },
-  { status: "scheduled", roots: ["запланиров", "расписани", "scheduled", "план"] },
   { status: "active", roots: ["активн", "запущен", "идёт", "идет", "active", "running"] },
   { status: "paused", roots: ["приостанов", "пауз", "paused", "останов"] },
   { status: "completed", roots: ["завершен", "завершён", "закончен", "completed", "готов"] },

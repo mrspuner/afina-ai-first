@@ -1,15 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, ChevronDown, Pencil } from "lucide-react";
+import { ArrowLeft, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ButtonGroup } from "@/components/ui/button-group";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
   Dialog,
@@ -20,7 +13,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import type { Campaign, Signal } from "@/state/app-state";
-import { ScheduleCampaignDialog } from "./schedule-campaign-dialog";
 import { StatusBadge } from "./status-badge";
 
 export interface CanvasHeaderToast {
@@ -28,7 +20,7 @@ export interface CanvasHeaderToast {
   text: string;
 }
 
-type ConfirmKind = "pause" | "duplicate" | "cancel-schedule";
+type ConfirmKind = "pause" | "duplicate";
 
 interface CanvasHeaderProps {
   campaign: Campaign;
@@ -36,12 +28,10 @@ interface CanvasHeaderProps {
   onRename: (name: string) => void;
   onSaveDraft: () => void;
   onLaunch: () => void;
-  onSchedule: (iso: string) => void;
   onPause: () => void;
   onResume: () => void;
   onDuplicate: () => void;
   onGoToStats: () => void;
-  onCancelSchedule: () => void;
   toast?: CanvasHeaderToast | null;
   onDismissToast?: () => void;
   /**
@@ -92,8 +82,6 @@ function formatDateTime(iso: string): string {
 }
 
 function statusDescription(c: Campaign): string {
-  if (c.status === "scheduled" && c.scheduledFor)
-    return `Запуск запланирован на ${formatDateTime(c.scheduledFor)}`;
   if (c.status === "active" && c.launchedAt)
     return `Запущена ${formatDateTime(c.launchedAt)}`;
   if (c.status === "paused" && c.pausedAt)
@@ -113,12 +101,10 @@ export function CanvasHeader({
   onRename,
   onSaveDraft,
   onLaunch,
-  onSchedule,
   onPause,
   onResume,
   onDuplicate,
   onGoToStats,
-  onCancelSchedule,
   toast,
   onDismissToast,
   mode = "edit",
@@ -128,7 +114,6 @@ export function CanvasHeader({
   const [editing, setEditing] = useState(false);
   const [draftName, setDraftName] = useState(campaign.name);
   const [confirm, setConfirm] = useState<ConfirmKind | null>(null);
-  const [schedulerOpen, setSchedulerOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Resync draft name when the campaign is renamed externally (e.g.,
@@ -239,26 +224,7 @@ export function CanvasHeader({
               <Button variant="outline" onClick={onSaveDraft}>
                 Сохранить черновик
               </Button>
-              <ButtonGroup>
-                <Button onClick={onLaunch}>Запустить</Button>
-                <DropdownMenu>
-                  <DropdownMenuTrigger
-                    render={
-                      <Button
-                        size="icon"
-                        aria-label="Дополнительные действия запуска"
-                      >
-                        <ChevronDown className="h-4 w-4" />
-                      </Button>
-                    }
-                  />
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => setSchedulerOpen(true)}>
-                      Запланировать…
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </ButtonGroup>
+              <Button onClick={onLaunch}>Запустить</Button>
             </>
           )}
           {campaign.status === "active" && (
@@ -291,21 +257,6 @@ export function CanvasHeader({
             <>
               <Button variant="outline" onClick={onGoToStats}>
                 Посмотреть статистику
-              </Button>
-              <Button onClick={() => setConfirm("duplicate")}>Дублировать</Button>
-            </>
-          )}
-          {campaign.status === "scheduled" && (
-            <>
-              <Button
-                variant="outline"
-                className="text-destructive border-destructive/40 hover:bg-destructive/10"
-                onClick={() => setConfirm("cancel-schedule")}
-              >
-                Отменить расписание
-              </Button>
-              <Button variant="outline" onClick={() => setSchedulerOpen(true)}>
-                Изменить расписание
               </Button>
               <Button onClick={() => setConfirm("duplicate")}>Дублировать</Button>
             </>
@@ -391,40 +342,8 @@ export function CanvasHeader({
               </DialogFooter>
             </>
           )}
-          {confirm === "cancel-schedule" && (
-            <>
-              <DialogHeader>
-                <DialogTitle>Отменить расписание?</DialogTitle>
-                <DialogDescription>
-                  Кампания вернётся в состояние черновика. Вам потребуется
-                  заново её запланировать.
-                </DialogDescription>
-              </DialogHeader>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setConfirm(null)}>
-                  Отмена
-                </Button>
-                <Button
-                  onClick={() => {
-                    setConfirm(null);
-                    onCancelSchedule();
-                  }}
-                >
-                  Отменить расписание
-                </Button>
-              </DialogFooter>
-            </>
-          )}
         </DialogContent>
       </Dialog>
-
-      <ScheduleCampaignDialog
-        open={schedulerOpen}
-        onOpenChange={setSchedulerOpen}
-        onConfirm={onSchedule}
-        campaignName={campaign.name}
-        initialIso={campaign.scheduledFor}
-      />
     </div>
   );
 }
