@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Copy, Play, Square } from "lucide-react";
+import { BarChart3, Copy, Play, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   EntityCardShell,
@@ -87,16 +87,23 @@ export function CampaignScreen() {
     icon: <Copy className="h-4 w-4" />,
   };
 
-  const secondaryActions: EntityCardAction[] = isActive
-    ? [
-        {
-          label: "Остановить",
-          onClick: stop,
-          icon: <Square className="h-4 w-4" />,
-        },
-        duplicateAction,
-      ]
-    : [duplicateAction];
+  // All controls live in one row: статистика (если есть) · дубль · остановить.
+  const secondaryActions: EntityCardAction[] = [];
+  if (hasStats) {
+    secondaryActions.push({
+      label: "Статистика",
+      onClick: () => dispatch({ type: "goto_stats", campaignId: campaign.id }),
+      icon: <BarChart3 className="h-4 w-4" />,
+    });
+  }
+  secondaryActions.push(duplicateAction);
+  if (isActive) {
+    secondaryActions.push({
+      label: "Остановить",
+      onClick: stop,
+      icon: <Square className="h-4 w-4" />,
+    });
+  }
 
   return (
     <EntityCardShell
@@ -149,18 +156,6 @@ export function CampaignScreen() {
             </Button>
           </div>
         </CardSection>
-      )}
-
-      {/* Stats link */}
-      {hasStats && (
-        <Button
-          variant="outline"
-          className="self-start gap-2"
-          onClick={() => dispatch({ type: "goto_stats", campaignId: campaign.id })}
-        >
-          Перейти в статистику
-          <ArrowRight className="h-4 w-4" />
-        </Button>
       )}
     </EntityCardShell>
   );
