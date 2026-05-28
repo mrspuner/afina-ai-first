@@ -11,7 +11,7 @@ import { getCampaignStats } from "./mock-stats";
 import type { Campaign, Signal } from "@/state/app-state";
 
 function relevantTimestamp(c: Campaign): string {
-  return c.launchedAt ?? c.scheduledFor ?? c.completedAt ?? c.createdAt;
+  return c.launchedAt ?? c.completedAt ?? c.createdAt;
 }
 
 function hasStats(c: Campaign): boolean {

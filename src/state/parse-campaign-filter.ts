@@ -9,7 +9,6 @@ export interface CampaignQuery {
 
 const STATUS_ROOTS: Array<{ status: CampaignStatus; roots: string[] }> = [
   { status: "draft", roots: ["черновик", "драфт", "draft"] },
-  { status: "scheduled", roots: ["запланиров", "расписани", "scheduled", "план"] },
   { status: "active", roots: ["активн", "запущен", "идёт", "идет", "active", "running"] },
   { status: "paused", roots: ["приостанов", "пауз", "paused", "останов"] },
   { status: "completed", roots: ["завершен", "завершён", "закончен", "completed", "готов"] },
@@ -23,7 +22,7 @@ const SORT_ROOTS: Array<{ sort: CampaignSort; roots: string[] }> = [
 export function parseCampaignQuery(text: string): CampaignQuery {
   const normalized = text
     .toLowerCase()
-    // The "draft" status label is "Не запущено" — collapse the negated phrase
+    // The "draft" status label is "Не запущена" — collapse the negated phrase
     // to "черновик" before stem matching so that "запущ" doesn't latch onto
     // the "active" root. Note: JS `\b` is ASCII-only, so we anchor on string
     // start or whitespace explicitly to make this work for Cyrillic.

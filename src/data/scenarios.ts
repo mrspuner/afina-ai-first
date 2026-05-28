@@ -49,3 +49,8 @@ export const scenarioCount = SCENARIOS.length;
 export const getScenario = (id: string): Scenario | undefined => SCENARIOS.find((s) => s.id === id);
 export const baseScenarios = (): Scenario[] => SCENARIOS.filter((s) => s.isBase);
 export const curatedScenarios = (): Scenario[] => SCENARIOS.filter((s) => s.isCurated);
+
+/** Scenario id → display name. */
+export const SCENARIO_NAMES: Record<string, string> = Object.fromEntries(
+  SCENARIOS.map((s) => [s.id, s.name]),
+);

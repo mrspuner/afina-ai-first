@@ -53,11 +53,6 @@ function rndPastDate(rng: () => number, spanDays: number, now: number): string {
   return new Date(now - offset).toISOString();
 }
 
-function rndFutureDate(rng: () => number, spanDays: number, now: number): string {
-  const offset = Math.floor(rng() * spanDays * DAY_MS);
-  return new Date(now + offset).toISOString();
-}
-
 function splitSegments(count: number, rng: () => number): Signal["segments"] {
   const weights = [rng(), rng(), rng(), rng()];
   const total = weights.reduce((a, b) => a + b, 0) || 1;
@@ -150,9 +145,6 @@ export function generateCampaigns(opts: GenerateCampaignsOpts): Campaign[] {
       campaign.launchedAt = rndPastDate(rng, opts.dateSpanDays, opts.now);
       campaign.completedAt = rndPastDate(rng, 30, opts.now);
     }
-    if (status === "scheduled") {
-      campaign.scheduledFor = rndFutureDate(rng, 30, opts.now);
-    }
     out.push(campaign);
   });
   return out;
@@ -171,7 +163,7 @@ function buildPresets(): Record<PresetKey, Preset> {
   const midCampaigns = generateCampaigns({
     seed: 0xcafe,
     signals: midSignals,
-    distribution: { active: 2, paused: 1, completed: 3, scheduled: 2, draft: 2 },
+    distribution: { active: 2, paused: 1, completed: 3, draft: 2 },
     dateSpanDays: 30,
     now,
   });
@@ -186,7 +178,7 @@ function buildPresets(): Record<PresetKey, Preset> {
   const fullCampaigns = generateCampaigns({
     seed: 0xf00d,
     signals: fullSignals,
-    distribution: { active: 8, paused: 2, completed: 10, scheduled: 6, draft: 6 },
+    distribution: { active: 8, paused: 2, completed: 10, draft: 6 },
     dateSpanDays: 90,
     now,
   });

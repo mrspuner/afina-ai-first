@@ -2,16 +2,14 @@ import type { CampaignStatus } from "@/state/app-state";
 import { cn } from "@/lib/utils";
 
 export const STATUS_LABELS: Record<CampaignStatus, string> = {
-  active: "Активно",
-  scheduled: "Запланированно",
-  draft: "Не запущено",
-  paused: "Приостановлена",
-  completed: "Завершено",
+  active: "Запущена",
+  draft: "Не запущена",
+  paused: "Остановлена",
+  completed: "Завершена",
 };
 
 const DOT: Record<CampaignStatus, string> = {
   active: "bg-green-500",
-  scheduled: "bg-blue-500",
   draft: "bg-muted-foreground",
   paused: "bg-amber-500",
   completed: "bg-muted-foreground/50",

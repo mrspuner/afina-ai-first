@@ -21,12 +21,11 @@ type RecentItem =
 const RECENT_LIMIT_PER_KIND = 10;
 
 function campaignDate(c: Campaign): string {
-  return c.launchedAt ?? c.scheduledFor ?? c.completedAt ?? c.createdAt;
+  return c.launchedAt ?? c.completedAt ?? c.createdAt;
 }
 
 const CAMPAIGN_DOT: Record<Campaign["status"], string> = {
   active: "bg-green-500",
-  scheduled: "bg-blue-500",
   draft: "bg-muted-foreground",
   paused: "bg-amber-500",
   completed: "bg-muted-foreground/50",

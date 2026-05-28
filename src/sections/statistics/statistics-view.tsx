@@ -110,7 +110,7 @@ export function StatisticsView({ campaignId }: { campaignId?: string } = {}) {
   const { campaigns } = useAppState();
 
   // Stats only become meaningful once a campaign has actually been
-  // launched — having signals or draft/scheduled campaigns isn't enough to
+  // launched — having signals or draft campaigns isn't enough to
   // produce numbers. We render a soft empty state until at least one
   // campaign has reached active/paused/completed. The unconditional hook
   // calls below stay so the early return doesn't break rules of hooks.

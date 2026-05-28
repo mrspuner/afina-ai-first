@@ -289,7 +289,7 @@ describe("registry — wizard sub-states", () => {
 });
 
 describe("registry — views & commands", () => {
-  it.each(["draft", "scheduled", "active", "paused", "completed"] satisfies CampaignStatus[])(
+  it.each(["draft", "active", "paused", "completed"] satisfies CampaignStatus[])(
     "campaign-feed status=%s",
     (status) => {
       const items = resolveSuggestions({ kind: "campaign-feed", status });

@@ -25,6 +25,12 @@ function addressKey(a: ViewAddress): string {
       return `guided-signal:${a.scenarioId ?? ""}`;
     case "workflow":
       return `workflow:${a.campaignId}`;
+    case "campaign":
+      return `campaign:${a.campaignId}`;
+    case "campaign-payment":
+      return `campaign-payment:${a.campaignId}`;
+    case "signal":
+      return `signal:${a.signalId}`;
     case "section":
       return `section:${a.name}:${a.campaignId ?? ""}`;
   }

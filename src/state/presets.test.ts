@@ -13,11 +13,11 @@ describe("PRESETS.mid", () => {
     expect(PRESETS.mid.signals).toHaveLength(5);
   });
 
-  it("has 10 campaigns with expected status distribution", () => {
-    expect(PRESETS.mid.campaigns).toHaveLength(10);
-    const counts = { draft: 0, scheduled: 0, active: 0, paused: 0, completed: 0 };
-    for (const c of PRESETS.mid.campaigns) counts[c.status]++;
-    expect(counts).toEqual({ active: 2, paused: 1, completed: 3, scheduled: 2, draft: 2 });
+  it("has 8 campaigns with expected status distribution", () => {
+    expect(PRESETS.mid.campaigns).toHaveLength(8);
+    const counts = { draft: 0, active: 0, paused: 0, completed: 0 };
+    for (const c of PRESETS.mid.campaigns) counts[c.status as keyof typeof counts]++;
+    expect(counts).toEqual({ active: 2, paused: 1, completed: 3, draft: 2 });
   });
 
   it("all campaign signalIds reference existing signals", () => {
@@ -33,11 +33,11 @@ describe("PRESETS.full", () => {
     expect(PRESETS.full.signals).toHaveLength(30);
   });
 
-  it("has 32 campaigns with expected status distribution", () => {
-    expect(PRESETS.full.campaigns).toHaveLength(32);
-    const counts = { draft: 0, scheduled: 0, active: 0, paused: 0, completed: 0 };
-    for (const c of PRESETS.full.campaigns) counts[c.status]++;
-    expect(counts).toEqual({ active: 8, paused: 2, completed: 10, scheduled: 6, draft: 6 });
+  it("has 26 campaigns with expected status distribution", () => {
+    expect(PRESETS.full.campaigns).toHaveLength(26);
+    const counts = { draft: 0, active: 0, paused: 0, completed: 0 };
+    for (const c of PRESETS.full.campaigns) counts[c.status as keyof typeof counts]++;
+    expect(counts).toEqual({ active: 8, paused: 2, completed: 10, draft: 6 });
   });
 });
 
@@ -90,7 +90,7 @@ describe("generateCampaigns", () => {
     const campaigns = generateCampaigns({
       seed: 2,
       signals,
-      distribution: { active: 2, paused: 0, completed: 0, scheduled: 0, draft: 0 },
+      distribution: { active: 2, paused: 0, completed: 0, draft: 0 },
       dateSpanDays: 10,
       now: Date.UTC(2026, 3, 18),
     });
@@ -100,26 +100,5 @@ describe("generateCampaigns", () => {
     }
   });
 
-  it("sets scheduledFor in the future for scheduled campaigns", () => {
-    const now = Date.UTC(2026, 3, 18);
-    const signals = generateSignals({
-      count: 1,
-      seed: 1,
-      countRange: [100, 200],
-      dateSpanDays: 10,
-      now,
-    });
-    const campaigns = generateCampaigns({
-      seed: 2,
-      signals,
-      distribution: { active: 0, paused: 0, completed: 0, scheduled: 3, draft: 0 },
-      dateSpanDays: 10,
-      now,
-    });
-    for (const c of campaigns) {
-      expect(c.status).toBe("scheduled");
-      expect(c.scheduledFor).toBeDefined();
-      expect(new Date(c.scheduledFor!).getTime()).toBeGreaterThan(now);
-    }
-  });
 });
+

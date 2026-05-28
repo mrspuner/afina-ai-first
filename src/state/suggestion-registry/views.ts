@@ -2,7 +2,7 @@
  * Подсказки для переходных view'ов и ленты кампании.
  *
  * `campaign-feed` теперь ветвится по реальному `CampaignStatus` —
- * `draft`/`scheduled`/`active`/`paused`/`completed`. У workflow без launched
+ * `draft`/`active`/`paused`/`completed`. У workflow без launched
  * → trustные draft-чипы; у campaign view используем фактический status
  * выбранной кампании.
  */
@@ -29,13 +29,6 @@ const CAMPAIGN_SELECT: SuggestionItem[] = [
 const FEED_DRAFT: SuggestionItem[] = [
   ask("view-feed-draft-launch", "Запустить", "запусти эту кампанию"),
   ask("view-feed-draft-edit", "Изменить сценарий", "хочу поправить сценарий кампании"),
-  ask("view-feed-draft-schedule", "Запланировать", "запланируй запуск на завтра"),
-];
-
-const FEED_SCHEDULED: SuggestionItem[] = [
-  ask("view-feed-sched-launch-now", "Запустить сейчас", "запусти кампанию прямо сейчас, не жди расписание"),
-  ask("view-feed-sched-cancel", "Отменить расписание", "отмени запланированный запуск"),
-  ask("view-feed-sched-reschedule", "Перенести запуск", "перенеси запуск на другое время"),
 ];
 
 const FEED_ACTIVE: SuggestionItem[] = [
@@ -67,7 +60,6 @@ export function resolveCampaignSelect(): SuggestionItem[] {
 export function resolveCampaignFeed(status: CampaignStatus): SuggestionItem[] {
   switch (status) {
     case "draft": return FEED_DRAFT;
-    case "scheduled": return FEED_SCHEDULED;
     case "active": return FEED_ACTIVE;
     case "paused": return FEED_PAUSED;
     case "completed": return FEED_COMPLETED;

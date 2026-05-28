@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Check, CircleDashed, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
@@ -330,76 +330,26 @@ function RadioDot({ active }: { active: boolean }) {
   );
 }
 
-const LAUNCH_STEPS = [
-  "База загружена и проверена",
-  "Передаём в кампанию",
-  "Подбираем сигналы",
-  "Сигналы готовы",
-] as const;
-const LAUNCH_STEP_INTERVAL = 900;
+const LAUNCH_DURATION = 1600;
 
 function LaunchAnimation({ onDone }: { onDone: () => void }) {
-  const [activeIndex, setActiveIndex] = useState(0);
   const onDoneRef = useRef(onDone);
-  onDoneRef.current = onDone;
+  useEffect(() => {
+    onDoneRef.current = onDone;
+  });
 
   useEffect(() => {
-    const timers: number[] = [];
-    LAUNCH_STEPS.forEach((_, i) => {
-      timers.push(
-        window.setTimeout(() => setActiveIndex(i + 1), (i + 1) * LAUNCH_STEP_INTERVAL)
-      );
-    });
-    timers.push(
-      window.setTimeout(
-        () => onDoneRef.current(),
-        LAUNCH_STEPS.length * LAUNCH_STEP_INTERVAL + 400
-      )
-    );
-    return () => timers.forEach((id) => window.clearTimeout(id));
+    const timer = window.setTimeout(() => onDoneRef.current(), LAUNCH_DURATION);
+    return () => window.clearTimeout(timer);
   }, []);
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center px-8 pb-promptbar pt-[120px]">
-      <div className="flex w-full max-w-md flex-col gap-6">
-        <div className="flex flex-col gap-2">
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-            Запускаем кампанию
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            афина подбирает сигналы и готовит запуск. Это займёт несколько секунд.
-          </p>
-        </div>
-        <ol className="flex flex-col gap-2.5 rounded-lg border border-border bg-card p-5">
-          {LAUNCH_STEPS.map((label, idx) => {
-            const done = idx < activeIndex;
-            const active = idx === activeIndex;
-            return (
-              <li key={label} className="flex items-center gap-3">
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center">
-                  {done ? (
-                    <Check className="h-4 w-4 text-green-600" />
-                  ) : active ? (
-                    <Loader2 className="h-4 w-4 animate-spin text-foreground" />
-                  ) : (
-                    <CircleDashed className="h-4 w-4 text-muted-foreground/60" />
-                  )}
-                </span>
-                <span
-                  className={
-                    done
-                      ? "text-sm text-muted-foreground line-through decoration-muted-foreground/30"
-                      : active
-                      ? "text-sm font-medium text-foreground"
-                      : "text-sm text-muted-foreground"
-                  }
-                >
-                  {label}
-                </span>
-              </li>
-            );
-          })}
-        </ol>
+      <div className="flex flex-col items-center gap-4 text-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+          Запускаем кампанию
+        </h1>
       </div>
     </div>
   );
