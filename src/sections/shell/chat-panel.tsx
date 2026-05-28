@@ -9,6 +9,10 @@ import { useChatSubmit } from "./use-chat-submit";
 import { DraftQueueList } from "./draft-queue-list";
 import { SuggestionBar } from "./suggestion-bar";
 import type { PromptChip } from "@/state/prompt-chips-context";
+import { useAppDispatch, useAppState } from "@/state/app-state-context";
+import { useDraftQueue } from "@/state/draft-queue-context";
+import { selectPromptSuggestions } from "@/state/select-prompt-suggestions";
+import type { SuggestionItem } from "@/state/suggestion-registry";
 
 const TRANSIENT_REPLY_LINGER_MS = 3500;
 
@@ -72,6 +76,9 @@ function TransientReply({ messages }: { messages: ChatMessage[] }) {
 export function ChatPanel({ placeholder }: { placeholder: string }) {
   const chat = useChat();
   const { submit } = useChatSubmit();
+  const state = useAppState();
+  const dispatch = useAppDispatch();
+  const { drafts } = useDraftQueue();
   const composerRef = useRef<ChatComposerHandle>(null);
   const [activeInfo, setActiveInfo] = useState<{
     tag: PromptChip | null;
@@ -88,6 +95,35 @@ export function ChatPanel({ placeholder }: { placeholder: string }) {
     },
     []
   );
+
+  const resolution = selectPromptSuggestions(state, {
+    activeTag: activeInfo.tag,
+    hasTypedText: activeInfo.hasTypedText,
+    queueLength: drafts.length,
+    welcomeChips: [],
+  });
+
+  function handlePick(item: SuggestionItem) {
+    switch (item.action.kind) {
+      case "insert-text":
+        composerRef.current?.insertSuggestion(item.action.fullText);
+        return;
+      case "submit":
+        submit({ text: item.action.phrase, segments: [] });
+        return;
+      case "dispatch":
+        dispatch(item.action.action);
+        return;
+      case "command":
+        if (item.action.command === "apply-all") {
+          composerRef.current?.insertApplyAllCommand();
+        }
+        return;
+      case "chat-submit":
+        // Welcome-волны не имеют смысла в collapsed chat-panel.
+        return;
+    }
+  }
 
   return (
     <PromptBar
@@ -108,15 +144,7 @@ export function ChatPanel({ placeholder }: { placeholder: string }) {
         onSubmit={submit}
         onActiveTagChange={handleActiveTagChange}
       />
-      <SuggestionBar
-        activeTag={activeInfo.tag}
-        hasTypedText={activeInfo.hasTypedText}
-        isWelcome={false}
-        onPickSuggestion={(fullText) =>
-          composerRef.current?.insertSuggestion(fullText)
-        }
-        onPickApplyAll={() => composerRef.current?.insertApplyAllCommand()}
-      />
+      <SuggestionBar resolution={resolution} onPick={handlePick} />
     </PromptBar>
   );
 }

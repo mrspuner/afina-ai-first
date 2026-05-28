@@ -30,7 +30,6 @@ import { cn } from "@/lib/utils";
 import { useAppState, useAppDispatch } from "@/state/app-state-context";
 import {
   isOnWelcome,
-  isOnStatisticsSection,
   isWorkflowView,
   type View,
 } from "@/state/app-state";
@@ -40,8 +39,8 @@ import { decideEnterAction, APPLY_ALL_COMMAND } from "@/state/prompt-bar-enter";
 import { applyDraftToNode } from "@/state/apply-draft";
 import { useDraftQueue } from "@/state/draft-queue-context";
 import { useWelcomeChat } from "@/sections/welcome/welcome-chat-context";
-import { OnboardingChatChips } from "@/sections/welcome/onboarding-chat-view";
-import { CampaignsPromptChips } from "@/sections/campaigns/campaigns-prompt-chips";
+import { selectPromptSuggestions } from "@/state/select-prompt-suggestions";
+import type { SuggestionItem } from "@/state/suggestion-registry";
 import { PromptBar } from "./prompt-bar";
 import { SuggestionBar } from "./suggestion-bar";
 import { useChat } from "@/state/chat-context";
@@ -133,7 +132,6 @@ export function ShellBottomBar() {
   const {
     view,
     selectedWorkflowNode,
-    campaigns,
     wizardCurrentStep,
     budgetHelpShown,
     aiReply,
@@ -276,6 +274,35 @@ export function ShellBottomBar() {
     // sees the thinking animation before the result.
   }
 
+  function handlePickSuggestion(item: SuggestionItem) {
+    switch (item.action.kind) {
+      case "insert-text":
+        textInput.insertAtCursor(item.action.fullText, {
+          separator: "smart",
+          preserveTags: true,
+        });
+        return;
+      case "submit":
+        chatSubmit({ text: item.action.phrase, segments: [] });
+        editorRef.current?.clear();
+        chipsApi.clearChips();
+        return;
+      case "dispatch":
+        dispatch(item.action.action);
+        return;
+      case "chat-submit":
+        welcomeChat?.submitChip(item.action.chip);
+        return;
+      case "command":
+        if (item.action.command === "apply-all") {
+          chipsApi.clearChips();
+          editorRef.current?.clear();
+          textInput.insertAtCursor(APPLY_ALL_COMMAND, { separator: "none" });
+        }
+        return;
+    }
+  }
+
   const chatPlaceholder =
     isOnWelcome(state) ? "Задайте вопрос…" :
     isWorkflowView(state) ? "Опишите изменение сценария..." :
@@ -283,8 +310,6 @@ export function ShellBottomBar() {
     view.kind === "guided-signal" ? "Введите ваши параметры или задайте вопрос" :
     view.kind === "section" && (view.name === "Сигналы" || view.name === "Кампании") ? "Напишите, что вы хотите сделать" :
     "Выберите шаг или задайте вопрос…";
-
-  const onWelcome = isOnWelcome(state);
 
   return (
     <>
@@ -379,67 +404,14 @@ export function ShellBottomBar() {
           </PromptInputFooter>
         </PromptInput>
         <SuggestionBar
-          activeTag={activeTag}
-          hasTypedText={hasTypedText}
-          isWelcome={
-            onWelcome || (view.kind === "section" && view.name === "Кампании")
-          }
-          isStatistics={isOnStatisticsSection(state)}
-          welcomeSlot={
-            onWelcome && welcomeChat ? (
-              <OnboardingChatChips
-                chips={welcomeChat.chips}
-                onChipClick={welcomeChat.submitChip}
-              />
-            ) : view.kind === "section" &&
-              view.name === "Кампании" &&
-              campaigns.length > 0 ? (
-              <CampaignsPromptChips
-                onChipClick={(text) => {
-                  const { statuses, sort } = parseCampaignQuery(text);
-                  if (statuses.length > 0 || sort !== "default") {
-                    dispatch({ type: "campaigns_query_set", statuses, sort });
-                  }
-                }}
-              />
-            ) : null
-          }
-          onPickSuggestion={(fullText) => {
-            textInput.insertAtCursor(fullText, {
-              separator: "smart",
-              preserveTags: true,
-            });
-          }}
-          onPickApplyAll={() => {
-            chipsApi.clearChips();
-            editorRef.current?.clear();
-            textInput.insertAtCursor(APPLY_ALL_COMMAND, { separator: "none" });
-          }}
-          onPickStatsQuery={(phrase) => {
-            // Вставить фразу и тут же отправить через тот же путь, что Enter.
-            // chatSubmit маршрутизирует stats-запросы через useChatSubmit.
-            chatSubmit({ text: phrase, segments: [] });
-            editorRef.current?.clear();
-            chipsApi.clearChips();
-          }}
+          resolution={selectPromptSuggestions(state, {
+            activeTag,
+            hasTypedText,
+            queueLength: draftsRef.length,
+            welcomeChips: welcomeChat?.chips ?? [],
+          })}
+          onPick={(item) => handlePickSuggestion(item)}
         />
-        {view.kind === "guided-signal" &&
-          wizardCurrentStep === 5 &&
-          !budgetHelpShown && (
-            <div className="flex flex-wrap justify-start gap-2">
-              <motion.button
-                type="button"
-                onClick={() => dispatch({ type: "budget_help_shown" })}
-                initial={{ y: 6, opacity: 0, scale: 0.96 }}
-                animate={{ y: 0, opacity: 1, scale: 1 }}
-                transition={{ duration: 0.26, ease: [0.23, 1, 0.32, 1] }}
-                whileTap={{ scale: 0.97 }}
-                className="rounded-full border border-white/10 bg-[#171717] px-[13px] py-[7px] text-[12px] text-white transition-colors duration-150 ease-out hover:bg-[#1f1f1f]"
-              >
-                Как рассчитывается рекомендуемый бюджет?
-              </motion.button>
-            </div>
-          )}
       </PromptBar>
     </>
   );

@@ -1,0 +1,270 @@
+import { describe, it, expect } from "vitest";
+import { selectPromptSuggestions, type PromptBarContext } from "./select-prompt-suggestions";
+import { initialState, type AppState, type CampaignStatus } from "./app-state";
+import type { PromptChip, NodeTagPayload } from "./prompt-chips-context";
+import type { Signal } from "./app-state";
+
+function nodeChip(nodeType: string, paramLabel?: string): PromptChip {
+  const payload: NodeTagPayload = { nodeId: "n1", nodeType, color: "#fff", paramLabel };
+  return { id: "chip1", kind: "node", label: paramLabel ?? "Node", payload, removable: true };
+}
+
+function ctx(over: Partial<PromptBarContext> = {}): PromptBarContext {
+  return { activeTag: null, hasTypedText: false, queueLength: 0, welcomeChips: [], ...over };
+}
+
+function withView(view: AppState["view"], over: Partial<AppState> = {}): AppState {
+  return { ...initialState, view, ...over };
+}
+
+function mkCampaign(id: string, status: CampaignStatus) {
+  return {
+    id,
+    name: id,
+    signalId: "s1",
+    status,
+    createdAt: "2026-01-01",
+  };
+}
+
+describe("selectPromptSuggestions — приоритеты", () => {
+  it("печатает после тега → hidden", () => {
+    expect(
+      selectPromptSuggestions(
+        withView({ kind: "welcome" }),
+        ctx({ activeTag: nodeChip("sms", "Текст"), hasTypedText: true })
+      ).kind
+    ).toBe("hidden");
+  });
+
+  it("активный тег → node-context", () => {
+    const r = selectPromptSuggestions(
+      withView({ kind: "welcome" }),
+      ctx({ activeTag: nodeChip("sms", "Текст") })
+    );
+    if (r.kind !== "items") throw new Error("expected items");
+    expect(r.scope.kind).toBe("node-context");
+  });
+
+  it("очередь без тега → draft-queue", () => {
+    const r = selectPromptSuggestions(withView({ kind: "welcome" }), ctx({ queueLength: 2 }));
+    if (r.kind !== "items") throw new Error();
+    expect(r.scope.kind).toBe("draft-queue");
+    expect(r.items[0].variant).toBe("brand");
+  });
+});
+
+describe("selectPromptSuggestions — section.campaigns", () => {
+  it("пусто → онбординг", () => {
+    const r = selectPromptSuggestions(
+      withView({ kind: "section", name: "Кампании" }),
+      ctx()
+    );
+    if (r.kind !== "items") throw new Error();
+    expect(r.items.some((i) => i.id === "sec-camp-onboard-create")).toBe(true);
+  });
+
+  it("с фильтром active → 'active' выпадает, появляется reset", () => {
+    const r = selectPromptSuggestions(
+      withView(
+        { kind: "section", name: "Кампании" },
+        { campaigns: [mkCampaign("c1", "active")], campaignFilter: ["active"] }
+      ),
+      ctx()
+    );
+    if (r.kind !== "items") throw new Error();
+    expect(r.items.some((i) => i.id === "sec-camp-reset")).toBe(true);
+    expect(r.items.some((i) => i.id === "sec-camp-active")).toBe(false);
+  });
+
+  it("с sort=profit-desc → 'profit' выпадает", () => {
+    const r = selectPromptSuggestions(
+      withView(
+        { kind: "section", name: "Кампании" },
+        { campaigns: [mkCampaign("c1", "active")], campaignSort: "profit-desc" }
+      ),
+      ctx()
+    );
+    if (r.kind !== "items") throw new Error();
+    expect(r.items.some((i) => i.id === "sec-camp-profit")).toBe(false);
+  });
+});
+
+describe("selectPromptSuggestions — section.statistics", () => {
+  it("использует period+rows из state.stats", () => {
+    const base = withView({ kind: "section", name: "Статистика" });
+    const r = selectPromptSuggestions(
+      { ...base, stats: { ...base.stats, period: { preset: "this-year" }, rows: "days" } },
+      ctx()
+    );
+    if (r.kind !== "items") throw new Error();
+    expect(r.items.some((i) => i.label.includes("прошлым годом"))).toBe(true);
+    expect(r.items.some((i) => i.label.includes("Лучший день"))).toBe(true);
+  });
+});
+
+describe("selectPromptSuggestions — section.signals", () => {
+  it("пусто → онбординг", () => {
+    const r = selectPromptSuggestions(
+      withView({ kind: "section", name: "Сигналы" }, { signals: [] }),
+      ctx()
+    );
+    if (r.kind !== "items") throw new Error();
+    expect(r.items.some((i) => i.id === "sec-sig-onboard-create")).toBe(true);
+  });
+
+  it("есть awaiting_payment → 'Оплатить ожидающие' первым", () => {
+    const signal: Signal = {
+      id: "s1",
+      type: "Удержание",
+      count: 0,
+      segments: { max: 0, high: 0, mid: 0, low: 0 },
+      createdAt: "2026-01-01",
+      updatedAt: "2026-01-01",
+      status: "awaiting_payment",
+    };
+    const r = selectPromptSuggestions(
+      withView({ kind: "section", name: "Сигналы" }, { signals: [signal] }),
+      ctx()
+    );
+    if (r.kind !== "items") throw new Error();
+    expect(r.items[0].id).toBe("sec-sig-pay");
+  });
+});
+
+describe("selectPromptSuggestions — section.settings", () => {
+  it("дефолтный demo-account имеет интересы → 'Управлять интеграциями'", () => {
+    // initialState.accountSettings = DEMO_ACCOUNT_SETTINGS — у него есть
+    // interests/regions/domainBlocklist, значит hasIntegrations=true.
+    const r = selectPromptSuggestions(
+      withView({ kind: "section", name: "Настройки" }),
+      ctx()
+    );
+    if (r.kind !== "items") throw new Error();
+    expect(r.items.some((i) => i.id === "sec-set-integrations-manage")).toBe(true);
+  });
+});
+
+describe("selectPromptSuggestions — wizard", () => {
+  it("step null → hidden", () => {
+    const r = selectPromptSuggestions(
+      withView({ kind: "guided-signal" }, { wizardCurrentStep: null }),
+      ctx()
+    );
+    expect(r.kind).toBe("hidden");
+  });
+
+  it("step 1 → 6 сценариев", () => {
+    const r = selectPromptSuggestions(
+      withView({ kind: "guided-signal" }, { wizardCurrentStep: 1 }),
+      ctx()
+    );
+    if (r.kind !== "items") throw new Error();
+    expect(r.items).toHaveLength(6);
+  });
+
+  it("step 2 без snapshot → стартовый набор (как пусто-пусто)", () => {
+    const r = selectPromptSuggestions(
+      withView({ kind: "guided-signal" }, { wizardCurrentStep: 2 }),
+      ctx()
+    );
+    if (r.kind !== "items") throw new Error();
+    expect(r.items.some((i) => i.label === "Подобрать по сайту")).toBe(true);
+  });
+
+  it("step 2 с snapshot.hasInterests → ветка 'есть интересы'", () => {
+    const r = selectPromptSuggestions(
+      withView({ kind: "guided-signal" }, { wizardCurrentStep: 2 }),
+      ctx({ wizard: { hasInterests: true, hasDomains: false } })
+    );
+    if (r.kind !== "items") throw new Error();
+    expect(r.items.some((i) => i.id === "wiz-2-add-domain")).toBe(true);
+  });
+
+  it("step 5 — две ветки по budgetHelpShown", () => {
+    const noHelp = selectPromptSuggestions(
+      withView({ kind: "guided-signal" }, { wizardCurrentStep: 5, budgetHelpShown: false }),
+      ctx()
+    );
+    if (noHelp.kind !== "items") throw new Error();
+    expect(noHelp.items).toHaveLength(1);
+
+    const afterHelp = selectPromptSuggestions(
+      withView({ kind: "guided-signal" }, { wizardCurrentStep: 5, budgetHelpShown: true }),
+      ctx()
+    );
+    if (afterHelp.kind !== "items") throw new Error();
+    expect(afterHelp.items.length).toBeGreaterThan(1);
+  });
+
+  it("step 6 snapshot.signalNameSet → 'Переименовать'", () => {
+    const r = selectPromptSuggestions(
+      withView({ kind: "guided-signal" }, { wizardCurrentStep: 6 }),
+      ctx({ wizard: { signalNameSet: true } })
+    );
+    if (r.kind !== "items") throw new Error();
+    expect(r.items.some((i) => i.id === "wiz-6-rename")).toBe(true);
+  });
+});
+
+describe("selectPromptSuggestions — campaign-feed status-aware", () => {
+  it("workflow launched=false → status=draft", () => {
+    const r = selectPromptSuggestions(
+      withView({ kind: "workflow", campaign: { id: "c1", name: "X" }, launched: false }),
+      ctx()
+    );
+    if (r.kind !== "items") throw new Error();
+    if (r.scope.kind === "campaign-feed") expect(r.scope.status).toBe("draft");
+  });
+
+  it("workflow launched=true, campaign paused → status=paused", () => {
+    const r = selectPromptSuggestions(
+      withView(
+        { kind: "workflow", campaign: { id: "c1", name: "X" }, launched: true },
+        { campaigns: [mkCampaign("c1", "paused")] }
+      ),
+      ctx()
+    );
+    if (r.kind !== "items") throw new Error();
+    if (r.scope.kind === "campaign-feed") expect(r.scope.status).toBe("paused");
+    expect(r.items.some((i) => i.label === "Возобновить")).toBe(true);
+  });
+
+  it("campaign view → status из state.campaigns", () => {
+    const r = selectPromptSuggestions(
+      withView(
+        { kind: "campaign", campaign: { id: "c1", name: "X" } },
+        { campaigns: [mkCampaign("c1", "completed")] }
+      ),
+      ctx()
+    );
+    if (r.kind !== "items") throw new Error();
+    if (r.scope.kind === "campaign-feed") expect(r.scope.status).toBe("completed");
+  });
+});
+
+describe("selectPromptSuggestions — welcome / awaiting / select", () => {
+  it("welcome без чипов → hidden", () => {
+    expect(
+      selectPromptSuggestions(withView({ kind: "welcome" }), ctx()).kind
+    ).toBe("hidden");
+  });
+
+  it("welcome с чипами → welcome-wave", () => {
+    const r = selectPromptSuggestions(
+      withView({ kind: "welcome" }),
+      ctx({ welcomeChips: [{ id: "w1", label: "?", next: "s1-w1" }] })
+    );
+    if (r.kind !== "items") throw new Error();
+    expect(r.scope.kind).toBe("welcome-wave");
+  });
+
+  it("awaiting / select имеют чипы", () => {
+    expect(
+      selectPromptSuggestions(withView({ kind: "awaiting-campaign" }), ctx()).kind
+    ).toBe("items");
+    expect(
+      selectPromptSuggestions(withView({ kind: "campaign-select" }), ctx()).kind
+    ).toBe("items");
+  });
+});
