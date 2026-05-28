@@ -6,6 +6,7 @@ import { EMPTY_SURVEY } from "@/types/survey";
 import type { SignalStatus } from "@/types/signal-status";
 import type { StepData } from "@/types/campaign";
 import type { NodeParams } from "@/types/workflow";
+import { SCENARIOS } from "@/data/scenarios";
 import {
   DEFAULT_DIRECTION_ID,
   businessDirectionFromSurvey,
@@ -309,8 +310,52 @@ export function appReducer(state: AppState, action: Action): AppState {
       };
 
     case "signal_complete":
-    case "step2_clicked":
-      return { ...state, view: { kind: "campaign-select" } };
+    case "step2_clicked": {
+      // Скип CampaignTypeView: кампания собирается по сценарию из сигнала.
+      // Если для сигнала уже есть черновой кампейн — открываем его, иначе
+      // создаём новый с именем сценария и роутим в workflow-редактор.
+      const latestSignal = state.signals[state.signals.length - 1];
+      if (!latestSignal) {
+        return { ...state, view: { kind: "campaign-select" } };
+      }
+      const existingDraft = state.campaigns.find(
+        (c) => c.signalId === latestSignal.id && c.status === "draft"
+      );
+      if (existingDraft) {
+        return {
+          ...state,
+          view: {
+            kind: "workflow",
+            campaign: { id: existingDraft.id, name: existingDraft.name },
+            launched: false,
+          },
+          activeSection: null,
+        };
+      }
+      const scenarioId = latestSignal.wizardData?.scenario ?? null;
+      const scenario = scenarioId
+        ? SCENARIOS.find((s) => s.id === scenarioId)
+        : null;
+      const campaignName = scenario?.name ?? "Новая кампания";
+      const campaignId = `cmp_${nanoid(6)}`;
+      const newCampaign: Campaign = {
+        id: campaignId,
+        name: campaignName,
+        signalId: latestSignal.id,
+        status: "draft",
+        createdAt: new Date().toISOString(),
+      };
+      return {
+        ...state,
+        campaigns: [...state.campaigns, newCampaign],
+        view: {
+          kind: "workflow",
+          campaign: { id: campaignId, name: campaignName },
+          launched: false,
+        },
+        activeSection: null,
+      };
+    }
 
     case "campaign_selected": {
       const existing = state.campaigns.find((c) => c.id === action.campaign.id);
