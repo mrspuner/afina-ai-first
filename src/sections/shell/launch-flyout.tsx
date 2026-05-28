@@ -161,7 +161,10 @@ export function LaunchFlyout({ open, onClose }: LaunchFlyoutProps) {
                   </div>
                   <button
                     type="button"
-                    onClick={() => dispatch({ type: "catalog_open", returnTo: "launcher" })}
+                    onClick={() => {
+                      dispatch({ type: "start_signal_flow" });
+                      onClose();
+                    }}
                     className="mt-3 w-full rounded-lg border border-dashed border-border p-3 text-left text-sm text-muted-foreground transition-colors hover:border-brand/50 hover:bg-accent hover:text-foreground"
                   >
                     Все {scenarioCount} сценариев →
