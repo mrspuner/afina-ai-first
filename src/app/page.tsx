@@ -46,14 +46,14 @@ export default function Home() {
   function renderMain() {
     if (view.kind === "welcome") {
       // First-entry 3-screen onboarding: site → enrich → interests →
-      // scenarios → catalog. Skippable; once completed or skipped,
+      // scenarios → wizard step-1. Skippable; once completed or skipped,
       // surveyStatus closes the gate and we render WelcomeSection.
       if (surveyStatus === "not_started") {
         return (
           <SurveySection
             skippable
             withOnboardingScreens
-            onComplete={() => { /* catalog open routes the user from here */ }}
+            onComplete={() => { /* start_signal_flow routes the user from here */ }}
             onSkip={() => { /* survey_skipped re-renders WelcomeSection */ }}
           />
         );
