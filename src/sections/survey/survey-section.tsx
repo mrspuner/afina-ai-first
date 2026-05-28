@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import { ArrowLeft } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { useAppDispatch } from "@/state/app-state-context";
 import type { Survey } from "@/types/survey";
 
@@ -39,6 +41,16 @@ export function SurveySection({
   const dispatch = useAppDispatch();
   const [phase, setPhase] = useState<Phase>({ kind: "form" });
 
+  // Escape exits fullscreen survey — sidebar/promptbar are hidden, so without
+  // it the user is trapped until completion.
+  useEffect(() => {
+    function handler(e: KeyboardEvent) {
+      if (e.key === "Escape") dispatch({ type: "go_welcome" });
+    }
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [dispatch]);
+
   function handleSubmit(survey: Survey) {
     setPhase({ kind: "awaiting", survey });
   }
@@ -66,7 +78,24 @@ export function SurveySection({
   }
 
   return (
-    <div className="flex flex-1 items-center justify-center px-8 pb-16 pt-[120px]">
+    <div className="relative flex flex-1 items-center justify-center px-8 pb-16 pt-[120px]">
+      <motion.div
+        initial={{ opacity: 0, x: -8 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.28, delay: 0.15, ease: [0.32, 0.72, 0, 1] }}
+        className="absolute left-6 top-6"
+      >
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => dispatch({ type: "go_welcome" })}
+          aria-label="Вернуться на главную"
+          className="text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Назад
+        </Button>
+      </motion.div>
       <AnimatePresence mode="wait">
         {phase.kind === "form" && (
           <motion.div
