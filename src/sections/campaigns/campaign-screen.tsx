@@ -54,7 +54,7 @@ export function CampaignScreen() {
   function openWorkflow() {
     dispatch({
       type: "open_workflow",
-      campaign: { id: campaign!.id, name: campaign!.name },
+      campaign: { id: campaign.id, name: campaign.name },
       launched: isActive || status === "paused" || isCompleted,
     });
   }
@@ -63,19 +63,19 @@ export function CampaignScreen() {
     if (status === "paused") {
       dispatch({
         type: "campaign_status_changed",
-        id: campaign!.id,
+        id: campaign.id,
         status: "active",
         timestamp: new Date().toISOString(),
       });
     } else {
-      dispatch({ type: "open_campaign_payment", campaignId: campaign!.id });
+      dispatch({ type: "open_campaign_payment", campaignId: campaign.id });
     }
   }
 
   function stop() {
     dispatch({
       type: "campaign_status_changed",
-      id: campaign!.id,
+      id: campaign.id,
       status: "paused",
       timestamp: new Date().toISOString(),
     });
