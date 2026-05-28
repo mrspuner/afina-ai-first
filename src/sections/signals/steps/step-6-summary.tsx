@@ -8,25 +8,7 @@ import { StepProps } from "@/types/campaign";
 import { useAppState } from "@/state/app-state-context";
 import { computeShortfall } from "@/sections/signals/top-up-modal";
 import { cn } from "@/lib/utils";
-import { SCENARIOS } from "@/data/scenarios";
-
-const SCENARIO_NAMES: Record<string, string> = Object.fromEntries(
-  SCENARIOS.map((s) => [s.id, s.name])
-);
-
-const SEGMENT_NAMES: Record<string, string> = {
-  max: "Максимальный (₽ 0.45 / сигнал)",
-  "very-high": "Очень высокий (₽ 0.35 / сигнал)",
-  high: "Высокий (₽ 0.25 / сигнал)",
-  medium: "Средний и ниже (₽ 0.07 / сигнал)",
-};
-
-const SEGMENT_PRICES: Record<string, number> = {
-  max: 0.45,
-  "very-high": 0.35,
-  high: 0.25,
-  medium: 0.07,
-};
+import { SCENARIO_NAMES, SEGMENT_NAMES, SEGMENT_PRICES } from "@/sections/signals/signal-summary-data";
 
 function formatRub(amount: number): string {
   return `₽ ${amount.toLocaleString("ru-RU", { maximumFractionDigits: 2 })}`;
