@@ -71,7 +71,7 @@ export function Step1Scenario({ data, onNext }: StepProps) {
 
   return (
     <StepContent
-      title="Выбор сценария"
+      title="Выберите сценарий"
       subtitle="Готовая связка сигнала и кампании под бизнес-цель"
     >
       <div className="flex flex-col gap-4">

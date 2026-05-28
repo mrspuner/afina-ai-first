@@ -4,7 +4,7 @@ import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export const STEPPER_ITEMS = [
-  { label: "Тип сигнала", step: 1 },
+  { label: "Выбор сценария", step: 1 },
   { label: "Интересы", step: 2 },
   { label: "Сегменты", step: 3 },
   { label: "База", step: 4 },
