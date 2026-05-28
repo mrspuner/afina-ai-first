@@ -24,6 +24,7 @@ import { CampaignTypeView } from "@/sections/campaigns/campaign-type-view";
 import { WorkflowSection } from "@/sections/campaigns/workflow-section";
 import { CampaignPaymentScreen } from "@/sections/campaigns/campaign-payment-screen";
 import { CampaignScreen } from "@/sections/campaigns/campaign-screen";
+import { SignalScreen } from "@/sections/signals/signal-screen";
 import { StatisticsSection } from "@/sections/statistics/statistics-section";
 import { SettingsSection } from "@/sections/settings/settings-section";
 import { DevPanel } from "@/components/dev/dev-panel";
@@ -82,6 +83,7 @@ export default function Home() {
     if (view.kind === "workflow") return <WorkflowSection />;
     if (view.kind === "campaign-payment") return <CampaignPaymentScreen />;
     if (view.kind === "campaign") return <CampaignScreen />;
+    if (view.kind === "signal") return <SignalScreen />;
     if (view.kind === "section") {
       if (view.name === "Статистика") return <StatisticsSection />;
       if (view.name === "Сигналы") return <SignalsSection />;
