@@ -11,7 +11,6 @@ export type Chip = {
   label: string;
   /**
    * Key of the next wave node in `WAVES`, or a control marker:
-   * - "create-signal" — open LaunchFlyout (terminal onboarding chip)
    * - "post-create-signal" — start guided-signal flow (post-onboarding chip)
    * - "post-create-campaign" — bot replies with POST_CAMPAIGN_REPLY
    */
@@ -31,7 +30,6 @@ const WAVE_3_CHIPS: Chip[] = [
     label: "Как платформа узнаёт об активности моих клиентов?",
     next: "wave-3-repeat",
   },
-  { id: "w3-create", label: "Создать первый сигнал →", next: "create-signal" },
 ];
 
 // ─── Волна 0 (начальные чипсы) ───────────────────────────────────────────────

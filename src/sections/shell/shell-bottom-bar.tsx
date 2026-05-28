@@ -3,8 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { getNodeColor } from "@/sections/campaigns/node-visuals";
 import type { NodeTagPayload, PromptChip } from "@/state/prompt-chips-context";
-import { AnimatePresence, motion } from "motion/react";
-import Image from "next/image";
 import { Mic } from "lucide-react";
 import type { PromptInputMessage } from "@/components/ai-elements/prompt-input";
 import {
@@ -36,7 +34,6 @@ import {
 import { parseStructuralCommands } from "@/state/structural-commands";
 import { parseCampaignQuery } from "@/state/parse-campaign-filter";
 import { decideEnterAction, APPLY_ALL_COMMAND } from "@/state/prompt-bar-enter";
-import { applyDraftToNode } from "@/state/apply-draft";
 import { useDraftQueue } from "@/state/draft-queue-context";
 import { useWelcomeChat } from "@/sections/welcome/welcome-chat-context";
 import { selectPromptSuggestions } from "@/state/select-prompt-suggestions";
@@ -47,8 +44,6 @@ import { useChat } from "@/state/chat-context";
 import { DraftQueueList } from "./draft-queue-list";
 import { TransientReply } from "./transient-reply";
 import { useChatSubmit } from "./use-chat-submit";
-
-import { useAiReplyAutoDismiss } from "./use-ai-reply-auto-dismiss";
 
 function AttachmentFileList() {
   const { files } = usePromptInputAttachments();
@@ -134,9 +129,7 @@ export function ShellBottomBar() {
   const {
     view,
     selectedWorkflowNode,
-    aiReply,
   } = state;
-  useAiReplyAutoDismiss(aiReply, dispatch);
   const welcomeChat = useWelcomeChat();
   const chipsApi = usePromptChips();
   const { drafts: draftsRef, clearQueue, parkDraft } = useDraftQueue();
@@ -196,7 +189,26 @@ export function ShellBottomBar() {
       queueLength: draftsRef.length,
     });
     if (decision.kind === "apply-all") {
-      for (const d of draftsRef) applyDraftToNode(dispatch, d.chip, d.text);
+      // История: каждый запаркованный запрос (тег + текст) — отдельной строкой
+      // с чипом (triggerLabel), как и обычные тегированные правки.
+      for (const d of draftsRef) {
+        chat.append({ role: "user", text: d.text, triggerLabel: d.chip.label });
+      }
+      // Применяем ВСЕ черновики одним диспатчем — отдельные вызовы перетирали
+      // бы друг друга (workflow_node_command_submit заменяет состояние, не
+      // накапливает), и применился бы только последний.
+      const commands = draftsRef
+        .filter((d) => isNodeTagPayload(d.chip.payload))
+        .map((d) => ({
+          nodeId: isNodeTagPayload(d.chip.payload)
+            ? d.chip.payload.nodeId
+            : undefined,
+          nodeLabel: d.chip.label,
+          text: d.text,
+        }));
+      if (commands.length > 0) {
+        dispatch({ type: "workflow_node_command_submit", commands });
+      }
       clearQueue();
       chipsApi.clearChips();
       editorRef.current?.clear();
@@ -257,6 +269,41 @@ export function ShellBottomBar() {
           : undefined,
         text: s.text,
       }));
+
+    // C5: если в очереди уже есть черновики, свежий тег+текст по Enter не
+    // применяется немедленно, а тоже паркуется — всё копится и применяется
+    // вместе командой «Применить все изменения» (см. decideEnterAction).
+    // Проверяем до записи в историю/диспатча — парковка не является submit'ом.
+    if (nodeCommands.length > 0 && draftsRef.length > 0) {
+      for (const s of segments) {
+        if (s.chip.kind === "node" && s.text.length > 0) {
+          parkDraft(s.chip, s.text);
+        }
+      }
+      chipsApi.clearChips();
+      editorRef.current?.clear();
+      prevActiveRef.current = null;
+      return;
+    }
+
+    // Реальная правка сценария → запрос пользователя уходит в общий чат
+    // (история запросов видна в drawer). Ответ ассистента эмитит WorkflowView
+    // обычным сообщением (inline через TransientReply) — без отдельной плашки.
+    // Тегированные правки пишем по сегментам, каждую с чипом (triggerLabel);
+    // структурные/безтеговые — просто текстом.
+    if (nodeCommands.length > 0) {
+      for (const s of segments) {
+        if (s.chip.kind === "node" && s.text.length > 0) {
+          chat.append({
+            role: "user",
+            text: s.text,
+            triggerLabel: s.chip.label,
+          });
+        }
+      }
+    } else if (structural.ops.length > 0 && rawText.trim()) {
+      chat.append({ role: "user", text: rawText });
+    }
 
     if (structural.ops.length > 0) {
       dispatch({
@@ -338,31 +385,6 @@ export function ShellBottomBar() {
           <>
             <DraftQueueList variant="compact" onTakeDraft={() => {}} />
             <TransientReply messages={chat.messages} />
-            <AnimatePresence initial={false}>
-              {aiReply ? (
-                <motion.div
-                  key="ai-reply"
-                  initial={{ y: 6, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  exit={{ y: 6, opacity: 0 }}
-                  transition={{ duration: 0.26, ease: [0.23, 1, 0.32, 1] }}
-                  role="status"
-                  aria-live="polite"
-                  data-testid="ai-reply-slot"
-                  className="flex items-start gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/80"
-                >
-                  <Image
-                    src="/mascot-icon.svg"
-                    alt=""
-                    width={16}
-                    height={16}
-                    className="mt-0.5 shrink-0"
-                    aria-hidden
-                  />
-                  <span className="min-w-0 flex-1 leading-snug">{aiReply}</span>
-                </motion.div>
-              ) : null}
-            </AnimatePresence>
           </>
         }
       >
@@ -384,6 +406,7 @@ export function ShellBottomBar() {
             className="px-3 py-2"
             placeholder={chatPlaceholder}
             onTagSwap={parkPreviousIfNeeded}
+            captureGlobalTyping
           />
           <PromptInputFooter>
             <PromptInputTools>

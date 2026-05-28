@@ -30,7 +30,7 @@ export function OnboardingScenariosScreen({ onChooseScenario }: OnboardingScenar
         transition={{ duration: 0.45, delay: 0.15, ease: [0.23, 1, 0.32, 1] }}
         className="max-w-md text-sm text-muted-foreground"
       >
-        Каждый сценарий заточен под вашу аудиторию. Выберите, с какого начать.
+        Каждый сценарий заточен под вашу аудиторию. Выберите подходящий — дальше запустим поиск сигналов по нему.
       </motion.p>
       <motion.div
         initial={{ opacity: 0, y: 8 }}

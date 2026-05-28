@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowLeft } from "lucide-react";
+import { X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { useAppDispatch } from "@/state/app-state-context";
@@ -80,20 +80,19 @@ export function SurveySection({
   return (
     <div className="relative flex flex-1 items-center justify-center px-8 pb-16 pt-[120px]">
       <motion.div
-        initial={{ opacity: 0, x: -8 }}
+        initial={{ opacity: 0, x: 8 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.28, delay: 0.15, ease: [0.32, 0.72, 0, 1] }}
-        className="absolute left-6 top-6"
+        className="absolute right-6 top-6"
       >
         <Button
           variant="ghost"
-          size="sm"
+          size="icon"
           onClick={() => dispatch({ type: "go_welcome" })}
-          aria-label="Вернуться на главную"
+          aria-label="Закрыть и вернуться на главную"
           className="text-muted-foreground hover:text-foreground"
         >
-          <ArrowLeft className="h-4 w-4" />
-          Назад
+          <X className="h-4 w-4" />
         </Button>
       </motion.div>
       <AnimatePresence mode="wait">

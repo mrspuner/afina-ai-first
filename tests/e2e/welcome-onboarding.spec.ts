@@ -7,150 +7,170 @@ async function applyPreset(page: Page, key: "empty" | "mid" | "full") {
   await page.keyboard.press("Control+Shift+KeyE");
 }
 
+// Поведение welcome унифицировано: клик по чипсе/вопрос открывает правый
+// drawer и пишет диалог туда (а не морфит сам экран). Чипса «Создать первый
+// сигнал →» убрана — запуск флоу живёт на кнопках героя.
 test.describe("Welcome onboarding chat (empty preset)", () => {
-  test("wave 0 → wave 1 → wave 2 → wave 3 navigation", async ({ page }) => {
+  test("wave 0 → 1 → 2 → 3 navigation writes answers into the drawer", async ({
+    page,
+  }) => {
     await page.goto("/");
     await expect(
       page.getByRole("heading", { name: "Добро пожаловать" })
     ).toBeVisible();
 
-    // Wave 0 chips are visible
+    // Wave-0 chip lives under the collapsed bar; clicking opens the drawer.
     await page
       .getByRole("button", { name: "Что такое сигнал и кампания?" })
       .click();
 
-    // Wave 1 answer + wave 2 chips
-    await expect(page.getByText("Сигнал — это момент, когда")).toBeVisible();
-    await page
+    const drawer = page.getByTestId("chat-drawer");
+    await expect(drawer).toBeVisible();
+
+    // Wave-1 answer lands in the drawer; wave-2 chips render in the drawer.
+    await expect(drawer.getByText("Сигнал — это момент, когда")).toBeVisible();
+    await drawer
       .getByRole("button", { name: "Какие сценарии кампаний бывают?" })
       .click();
 
-    // Wave 2 answer + wave 3 chips
+    // Wave-2 answer + the single wave-3 chip (terminal CTA removed).
     await expect(
-      page.getByText("Платформа покрывает шесть типовых ситуаций")
+      drawer.getByText("Платформа покрывает шесть типовых ситуаций")
     ).toBeVisible();
     await expect(
-      page.getByRole("button", {
+      drawer.getByRole("button", {
         name: "Как платформа узнаёт об активности моих клиентов?",
       })
     ).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Создать первый сигнал →" })
-    ).toBeVisible();
+    ).toHaveCount(0);
   });
 
-  test("terminal chip starts the signal creation wizard", async ({ page }) => {
+  test("welcome chips open the drawer instead of redirecting to the signal flow", async ({
+    page,
+  }) => {
     await page.goto("/");
     await page
       .getByRole("button", { name: "Откуда берутся мои данные?" })
       .click();
-    await page
-      .getByRole("button", { name: "Как это соотносится с требованиями 152-ФЗ?" })
-      .click();
-    await page
-      .getByRole("button", { name: "Создать первый сигнал →" })
-      .click();
 
-    // Lands directly on the 6-scenario picker (step 1 of CampaignWorkspace)
+    const drawer = page.getByTestId("chat-drawer");
+    await expect(drawer).toBeVisible();
+    // Still on welcome — no navigation into the wizard.
+    await expect(
+      page.getByRole("heading", { name: "Добро пожаловать" })
+    ).toBeVisible();
     await expect(
       page.getByRole("heading", { name: "Выберите тип сигнала" })
-    ).toBeVisible();
+    ).toHaveCount(0);
+
+    // Deep chips never expose a signal-flow CTA.
+    await drawer
+      .getByRole("button", { name: "Как это соотносится с требованиями 152-ФЗ?" })
+      .click();
+    await expect(
+      page.getByRole("button", { name: "Создать первый сигнал →" })
+    ).toHaveCount(0);
   });
 
-  test("wave 3 extra question is single-use, only 'Создать первый сигнал' remains", async ({
+  test("wave-3 extra question is single-use and ends the thread", async ({
     page,
   }) => {
     await page.goto("/");
     await page
       .getByRole("button", { name: "Что такое сигнал и кампания?" })
       .click();
-    await page
+    const drawer = page.getByTestId("chat-drawer");
+    await drawer
       .getByRole("button", { name: "Какие сценарии кампаний бывают?" })
       .click();
-    // Both wave-3 chips visible on first landing
+
+    const extra = drawer.getByRole("button", {
+      name: "Как платформа узнаёт об активности моих клиентов?",
+    });
+    await expect(extra).toBeVisible();
+    await extra.click();
+
+    // Answer shown; the extra chip is consumed and no chips remain.
     await expect(
-      page.getByRole("button", {
-        name: "Как платформа узнаёт об активности моих клиентов?",
-      })
+      drawer.getByText("Источник сигналов — поведенческие модели")
     ).toBeVisible();
-
-    // Ask the extra question
-    await page
-      .getByRole("button", {
-        name: "Как платформа узнаёт об активности моих клиентов?",
-      })
-      .click();
-
-    // Extra-question chip is gone, terminal chip remains
     await expect(
-      page.getByRole("button", {
+      drawer.getByRole("button", {
         name: "Как платформа узнаёт об активности моих клиентов?",
       })
     ).toHaveCount(0);
     await expect(
       page.getByRole("button", { name: "Создать первый сигнал →" })
-    ).toBeVisible();
+    ).toHaveCount(0);
   });
 
-  test("history is reset when user leaves welcome and returns", async ({
+  test("history resets when user leaves welcome and returns", async ({
     page,
   }) => {
     await page.goto("/");
     await page
       .getByRole("button", { name: "Что я могу сделать со своей базой?" })
       .click();
-    await expect(page.getByText("База клиентов — это ваша точка")).toBeVisible();
+    const drawer = page.getByTestId("chat-drawer");
+    await expect(
+      drawer.getByText("База клиентов — это ваша точка")
+    ).toBeVisible();
 
-    // Leave to Сигналы, then back via logo
+    // Leave to Сигналы, then back via the logo.
     await page.getByRole("button", { name: "Сигналы" }).click();
     await expect(
       page.getByRole("heading", { name: "Добро пожаловать" })
-    ).not.toBeVisible();
+    ).toHaveCount(0);
     await page.getByRole("button", { name: "На главный экран" }).click();
 
-    // Back on welcome — wave 0 chips again, no history
+    // Back on welcome — wave-0 chips again, prior answer cleared.
     await expect(
       page.getByRole("heading", { name: "Добро пожаловать" })
     ).toBeVisible();
     await expect(
+      page.getByText("База клиентов — это ваша точка")
+    ).toHaveCount(0);
+    await expect(
       page.getByRole("button", { name: "Что такое сигнал и кампания?" })
     ).toBeVisible();
-    await expect(page.getByText("База клиентов — это ваша точка")).not.toBeVisible();
   });
 
-  test("free-form submit adds user + bot messages to history", async ({
+  test("free-form submit opens the drawer with user + bot messages", async ({
     page,
   }) => {
     await page.goto("/");
-    await page.getByPlaceholder("Задайте вопрос…").fill("привет");
+    const input = page.getByRole("textbox").first();
+    await input.click();
+    await input.fill("привет");
     await page.keyboard.press("Enter");
 
-    await expect(page.getByText("привет", { exact: true })).toBeVisible();
+    const drawer = page.getByTestId("chat-drawer");
+    await expect(drawer.getByText("привет", { exact: true })).toBeVisible();
     await expect(
-      page.getByText("Пока умею отвечать только на подсказки")
+      drawer.getByText("Пока умею отвечать только на подсказки")
     ).toBeVisible();
   });
 });
 
 test.describe("Welcome post-onboarding (full preset, campaign launched)", () => {
-  test("post-campaign welcome shows minimal caption and interface chips", async ({
+  test("post-campaign welcome shows the done caption and interface chips", async ({
     page,
   }) => {
     await page.goto("/");
     await applyPreset(page, "full");
 
-    // Full preset seeds active/completed campaigns → isCampaignDone === true
+    // Full preset seeds active/completed campaigns → isCampaignDone === true.
     await expect(
       page.getByRole("heading", { name: "Добро пожаловать" })
     ).toBeVisible();
-    await expect(page.getByText("Что вы хотите сделать")).toBeVisible();
+    await expect(page.getByText("Запустите ещё один сценарий")).toBeVisible();
 
-    // Steps (Шаг 1..3) must be hidden
-    await expect(
-      page.getByRole("button", { name: /Шаг 1.*Получение сигнала/s })
-    ).toHaveCount(0);
+    // Onboarding step cards are not rendered in the done state.
+    await expect(page.getByText("Получение сигнала")).toHaveCount(0);
 
-    // Post-onboarding chips visible
+    // Post-onboarding chips visible.
     await expect(
       page.getByRole("button", { name: "Создать новый сигнал" })
     ).toBeVisible();
@@ -159,22 +179,21 @@ test.describe("Welcome post-onboarding (full preset, campaign launched)", () => 
     ).toBeVisible();
   });
 
-  test("'Создать новую кампанию' replies with inline bot message", async ({
-    page,
-  }) => {
+  test("'Создать новую кампанию' replies inside the drawer", async ({ page }) => {
     await page.goto("/");
     await applyPreset(page, "full");
 
-    await page
-      .getByRole("button", { name: "Создать новую кампанию" })
-      .click();
+    await page.getByRole("button", { name: "Создать новую кампанию" }).click();
 
+    const drawer = page.getByTestId("chat-drawer");
     await expect(
-      page.getByText("Для этого выберите существующий сигнал или создайте новый.")
+      drawer.getByText(
+        "Для этого выберите существующий сигнал или создайте новый."
+      )
     ).toBeVisible();
-    // Chips remain
+    // Chips remain available in the drawer.
     await expect(
-      page.getByRole("button", { name: "Создать новую кампанию" })
+      drawer.getByRole("button", { name: "Создать новую кампанию" })
     ).toBeVisible();
   });
 
@@ -184,12 +203,11 @@ test.describe("Welcome post-onboarding (full preset, campaign launched)", () => 
     await page.goto("/");
     await applyPreset(page, "full");
 
-    await page
-      .getByRole("button", { name: "Создать новый сигнал" })
-      .click();
+    await page.getByRole("button", { name: "Создать новый сигнал" }).click();
 
+    // start_signal_flow входит в визард с первого шага (ссылка на сайт).
     await expect(
-      page.getByRole("heading", { name: "Выберите тип сигнала" })
+      page.getByRole("heading", { name: /С чего начнём/ })
     ).toBeVisible();
   });
 });

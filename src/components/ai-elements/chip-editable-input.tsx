@@ -28,6 +28,12 @@ interface ChipEditableInputProps {
    * sync chips→DOM до фактической вставки нового чипа.
    */
   onTagSwap?: () => void;
+  /**
+   * Глобальный перехват ввода: если пользователь печатает, не находясь ни в
+   * одном поле, символ уходит в этот бар (в конец). Включаем только для
+   * видимого нижнего бара — не для drawer, чтобы не было двойной вставки.
+   */
+  captureGlobalTyping?: boolean;
 }
 
 export interface ChipEditableInputHandle {
@@ -66,7 +72,10 @@ export interface ChipEditableInputHandle {
 export const ChipEditableInput = forwardRef<
   ChipEditableInputHandle,
   ChipEditableInputProps
->(function ChipEditableInput({ placeholder, className, onTagSwap }, ref) {
+>(function ChipEditableInput(
+  { placeholder, className, onTagSwap, captureGlobalTyping },
+  ref
+) {
   const editorRef = useRef<HTMLDivElement>(null);
   const { chips, removeChip } = usePromptChips();
   const controller = usePromptInputController();
@@ -221,6 +230,21 @@ export const ChipEditableInput = forwardRef<
     ed.querySelectorAll<HTMLElement>("[data-chip-id]").forEach((el) => {
       const id = el.dataset.chipId!;
       if (!stateById.has(id)) {
+        // Remove the chip AND the text segment it owns — everything after it up
+        // to the next chip (or end). createChipElement/insertChipAtRange append
+        // a trailing space after every chip, and the user's command text lives
+        // in this same segment; leaving them orphans the space (it accumulates
+        // across tag swaps — bug) and keeps stale text in the bar after the tag
+        // is parked (M5: switching tags must leave a clean slate).
+        let sibling = el.nextSibling;
+        while (
+          sibling &&
+          !(sibling instanceof HTMLElement && sibling.dataset.chipId)
+        ) {
+          const next = sibling.nextSibling;
+          sibling.remove();
+          sibling = next;
+        }
         el.remove();
       } else {
         // Update label if it changed. Trailing text node carries the label;
@@ -244,6 +268,7 @@ export const ChipEditableInput = forwardRef<
 
     // Add state chips not in DOM, in array order. Each gets inserted at
     // the saved caret (or appended if no caret).
+    let insertedChip = false;
     for (const chip of chips) {
       const selector = `[data-chip-id="${cssEscape(chip.id)}"]`;
       if (ed.querySelector(selector)) continue;
@@ -253,6 +278,7 @@ export const ChipEditableInput = forwardRef<
       if (hadChip) onTagSwap?.();
       const el = createChipElement(chip);
       insertChipAtRange(el, ed, lastRangeRef.current);
+      insertedChip = true;
       // Refresh the saved range so subsequent chip pushes append after the
       // chip we just inserted (not at the same anchor each time).
       const sel = window.getSelection();
@@ -260,6 +286,10 @@ export const ChipEditableInput = forwardRef<
         lastRangeRef.current = sel.getRangeAt(0).cloneRange();
       }
     }
+
+    // После вставки нового тега держим фокус в поле — курсор уже стоит после
+    // чипа (insertChipAtRange), пользователю остаётся только печатать.
+    if (insertedChip) ed.focus();
 
     // Re-flush text into controller so external readers see the latest.
     setInput(readText());
@@ -284,6 +314,27 @@ export const ChipEditableInput = forwardRef<
       toRemove.forEach((n) => n.remove());
     }
   }, [value, readText]);
+
+  // Hydrate the editor from the shared controller value ONCE on mount. The
+  // collapsed prompt-bar and the expanded drawer are never mounted together —
+  // switching between them destroys one ChipEditableInput and mounts another.
+  // Chips survive (shared chips state), but free text lived only in the
+  // controller value and was never re-rendered into the fresh editor's DOM, so
+  // it appeared lost. This restores it after the chips (caret-position relative
+  // to chips isn't stored — the model is "one tag + text after it"). Trimmed to
+  // avoid the chip's trailing space accumulating across repeated toggles.
+  // Subsequent edits flow through onInput, not back through here (run-once ref).
+  const didHydrateRef = useRef(false);
+  useEffect(() => {
+    if (didHydrateRef.current) return;
+    didHydrateRef.current = true;
+    const ed = editorRef.current;
+    if (!ed) return;
+    const text = value.trim();
+    if (text.length === 0) return;
+    if (readText().trim().length > 0) return; // editor already has text
+    insertTextImperative(text, { separator: "smart" });
+  }, [value, readText, insertTextImperative]);
 
   useImperativeHandle(
     ref,
@@ -407,6 +458,31 @@ export const ChipEditableInput = forwardRef<
     return () => obs.disconnect();
   }, [chips, removeChip]);
 
+  // Глобальный перехват ввода: печать вне любого поля уходит в конец этого
+  // бара. smart-разделитель ставит пробел перед вводом, если последний элемент
+  // — тег (или текст без хвостового пробела). Пробел как первый символ не
+  // перехватываем — чтобы сохранить скролл страницы пробелом и не плодить
+  // ведущий пробел. Перехват включается только для видимого нижнего бара.
+  useEffect(() => {
+    if (!captureGlobalTyping) return;
+    // DOM-тип события: импортированный из React `KeyboardEvent` здесь затеняет
+    // глобальный, поэтому ссылаемся на него через globalThis.
+    const handler = (e: globalThis.KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key.length !== 1 || e.key === " ") return; // только печатные символы
+      const active = document.activeElement;
+      if (active && isEditableElement(active)) return; // уже печатаем в поле
+      const ed = editorRef.current;
+      if (!ed || ed.offsetParent === null) return; // бар должен быть видим
+      e.preventDefault();
+      ed.focus();
+      placeCaretAtEnd(ed);
+      insertTextImperative(e.key, { separator: "smart" });
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [captureGlobalTyping, insertTextImperative]);
+
   const onPaste = useCallback((e: ClipboardEvent<HTMLDivElement>) => {
     const text = e.clipboardData.getData("text/plain");
     if (!text) return;
@@ -510,11 +586,26 @@ function insertChipAtRange(
     sel?.removeAllRanges();
     sel?.addRange(next);
   } else {
-    // No caret reference at all — append.
+    // No caret reference at all — append, then park the caret after the
+    // trailing space so focus lands right after the freshly-added tag.
     const space = document.createTextNode(" ");
     editor.appendChild(el);
     editor.appendChild(space);
+    const next = document.createRange();
+    next.setStartAfter(space);
+    next.collapse(true);
+    const sel2 = window.getSelection();
+    sel2?.removeAllRanges();
+    sel2?.addRange(next);
   }
+}
+
+/** true, если фокус сейчас в редактируемом элементе (input/textarea/select/
+ *  contenteditable) — тогда глобальный перехват ввода не нужен. */
+function isEditableElement(el: Element): boolean {
+  const tag = el.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
+  return (el as HTMLElement).isContentEditable === true;
 }
 
 function placeCaretAtEnd(el: HTMLElement) {

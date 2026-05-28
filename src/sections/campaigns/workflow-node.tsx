@@ -1,7 +1,8 @@
 "use client";
 
+import { useEffect } from "react";
 import { motion } from "motion/react";
-import { Handle, Position } from "@xyflow/react";
+import { Handle, Position, useUpdateNodeInternals } from "@xyflow/react";
 import type { NodeProps } from "@xyflow/react";
 import { X } from "lucide-react";
 import { useAppDispatch } from "@/state/app-state-context";
@@ -20,6 +21,16 @@ export function WorkflowNodeComponent({ id, data, selected }: NodeProps<Workflow
   const s = NODE_STYLES[data.nodeType] ?? NODE_STYLES.default;
   const Icon = NODE_ICON[data.nodeType];
   const dispatch = useAppDispatch();
+  const updateNodeInternals = useUpdateNodeInternals();
+
+  // Selecting a node resizes it (110→320 wide, taller card), which moves both
+  // handles. React Flow caches handle positions per node, so without telling it
+  // to re-measure, edges keep pointing at the old handle coords and visibly
+  // "break" off the node. Re-measure on select toggle (and again once the
+  // layout animation settles) so connectors stay anchored point-to-point.
+  useEffect(() => {
+    updateNodeInternals(id);
+  }, [selected, id, updateNodeInternals]);
 
   const showReadyDot =
     !data.needsAttention && !data.processing && !data.justUpdated && !selected;
@@ -45,6 +56,7 @@ export function WorkflowNodeComponent({ id, data, selected }: NodeProps<Workflow
         scale: 1,
       }}
       transition={{ layout: { duration: 0.28, ease: [0.32, 0.72, 0, 1] } }}
+      onLayoutAnimationComplete={() => updateNodeInternals(id)}
       style={{
         position: "relative",
         border: `1px solid ${s.border}`,

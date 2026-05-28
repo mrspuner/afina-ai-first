@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { PromptInputProvider } from "@/components/ai-elements/prompt-input";
 import { PromptChipsProvider } from "@/state/prompt-chips-context";
@@ -9,6 +10,7 @@ import { DraftQueueProvider } from "@/state/draft-queue-context";
 import { ChatPanel } from "@/sections/shell/chat-panel";
 import { ChatDrawer } from "@/sections/shell/chat-drawer";
 import { useAppState, useAppDispatch } from "@/state/app-state-context";
+import { activeNavSection } from "@/state/app-state";
 import { useChat } from "@/state/chat-context";
 import { AppSidebar } from "@/sections/shell/app-sidebar";
 import { LaunchFlyout } from "@/sections/shell/launch-flyout";
@@ -30,6 +32,17 @@ import { DevPanel } from "@/components/dev/dev-panel";
 
 const SHELL_EASE = [0.32, 0.72, 0, 1] as const;
 
+/**
+ * Инстанцирует онбординг-чат welcome ВНУТРИ ChatProvider — так хук может
+ * писать в общий чат и открывать drawer (унификация поведения welcome со всем
+ * интерфейсом). Раньше welcomeChat создавался выше ChatProvider и держал свою
+ * историю, из-за чего welcome-экран морфился.
+ */
+function WelcomeChatBridge({ children }: { children: ReactNode }) {
+  const welcomeChat = useOnboardingChat();
+  return <WelcomeChatProvider value={welcomeChat}>{children}</WelcomeChatProvider>;
+}
+
 function BottomBarSlot() {
   const { view } = useAppState();
   const { mode } = useChat();
@@ -43,11 +56,11 @@ function BottomBarSlot() {
 }
 
 export default function Home() {
-  const { view, launchFlyoutOpen, activeSection } = useAppState();
+  const state = useAppState();
+  const { view, launchFlyoutOpen } = state;
   const dispatch = useAppDispatch();
-  const welcomeChat = useOnboardingChat();
 
-  const isSurveyFullscreen = view.kind === "survey";
+  const isFullscreen = view.kind === "survey";
 
   // Routing key for the renderMain animation. View kinds that render the
   // SAME section component must collapse to one key, otherwise switching
@@ -94,13 +107,13 @@ export default function Home() {
   return (
     <PromptInputProvider>
       <PromptChipsProvider>
-      <WelcomeChatProvider value={welcomeChat}>
-        <ChatProvider>
+      <ChatProvider>
+      <WelcomeChatBridge>
         <DraftQueueProvider>
         <TriggerEditRegistryProvider>
         <div className="flex h-screen overflow-hidden bg-background">
           <AnimatePresence initial={false}>
-            {!isSurveyFullscreen && (
+            {!isFullscreen && (
               <motion.div
                 key="sidebar"
                 initial={{ opacity: 0, x: -16 }}
@@ -109,7 +122,7 @@ export default function Home() {
                 transition={{ duration: 0.28, ease: SHELL_EASE }}
               >
                 <AppSidebar
-                  activeNav={activeSection ?? undefined}
+                  activeNav={activeNavSection(state) ?? undefined}
                   onNavChange={(nav) => dispatch({ type: "sidebar_nav", section: nav })}
                   onLaunchOpen={() => dispatch({ type: "flyout_open" })}
                   onLogoClick={() => dispatch({ type: "go_welcome" })}
@@ -118,7 +131,7 @@ export default function Home() {
               </motion.div>
             )}
           </AnimatePresence>
-          {!isSurveyFullscreen && (
+          {!isFullscreen && (
             <LaunchFlyout
               open={launchFlyoutOpen}
               onClose={() => dispatch({ type: "flyout_close" })}
@@ -138,7 +151,7 @@ export default function Home() {
               </motion.div>
             </AnimatePresence>
             <AnimatePresence initial={false}>
-              {!isSurveyFullscreen && (
+              {!isFullscreen && (
                 <motion.div
                   key="bottom-bar"
                   initial={{ opacity: 0, y: 12 }}
@@ -156,8 +169,8 @@ export default function Home() {
         </div>
         </TriggerEditRegistryProvider>
         </DraftQueueProvider>
-        </ChatProvider>
-      </WelcomeChatProvider>
+      </WelcomeChatBridge>
+      </ChatProvider>
       </PromptChipsProvider>
     </PromptInputProvider>
   );

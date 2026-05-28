@@ -507,18 +507,32 @@ export function Step2Interests({ data, onNext }: StepProps) {
     );
   }
 
-  // M2 (revised) — Selection IS expansion. A trigger has a single interactive
-  // state: clicking the card selects it (highlighted, open, editable — system
-  // domains can be excluded, new ones added); clicking again deselects it
-  // (collapsed to a read-only domain preview). There is no separate
-  // expand/collapse control. The trigger chip enters the prompt bar only via
-  // the explicit "Добавить свой домен" button (onAddDomain → handleAddDomain).
-  function toggleTriggerSelection(triggerId: string) {
+  // Один активный тег на триггер: id фиксирован, повторный клик переписывает
+  // чип, а не плодит новые (pushChip дедупит по id). Тот же id использует
+  // handleAddDomain — пути «клик по карточке» и «добавить домен» ссылаются на
+  // один тег.
+  function pushTriggerChip(triggerId: string, triggerLabel: string) {
+    pushChip({
+      id: `trigger_${triggerId}`,
+      kind: "trigger",
+      label: triggerLabel,
+      payload: triggerId,
+      removable: true,
+    });
+  }
+
+  // M2 (revised) — Selection IS expansion: clicking the card selects it
+  // (highlighted, open, editable — system domains can be excluded, new ones
+  // added); clicking again deselects it (collapsed to a read-only domain
+  // preview). S1 — клик по карточке также отправляет триггер тегом в PromptBar,
+  // чтобы можно было сразу дать по нему AI-команду.
+  function toggleTriggerSelection(triggerId: string, triggerLabel: string) {
     setSelectedTriggers((prev) =>
       prev.includes(triggerId)
         ? prev.filter((t) => t !== triggerId)
         : [...prev, triggerId]
     );
+    pushTriggerChip(triggerId, triggerLabel);
   }
 
   function handleApplyParsed(
@@ -609,22 +623,40 @@ export function Step2Interests({ data, onNext }: StepProps) {
   // useChatSubmit routes `trigger` chips through triggerEdit.applyToTrigger —
   // no parser change. A stable chip id means re-clicking refreshes, not stacks.
   function handleAddDomain(triggerId: string, triggerLabel: string) {
-    pushChip({
-      id: `trigger_${triggerId}`,
-      kind: "trigger",
-      label: triggerLabel,
-      payload: triggerId,
-      removable: true,
-    });
-    const el = document.querySelector<HTMLDivElement>(
+    pushTriggerChip(triggerId, triggerLabel);
+    // Текст-команду вставляем ТОЛЬКО после того, как чип реально оказался в DOM
+    // (он попадает туда асинхронным эффектом ChipEditableInput). Один
+    // requestAnimationFrame порядок не гарантирует — поэтому ждём появления
+    // чипа, иначе «добавь домен » вставляется до тега и теряется/едет (S2).
+    insertCommandAfterChip(triggerId, "добавь домен ");
+  }
+
+  // Дожидается появления чипа триггера в contenteditable, затем вставляет
+  // text-команду после него. Поллинг по кадрам с потолком попыток — на случай
+  // если чип почему-то не материализуется.
+  function insertCommandAfterChip(
+    triggerId: string,
+    command: string,
+    attempt = 0
+  ) {
+    const ed = document.querySelector<HTMLDivElement>(
       '[role="textbox"][contenteditable="true"]'
     );
-    el?.focus();
-    requestAnimationFrame(() => {
-      textInput.insertAtCursor("добавь домен ", {
-        separator: "smart",
-        preserveTags: true,
-      });
+    const chipReady =
+      !!ed &&
+      Array.from(ed.querySelectorAll<HTMLElement>("[data-chip-id]")).some(
+        (c) => c.dataset.chipId === `trigger_${triggerId}`
+      );
+    if (!chipReady && attempt < 6) {
+      requestAnimationFrame(() =>
+        insertCommandAfterChip(triggerId, command, attempt + 1)
+      );
+      return;
+    }
+    ed?.focus();
+    textInput.insertAtCursor(command, {
+      separator: "smart",
+      preserveTags: true,
     });
   }
 
@@ -753,7 +785,7 @@ export function Step2Interests({ data, onNext }: StepProps) {
                   selected={selectedTriggers.includes(trigger.id)}
                   delta={deltas[trigger.id] ?? EMPTY_DELTA}
                   highlight={highlightedTriggerIds.has(trigger.id)}
-                  onToggle={() => toggleTriggerSelection(trigger.id)}
+                  onToggle={() => toggleTriggerSelection(trigger.id, trigger.label)}
                   onRemoveDelta={(bucket, domain) =>
                     handleRemoveDelta(trigger.id, bucket, domain)
                   }

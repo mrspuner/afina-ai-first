@@ -1376,3 +1376,52 @@ describe("ViewAddress — campaign-payment round-trip", () => {
     expect(next.view).toEqual({ kind: "section", name: "Кампании" });
   });
 });
+
+import { activeNavSection } from "./app-state";
+
+describe("activeNavSection — подсветка пункта меню по view", () => {
+  it("визард сигнала → «Сигналы»", () => {
+    expect(
+      activeNavSection({ ...initialState, view: { kind: "guided-signal" } })
+    ).toBe("Сигналы");
+    expect(
+      activeNavSection({ ...initialState, view: { kind: "awaiting-campaign" } })
+    ).toBe("Сигналы");
+  });
+
+  it("работа с кампанией (воркфлоу/карточка/оплата/выбор типа) → «Кампании»", () => {
+    expect(
+      activeNavSection({
+        ...initialState,
+        view: { kind: "workflow", campaign: { id: "c1", name: "C" }, launched: false },
+      })
+    ).toBe("Кампании");
+    expect(
+      activeNavSection({
+        ...initialState,
+        view: { kind: "campaign", campaign: { id: "c1", name: "C" } },
+      })
+    ).toBe("Кампании");
+    expect(
+      activeNavSection({
+        ...initialState,
+        view: { kind: "campaign-payment", campaign: { id: "c1", name: "C" } },
+      })
+    ).toBe("Кампании");
+    expect(
+      activeNavSection({ ...initialState, view: { kind: "campaign-select" } })
+    ).toBe("Кампании");
+  });
+
+  it("раздел → имя раздела; welcome → activeSection (null)", () => {
+    expect(
+      activeNavSection({
+        ...initialState,
+        view: { kind: "section", name: "Статистика" },
+      })
+    ).toBe("Статистика");
+    expect(
+      activeNavSection({ ...initialState, view: { kind: "welcome" } })
+    ).toBeNull();
+  });
+});

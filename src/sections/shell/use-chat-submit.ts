@@ -5,7 +5,11 @@ import { useChat } from "@/state/chat-context";
 import { useTriggerEdit } from "@/state/trigger-edit-context";
 import { useAppState, useAppDispatch } from "@/state/app-state-context";
 import { isOnStatisticsSection } from "@/state/app-state";
-import { mockReplyFor, mockReplyForFreeText } from "@/lib/mock-ai-reply";
+import { mockReplyFor } from "@/lib/mock-ai-reply";
+import {
+  lookupInformationalReply,
+  warmFallbackReply,
+} from "@/lib/informational-replies";
 import { parseTriggerCommand } from "@/lib/trigger-edit-parser";
 import {
   COMPLEX_THINKING_FINAL_REPLY_SIGNAL,
@@ -170,7 +174,11 @@ export function useChatSubmit(): { submit: (payload: ChatComposerSubmitPayload) 
 
     chat.append({ role: "user", text });
     const id = chat.append({ role: "assistant", text: "", pending: true });
-    schedule(() => chat.updatePending(id, mockReplyForFreeText()), 350);
+    // Информационные вопросы (разделы/визард/переходные view) получают
+    // содержательный ответ из каталога; нераспознанное — тёплый fallback
+    // вместо сухой заглушки.
+    const reply = lookupInformationalReply(text) ?? warmFallbackReply();
+    schedule(() => chat.updatePending(id, reply), 350);
   }
 
   return { submit };

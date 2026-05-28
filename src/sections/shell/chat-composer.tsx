@@ -48,6 +48,8 @@ interface ChatComposerProps {
   onSubmit: (payload: ChatComposerSubmitPayload) => void;
   /** Сообщает родителю текущий активный тег и печатается ли текст после него. */
   onActiveTagChange?: (info: { tag: PromptChip | null; hasTypedText: boolean }) => void;
+  /** Перехватывать глобальный ввод (только для видимого нижнего бара). */
+  captureGlobalTyping?: boolean;
 }
 
 /**
@@ -63,7 +65,10 @@ interface ChatComposerProps {
  * через `onTagSwap` и паркует предыдущую пару (тег + текст) в очередь.
  */
 export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(
-  function ChatComposer({ placeholder, onSubmit, onActiveTagChange }, ref) {
+  function ChatComposer(
+    { placeholder, onSubmit, onActiveTagChange, captureGlobalTyping },
+    ref
+  ) {
     const editorRef = useRef<ChipEditableInputHandle>(null);
     const { chips, pushChip, removeChip, clearChips } = usePromptChips();
     const { drafts, parkDraft, removeDraft, clearQueue } = useDraftQueue();
@@ -164,6 +169,23 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(
       const active = editorRef.current?.getActiveSegment() ?? null;
       const freeText = (message.text ?? "").trim();
 
+      // Только node-теги (кампании/воркфлоу) проходят через очередь черновиков и
+      // applyDraftToNode. Trigger/section-теги (визард сигнала) — НЕ команды
+      // узла: их понимает только chat-пайплайн (useChatSubmit), который
+      // применяет правку триггера к шагу и пишет сообщение в историю.
+      // applyDraftToNode игнорирует не-node payload, поэтому без этой ветки тег
+      // триггера по Enter молча ничего не делал (домен не добавлялся, в истории
+      // пусто).
+      if (active && active.chip.kind !== "node") {
+        if (freeText.length === 0) return; // тег без текста — нечего применять
+        onSubmit({ text: freeText, segments });
+        editorRef.current?.clear();
+        clearChips();
+        prevActiveRef.current = null;
+        setFromQueueChipId(null);
+        return;
+      }
+
       const action = decideEnterAction({
         hasActiveTag: active !== null,
         activeTagFromQueue:
@@ -241,6 +263,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(
           className="px-3 py-2"
           placeholder={placeholder}
           onTagSwap={parkPreviousIfNeeded}
+          captureGlobalTyping={captureGlobalTyping}
         />
         <PromptInputFooter>
           <PromptInputTools>

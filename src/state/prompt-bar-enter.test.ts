@@ -10,6 +10,10 @@ describe("decideEnterAction", () => {
     const r = decideEnterAction({ hasActiveTag: true, activeTagFromQueue: true, activeText: "переписанный текст", queueLength: 1 });
     expect(r.kind).toBe("park-tag");
   });
+  it("fresh tag with text but queue is non-empty → park (accumulate), do not apply", () => {
+    const r = decideEnterAction({ hasActiveTag: true, activeTagFromQueue: false, activeText: "сделай дружелюбнее", queueLength: 2 });
+    expect(r.kind).toBe("park-tag");
+  });
   it("apply-all command text + non-empty queue → flush whole queue", () => {
     const r = decideEnterAction({ hasActiveTag: false, activeTagFromQueue: false, activeText: APPLY_ALL_COMMAND, queueLength: 3 });
     expect(r.kind).toBe("apply-all");

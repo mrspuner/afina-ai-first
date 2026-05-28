@@ -28,9 +28,10 @@ describe("onboarding chat tree", () => {
     const w2keys = Object.keys(WAVES).filter((k) => /-w2[abc]$/.test(k));
     expect(w2keys.length).toBe(9); // 3 scenarios × 3 sub-branches
 
+    // Чипса «Создать первый сигнал →» (create-signal) убрана — запуск флоу
+    // живёт на кнопках героя welcome-экрана, не в онбординг-чате.
     const w3LabelSet = new Set([
       "Как платформа узнаёт об активности моих клиентов?",
-      "Создать первый сигнал →",
     ]);
     for (const k of w2keys) {
       const labels = WAVES[k].chips.map((c) => c.label);
@@ -41,10 +42,17 @@ describe("onboarding chat tree", () => {
   it("wave-3-repeat node exists and has the same chips", () => {
     const repeat = WAVES["wave-3-repeat"];
     expect(repeat).toBeDefined();
-    expect(repeat.chips.length).toBe(2);
-    expect(repeat.chips.map((c) => c.next).sort()).toEqual(
-      ["create-signal", "wave-3-repeat"].sort()
-    );
+    expect(repeat.chips.length).toBe(1);
+    expect(repeat.chips.map((c) => c.next)).toEqual(["wave-3-repeat"]);
+  });
+
+  it("no chip in the tree redirects to the signal flow (create-signal removed)", () => {
+    for (const node of Object.values(WAVES)) {
+      for (const c of node.chips) {
+        expect(c.next, `chip ${c.id}`).not.toBe("create-signal");
+      }
+    }
+    for (const c of WAVE_0_CHIPS) expect(c.next).not.toBe("create-signal");
   });
 
   it("chip ids are unique across the tree", () => {

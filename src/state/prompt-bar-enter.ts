@@ -23,7 +23,12 @@ export function decideEnterAction(ctx: EnterContext): EnterAction {
   const text = ctx.activeText.trim();
   if (ctx.hasActiveTag) {
     if (text.length === 0) return { kind: "noop" };
-    return ctx.activeTagFromQueue ? { kind: "park-tag" } : { kind: "apply-tag" };
+    // Парковка вместо немедленного применения, если тег поднят из очереди ЛИБО
+    // в очереди уже есть черновики — тогда все правки копятся и применяются
+    // вместе командой «Применить все изменения». Немедленный apply разрешён
+    // только когда очередь пуста и тег свежий (ТЗ M5.7 + правка пользователя).
+    if (ctx.activeTagFromQueue || ctx.queueLength > 0) return { kind: "park-tag" };
+    return { kind: "apply-tag" };
   }
   if (text.toLowerCase() === APPLY_ALL_COMMAND.toLowerCase() && ctx.queueLength > 0) {
     return { kind: "apply-all" };

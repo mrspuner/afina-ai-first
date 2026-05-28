@@ -86,6 +86,7 @@ export function ChatPanel({ placeholder }: { placeholder: string }) {
         placeholder={placeholder}
         onSubmit={submit}
         onActiveTagChange={handleActiveTagChange}
+        captureGlobalTyping
       />
       <SuggestionBar resolution={resolution} onPick={handlePick} />
     </PromptBar>

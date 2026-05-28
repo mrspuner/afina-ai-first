@@ -23,7 +23,7 @@ import {
   applyOps,
   type StructuralOp,
 } from "@/state/structural-commands";
-import { useAppDispatch } from "@/state/app-state-context";
+import { useChat } from "@/state/chat-context";
 
 interface GraphState {
   nodes: WorkflowNode[];
@@ -192,7 +192,7 @@ export function WorkflowView({
   onNodeClick,
   onPaneClick,
 }: WorkflowViewProps) {
-  const appDispatch = useAppDispatch();
+  const chat = useChat();
   const [graph, setGraph] = useState<GraphState>(() =>
     initialGraph(signalType, signal)
   );
@@ -244,7 +244,10 @@ export function WorkflowView({
     cycleTimersRef.current = [];
 
     setCyclePhase("thinking");
-    appDispatch({ type: "ai_reply_shown", text: "Думаю..." });
+    // Ответ идёт обычным сообщением ассистента в общий чат (pending-точки →
+    // текст), как любой другой ответ ИИ — не отдельной плашкой. История правок
+    // остаётся в drawer, inline-подсказку показывает TransientReply.
+    const replyId = chat.append({ role: "assistant", text: "", pending: true });
 
     let changedIdsAfter: Set<string> = new Set();
     const t1 = setTimeout(() => {
@@ -260,7 +263,7 @@ export function WorkflowView({
         return { ...result.graph, nodes: flashed };
       });
       setCyclePhase("reveal");
-      if (finalReply) appDispatch({ type: "ai_reply_shown", text: finalReply });
+      chat.updatePending(replyId, finalReply ?? "Готово.");
     }, durationMs);
 
     const t2 = setTimeout(() => {
@@ -365,9 +368,9 @@ export function WorkflowView({
     }
 
     if (opCount === 0) {
-      // All skipped — no cycle, just the explanation.
+      // All skipped — no cycle, just the explanation (обычное сообщение в чат).
       const reply = buildReply();
-      if (reply) appDispatch({ type: "ai_reply_shown", text: reply });
+      if (reply) chat.append({ role: "assistant", text: reply });
       onStructuralOpsHandled?.();
       return;
     }

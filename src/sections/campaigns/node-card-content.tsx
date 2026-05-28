@@ -10,6 +10,7 @@ import { getFieldMeta } from "@/state/node-field-editability";
 import { usePromptChips } from "@/state/prompt-chips-context";
 import type { NodeTagPayload } from "@/state/prompt-chips-context";
 import { useAppDispatch } from "@/state/app-state-context";
+import { cn } from "@/lib/utils";
 import { getNodeColor } from "./node-visuals";
 
 type ParamRow = { label: string; value: string };
@@ -202,51 +203,16 @@ export function NodeCardBody({ id, data }: NodeCardBodyProps) {
             const editability = data.params
               ? getFieldMeta(data.params.kind, row.label)?.editability
               : undefined;
+            const isEditingRow = editing?.label === row.label;
+            const rowGrid =
+              "grid grid-cols-[minmax(72px,max-content)_1fr_auto] items-center gap-x-2.5 text-[11px]";
 
-            let trailingIcon: React.ReactNode = null;
-            if (editability === "manual") {
-              trailingIcon = (
-                <button
-                  type="button"
-                  aria-label="Редактировать поле"
-                  className="nodrag ml-1 flex shrink-0 items-center text-muted-foreground/50 hover:text-muted-foreground focus-visible:outline-none"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setEditing({ label: row.label, value: row.value });
-                  }}
-                >
-                  <Pencil className="h-3 w-3" />
-                </button>
-              );
-            } else if (editability === "ai") {
-              trailingIcon = (
-                <button
-                  type="button"
-                  aria-label="Передать поле ассистенту"
-                  className="nodrag ml-1 flex shrink-0 items-center text-muted-foreground/50 hover:text-muted-foreground focus-visible:outline-none"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleAiField(row.label);
-                  }}
-                >
-                  <Image
-                    src="/mascot-icon.svg"
-                    width={12}
-                    height={12}
-                    alt=""
-                    aria-hidden
-                  />
-                </button>
-              );
-            }
-
-            return (
-              <div
-                key={row.label}
-                className="grid grid-cols-[minmax(72px,max-content)_1fr_auto] items-center gap-x-2.5 text-[11px]"
-              >
-                <span className="text-muted-foreground">{row.label}</span>
-                {editing?.label === row.label ? (
+            // While editing, the row hosts an <input> + save button — it can't
+            // be a <button> (no nested interactives), so render the plain grid.
+            if (isEditingRow) {
+              return (
+                <div key={row.label} className={cn(rowGrid, "px-1 py-0.5")}>
+                  <span className="text-muted-foreground">{row.label}</span>
                   <input
                     autoFocus
                     value={editing.value}
@@ -257,12 +223,6 @@ export function NodeCardBody({ id, data }: NodeCardBodyProps) {
                     }}
                     className="nodrag min-w-0 flex-1 rounded border border-border bg-background px-1.5 py-0.5 text-[11px] text-foreground"
                   />
-                ) : (
-                  <span className="truncate text-foreground" title={row.value}>
-                    {row.value}
-                  </span>
-                )}
-                {editing?.label === row.label ? (
                   <button
                     type="button"
                     aria-label="Сохранить поле"
@@ -274,10 +234,64 @@ export function NodeCardBody({ id, data }: NodeCardBodyProps) {
                   >
                     <Check className="h-3 w-3" />
                   </button>
-                ) : (
-                  trailingIcon
+                </div>
+              );
+            }
+
+            // Whole-row affordance: clicking anywhere on a manual row opens its
+            // inline editor; on an ai row sends the field tag to the prompt bar.
+            // The trailing icon is now just a visual marker, not the only target.
+            const interactive = editability === "manual" || editability === "ai";
+            const icon =
+              editability === "manual" ? (
+                <Pencil className="h-3 w-3" />
+              ) : editability === "ai" ? (
+                <Image src="/mascot-icon.svg" width={12} height={12} alt="" aria-hidden />
+              ) : null;
+
+            if (!interactive) {
+              return (
+                <div key={row.label} className={cn(rowGrid, "px-1 py-0.5")}>
+                  <span className="text-muted-foreground">{row.label}</span>
+                  <span className="truncate text-foreground" title={row.value}>
+                    {row.value}
+                  </span>
+                  <span />
+                </div>
+              );
+            }
+
+            return (
+              <button
+                key={row.label}
+                type="button"
+                aria-label={
+                  editability === "manual"
+                    ? `Редактировать поле «${row.label}»`
+                    : `Передать поле «${row.label}» ассистенту`
+                }
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (editability === "manual") {
+                    setEditing({ label: row.label, value: row.value });
+                  } else {
+                    handleAiField(row.label);
+                  }
+                }}
+                className={cn(
+                  rowGrid,
+                  "group nodrag rounded px-1 py-0.5 text-left transition-colors",
+                  "hover:bg-white/5 focus-visible:bg-white/5 focus-visible:outline-none"
                 )}
-              </div>
+              >
+                <span className="text-muted-foreground">{row.label}</span>
+                <span className="truncate text-foreground" title={row.value}>
+                  {row.value}
+                </span>
+                <span className="ml-1 flex shrink-0 items-center text-muted-foreground/50 transition-colors group-hover:text-muted-foreground">
+                  {icon}
+                </span>
+              </button>
             );
           })}
         </div>

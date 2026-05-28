@@ -293,6 +293,20 @@ export const initialState: AppState = {
 export function appReducer(state: AppState, action: Action): AppState {
   switch (action.type) {
     case "start_signal_flow":
+      // Анкета не пройдена — ведём пользователя сначала в survey-view
+      // (fullscreen без sidebar/bottom-bar). После `survey_completed`
+      // SurveySection повторно диспатчит `start_signal_flow`, и тогда
+      // условие ниже даст ему мастер. initialScenario при гейте теряется —
+      // в прототипе его никто из пользовательских путей не передаёт.
+      if (state.surveyStatus !== "completed") {
+        return {
+          ...state,
+          view: { kind: "survey" },
+          launchFlyoutOpen: false,
+          activeSection: null,
+          resumingSignalId: undefined,
+        };
+      }
       return {
         ...state,
         view: { kind: "guided-signal", initialScenario: action.initialScenario },
@@ -976,3 +990,30 @@ export const isWorkflowView = (s: AppState) => s.view.kind === "workflow";
 export const isOnWelcome = (s: AppState) => s.view.kind === "welcome";
 export const isOnStatisticsSection = (s: AppState): boolean =>
   s.view.kind === "section" && s.view.name === "Статистика";
+
+/**
+ * Какой пункт левого меню подсвечен. Выводится из текущего view, чтобы пункт
+ * не гас при заполнении визарда / работе с кампанией (там activeSection
+ * занулён):
+ *  - guided-signal / awaiting-campaign → «Сигналы» (поток создания сигнала);
+ *  - campaign-select / workflow / campaign / campaign-payment → «Кампании»
+ *    (выбор типа, воркфлоу, карточка, оплата);
+ *  - section → имя раздела;
+ *  - иначе (welcome / survey) → activeSection (обычно null).
+ */
+export function activeNavSection(s: AppState): SectionName | null {
+  switch (s.view.kind) {
+    case "section":
+      return s.view.name;
+    case "guided-signal":
+    case "awaiting-campaign":
+      return "Сигналы";
+    case "campaign-select":
+    case "workflow":
+    case "campaign":
+    case "campaign-payment":
+      return "Кампании";
+    default:
+      return s.activeSection;
+  }
+}
