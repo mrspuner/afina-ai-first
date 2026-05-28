@@ -1,9 +1,4 @@
-import { SCENARIOS } from "@/data/scenarios";
-
-/** Scenario id → display name, used by the wizard summary and the signal card. */
-export const SCENARIO_NAMES: Record<string, string> = Object.fromEntries(
-  SCENARIOS.map((s) => [s.id, s.name]),
-);
+export { SCENARIO_NAMES } from "@/data/scenarios";
 
 /** Segment key → labelled price line (prototype pricing). */
 export const SEGMENT_NAMES: Record<string, string> = {

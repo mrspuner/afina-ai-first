@@ -1,6 +1,5 @@
-import { SCENARIOS } from "@/data/scenarios";
+import { SCENARIOS, SCENARIO_NAMES } from "@/data/scenarios";
 import type { Signal } from "./app-state";
-import { SCENARIO_NAMES } from "@/sections/signals/signal-summary-data";
 
 /**
  * Human scenario name for a signal. Prefers the explicit scenario id captured

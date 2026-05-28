@@ -1324,6 +1324,17 @@ describe("ViewAddress — campaign-payment round-trip", () => {
   });
 });
 
+describe("ViewAddress — signal round-trip", () => {
+  it("restore_address rebuilds signal view from address", () => {
+    const state: AppState = { ...initialState, signals: [makeSignal({ id: "sig_1" })] };
+    const next = appReducer(state, {
+      type: "restore_address",
+      address: { kind: "signal", signalId: "sig_1" },
+    });
+    expect(next.view).toEqual({ kind: "signal", signal: { id: "sig_1" } });
+  });
+});
+
 describe("appReducer — entity cards", () => {
   it("campaign_opened routes every status to the campaign card", () => {
     for (const status of ["draft", "active", "paused", "completed"] as const) {
