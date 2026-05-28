@@ -158,6 +158,12 @@ export function selectPromptSuggestions(
     case "welcome":
       if (ctx.welcomeChips.length === 0) return { kind: "hidden" };
       return resolved({ kind: "welcome-wave", chips: ctx.welcomeChips });
+    case "survey":
+    case "campaign-payment":
+      // Fullscreen views: chrome (and therefore the promptbar) is hidden by
+      // page.tsx, but the bottom-bar can briefly re-render during the exit
+      // transition. Return hidden so the suggestion bar has nothing to draw.
+      return { kind: "hidden" };
     case "guided-signal": {
       const step = state.wizardCurrentStep;
       if (step === null) return { kind: "hidden" };
