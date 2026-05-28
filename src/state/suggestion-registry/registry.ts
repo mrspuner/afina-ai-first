@@ -1,0 +1,37 @@
+/**
+ * Единая точка доступа к чипам-подсказкам: `resolveSuggestions(scope)` →
+ * массив `SuggestionItem` под текущее место пользователя.
+ *
+ * Контент по scope разнесён по leaf-файлам (node-context, sections, wizard,
+ * views, commands, welcome-waves); этот модуль только маршрутизирует.
+ */
+
+import type { Scope, SuggestionItem } from "./types";
+import { resolveNodeContext } from "./node-context";
+import { resolveSection } from "./sections";
+import { resolveWizardStep } from "./wizard";
+import { resolveCampaignFeed, resolveAwaitingCampaign, resolveCampaignSelect } from "./views";
+import type { CampaignStatus } from "@/state/app-state";
+import { resolveDraftQueue } from "./commands";
+import { resolveWelcomeWave } from "./welcome-waves";
+
+export function resolveSuggestions(scope: Scope): SuggestionItem[] {
+  switch (scope.kind) {
+    case "node-context":
+      return resolveNodeContext(scope.nodeType, scope.paramLabel);
+    case "draft-queue":
+      return resolveDraftQueue();
+    case "welcome-wave":
+      return resolveWelcomeWave(scope.chips);
+    case "section":
+      return resolveSection(scope.sub);
+    case "wizard-step":
+      return resolveWizardStep(scope.sub);
+    case "awaiting-campaign":
+      return resolveAwaitingCampaign();
+    case "campaign-select":
+      return resolveCampaignSelect();
+    case "campaign-feed":
+      return resolveCampaignFeed(scope.status as CampaignStatus);
+  }
+}

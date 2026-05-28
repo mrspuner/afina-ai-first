@@ -15,6 +15,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { WorkflowNodeType } from "@/types/workflow";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 
 export interface NodeStyle {
   border: string;
@@ -73,4 +75,34 @@ export function getNodeColor(nodeType: string): string {
 /** Иконка узла по kind, либо undefined (узел без иконки). */
 export function getNodeIcon(nodeType: string): LucideIcon | undefined {
   return NODE_ICON[nodeType as WorkflowNodeType];
+}
+
+/**
+ * Кэш SVG-строк иконок узлов. Заполняется ЛЕНИВО при первом обращении к
+ * `getNodeIconSvg`, не при импорте модуля. Это критично: `renderToStaticMarkup`
+ * запускает вложенный React-рендерер, и если бы он выполнялся на module-level,
+ * импорт модуля во время SSR страницы обнулял бы hooks dispatcher и ронял
+ * рендер ("Invalid hook call" / useContext of null). Единственный вызов
+ * `getNodeIconSvg` — из императивного DOM-билдера чипа (client-only), поэтому
+ * рендер строки всегда происходит вне серверного рендера.
+ *
+ * Lucide SVG задают `stroke="currentColor"` — цвет наследуется от родителя.
+ */
+const NODE_ICON_SVG_CACHE: Partial<Record<WorkflowNodeType, string>> = {};
+
+/** SVG-строка иконки узла или null, если для типа иконки нет. */
+export function getNodeIconSvg(nodeType: string): string | null {
+  const key = nodeType as WorkflowNodeType;
+  const Icon = NODE_ICON[key];
+  if (!Icon) return null;
+  if (NODE_ICON_SVG_CACHE[key] === undefined) {
+    NODE_ICON_SVG_CACHE[key] = renderToStaticMarkup(
+      createElement(Icon, {
+        size: 14,
+        strokeWidth: 2,
+        "aria-hidden": true,
+      })
+    );
+  }
+  return NODE_ICON_SVG_CACHE[key] ?? null;
 }

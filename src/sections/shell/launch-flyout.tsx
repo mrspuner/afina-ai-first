@@ -4,52 +4,94 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useAppDispatch, useAppState } from "@/state/app-state-context";
-import { SignalRow } from "./signal-row";
-import { baseScenarios, scenarioCount } from "@/data/scenarios";
-
-const SIGNAL_TEMPLATES = baseScenarios().map((s) => ({
-  id: s.id,
-  title: s.name,
-  description: s.description,
-}));
+import type { Campaign, Signal } from "@/state/app-state";
+import { STATUS_LABELS } from "@/sections/campaigns/status-badge";
+import { SIGNAL_STATUS_LABEL } from "@/types/signal-status";
+import { cn } from "@/lib/utils";
 
 interface LaunchFlyoutProps {
   open: boolean;
   onClose: () => void;
 }
 
+type RecentItem =
+  | { kind: "signal"; date: string; signal: Signal }
+  | { kind: "campaign"; date: string; campaign: Campaign };
+
+const RECENT_LIMIT_PER_KIND = 10;
+
+function campaignDate(c: Campaign): string {
+  return c.launchedAt ?? c.scheduledFor ?? c.completedAt ?? c.createdAt;
+}
+
+const CAMPAIGN_DOT: Record<Campaign["status"], string> = {
+  active: "bg-green-500",
+  scheduled: "bg-blue-500",
+  draft: "bg-muted-foreground",
+  paused: "bg-amber-500",
+  completed: "bg-muted-foreground/50",
+};
+
+const SIGNAL_DOT: Record<NonNullable<Signal["status"]>, string> = {
+  draft: "bg-muted-foreground",
+  awaiting_payment: "bg-amber-500",
+  processing: "bg-sky-500",
+  ready: "bg-green-500",
+  expired: "bg-muted-foreground/50",
+  error: "bg-red-500",
+};
+
 export function LaunchFlyout({ open, onClose }: LaunchFlyoutProps) {
-  const { signals } = useAppState();
+  const { signals, campaigns } = useAppState();
   const dispatch = useAppDispatch();
   const [query, setQuery] = useState("");
   const dialogRef = useRef<HTMLElement>(null);
 
   const normalized = query.trim().toLocaleLowerCase("ru-RU");
 
-  const filteredTemplates = useMemo(() => {
-    if (!normalized) return SIGNAL_TEMPLATES;
-    return SIGNAL_TEMPLATES.filter((t) =>
-      t.title.toLocaleLowerCase("ru-RU").includes(normalized) ||
-      t.description.toLocaleLowerCase("ru-RU").includes(normalized)
-    );
-  }, [normalized]);
+  const recentItems = useMemo<RecentItem[]>(() => {
+    const sigItems: RecentItem[] = [...signals]
+      .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))
+      .slice(0, RECENT_LIMIT_PER_KIND)
+      .map((s) => ({ kind: "signal", date: s.updatedAt, signal: s }));
+    const cmpItems: RecentItem[] = [...campaigns]
+      .sort((a, b) => (campaignDate(a) < campaignDate(b) ? 1 : -1))
+      .slice(0, RECENT_LIMIT_PER_KIND)
+      .map((c) => ({ kind: "campaign", date: campaignDate(c), campaign: c }));
+    return [...sigItems, ...cmpItems].sort((a, b) => (a.date < b.date ? 1 : -1));
+  }, [signals, campaigns]);
 
-  const sortedSignals = useMemo(
-    () => [...signals].sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1)),
-    [signals]
-  );
+  const filteredItems = useMemo(() => {
+    if (!normalized) return recentItems;
+    return recentItems.filter((it) => {
+      const name = it.kind === "signal" ? it.signal.type : it.campaign.name;
+      return name.toLocaleLowerCase("ru-RU").includes(normalized);
+    });
+  }, [normalized, recentItems]);
 
-  const filteredSignals = useMemo(() => {
-    if (!normalized) return sortedSignals;
-    return sortedSignals.filter((s) =>
-      s.type.toLocaleLowerCase("ru-RU").includes(normalized)
-    );
-  }, [normalized, sortedSignals]);
+  const searchPool = useMemo<RecentItem[]>(() => {
+    if (!normalized) return [];
+    const sigItems: RecentItem[] = signals.map((s) => ({
+      kind: "signal",
+      date: s.updatedAt,
+      signal: s,
+    }));
+    const cmpItems: RecentItem[] = campaigns.map((c) => ({
+      kind: "campaign",
+      date: campaignDate(c),
+      campaign: c,
+    }));
+    return [...sigItems, ...cmpItems]
+      .filter((it) => {
+        const name = it.kind === "signal" ? it.signal.type : it.campaign.name;
+        return name.toLocaleLowerCase("ru-RU").includes(normalized);
+      })
+      .sort((a, b) => (a.date < b.date ? 1 : -1));
+  }, [normalized, signals, campaigns]);
 
-  const nothingFound =
-    normalized &&
-    filteredTemplates.length === 0 &&
-    filteredSignals.length === 0;
+  const listToRender = normalized ? searchPool : filteredItems;
+  const nothingFound = Boolean(normalized) && searchPool.length === 0;
+  const recentEmpty = !normalized && recentItems.length === 0;
 
   useEffect(() => {
     if (!open) return;
@@ -87,13 +129,17 @@ export function LaunchFlyout({ open, onClose }: LaunchFlyoutProps) {
 
   if (!open) return null;
 
-  function selectTemplate(id: string, name: string) {
-    dispatch({ type: "flyout_signal_select", id, name });
+  function startNewScenario() {
+    dispatch({ type: "start_signal_flow" });
+  }
+
+  function openSignal() {
+    dispatch({ type: "sidebar_nav", section: "Сигналы" });
     onClose();
   }
 
-  function selectSignal(signalId: string) {
-    dispatch({ type: "campaign_from_signal", signalId });
+  function openCampaign(id: string) {
+    dispatch({ type: "campaign_opened", id });
     onClose();
   }
 
@@ -107,10 +153,11 @@ export function LaunchFlyout({ open, onClose }: LaunchFlyoutProps) {
       <aside
         ref={dialogRef}
         role="dialog"
-        aria-label="Запустить"
+        aria-label="Последнее"
         className="fixed inset-y-0 left-[120px] z-50 flex w-[360px] flex-col bg-card shadow-xl"
       >
-        <header className="flex items-center justify-end px-5 py-4">
+        <header className="flex items-center justify-between px-5 py-4">
+          <h2 className="text-sm font-semibold text-foreground">Последнее</h2>
           <button
             type="button"
             onClick={onClose}
@@ -127,75 +174,82 @@ export function LaunchFlyout({ open, onClose }: LaunchFlyoutProps) {
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Поиск"
-              aria-label="Поиск"
+              placeholder="Поиск по сигналам и кампаниям"
+              aria-label="Поиск по сигналам и кампаниям"
               className="pl-9"
             />
           </div>
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
+          {!normalized && (
+            <button
+              type="button"
+              onClick={startNewScenario}
+              className="mb-6 w-full rounded-lg border border-border bg-background px-3 py-3 text-left text-sm font-medium text-foreground transition-colors hover:border-brand/50 hover:bg-accent"
+            >
+              Запустить новый сценарий
+            </button>
+          )}
+
           {nothingFound ? (
             <p className="mt-8 text-center text-sm text-muted-foreground">
-              Ничего не найдено.
+              Ничего не нашлось. Измените запрос.
+            </p>
+          ) : recentEmpty ? (
+            <p className="mt-8 text-center text-sm text-muted-foreground">
+              Здесь появятся ваши сигналы и кампании.
             </p>
           ) : (
-            <>
-              {filteredTemplates.length > 0 && (
-                <section className="mb-2">
-                  <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-foreground">
-                    Новый сигнал
-                  </p>
-                  <div className="flex flex-col gap-2">
-                    {filteredTemplates.map((t) => (
-                      <button
-                        key={t.id}
-                        type="button"
-                        onClick={() => selectTemplate(t.id, t.title)}
-                        className="w-full rounded-lg border border-border p-3 text-left transition-colors hover:bg-accent"
-                      >
-                        <p className="text-sm font-medium text-foreground">{t.title}</p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">{t.description}</p>
-                      </button>
-                    ))}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => dispatch({ type: "catalog_open", returnTo: "launcher" })}
-                    className="mt-3 w-full rounded-lg border border-dashed border-border p-3 text-left text-sm text-muted-foreground transition-colors hover:border-brand/50 hover:bg-accent hover:text-foreground"
-                  >
-                    Все {scenarioCount} сценариев →
-                  </button>
-                </section>
-              )}
-
-              <section className="mt-6">
-                <p className="text-xs font-semibold uppercase tracking-widest text-foreground">
-                  Новая коммуникационная кампания
-                </p>
-                <p className="mt-1 mb-3 text-xs text-muted-foreground">
-                  Создать кампанию по готовому сигналу
-                </p>
-                {signals.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">
-                    Нет сигналов. Создайте сигнал в разделе Сигналы.
-                  </p>
-                ) : filteredSignals.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">
-                    Сигналы не подходят под запрос.
-                  </p>
-                ) : (
-                  <div className="flex flex-col gap-2">
-                    {filteredSignals.map((s) => (
-                      <SignalRow key={s.id} signal={s} onClick={selectSignal} />
-                    ))}
-                  </div>
+            <section>
+              <div className="flex flex-col gap-2">
+                {listToRender.map((it) =>
+                  it.kind === "signal" ? (
+                    <RecentRow
+                      key={`s-${it.signal.id}`}
+                      name={it.signal.type}
+                      statusLabel={SIGNAL_STATUS_LABEL[it.signal.status ?? "ready"]}
+                      statusDot={SIGNAL_DOT[it.signal.status ?? "ready"]}
+                      onClick={openSignal}
+                    />
+                  ) : (
+                    <RecentRow
+                      key={`c-${it.campaign.id}`}
+                      name={it.campaign.name}
+                      statusLabel={STATUS_LABELS[it.campaign.status]}
+                      statusDot={CAMPAIGN_DOT[it.campaign.status]}
+                      onClick={() => openCampaign(it.campaign.id)}
+                    />
+                  )
                 )}
-              </section>
-            </>
+              </div>
+            </section>
           )}
         </div>
       </aside>
     </>
+  );
+}
+
+interface RecentRowProps {
+  name: string;
+  statusLabel: string;
+  statusDot: string;
+  onClick: () => void;
+}
+
+function RecentRow({ name, statusLabel, statusDot, onClick }: RecentRowProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full items-center justify-between gap-3 rounded-lg border border-border px-3 py-2 text-left transition-colors hover:bg-accent"
+    >
+      <p className="truncate text-sm font-medium text-foreground">{name}</p>
+      <span className="inline-flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
+        <span className={cn("h-1.5 w-1.5 rounded-full", statusDot)} aria-hidden />
+        {statusLabel}
+      </span>
+    </button>
   );
 }

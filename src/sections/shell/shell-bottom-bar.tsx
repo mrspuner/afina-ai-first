@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { getNodeColor } from "@/sections/campaigns/node-visuals";
 import type { NodeTagPayload, PromptChip } from "@/state/prompt-chips-context";
-import { motion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import Image from "next/image";
 import { Mic } from "lucide-react";
 import type { PromptInputMessage } from "@/components/ai-elements/prompt-input";
@@ -21,12 +21,15 @@ import {
   ChipEditableInput,
   type ChipEditableInputHandle,
 } from "@/components/ai-elements/chip-editable-input";
-import { usePromptChips, isNodeTagPayload } from "@/state/prompt-chips-context";
+import {
+  usePromptChips,
+  isNodeTagPayload,
+  type ChipSegment,
+} from "@/state/prompt-chips-context";
 import { cn } from "@/lib/utils";
 import { useAppState, useAppDispatch } from "@/state/app-state-context";
 import {
   isOnWelcome,
-  isOnStatisticsSection,
   isWorkflowView,
   type View,
 } from "@/state/app-state";
@@ -36,13 +39,14 @@ import { decideEnterAction, APPLY_ALL_COMMAND } from "@/state/prompt-bar-enter";
 import { applyDraftToNode } from "@/state/apply-draft";
 import { useDraftQueue } from "@/state/draft-queue-context";
 import { useWelcomeChat } from "@/sections/welcome/welcome-chat-context";
-import { OnboardingChatChips } from "@/sections/welcome/onboarding-chat-view";
-import { CampaignsPromptChips } from "@/sections/campaigns/campaigns-prompt-chips";
+import { selectPromptSuggestions } from "@/state/select-prompt-suggestions";
+import type { SuggestionItem } from "@/state/suggestion-registry";
 import { PromptBar } from "./prompt-bar";
 import { SuggestionBar } from "./suggestion-bar";
 import { useChat } from "@/state/chat-context";
 import { DraftQueueList } from "./draft-queue-list";
 import { useChatSubmit } from "./use-chat-submit";
+import { useAiReplyAutoDismiss } from "./use-ai-reply-auto-dismiss";
 
 function AttachmentFileList() {
   const { files } = usePromptInputAttachments();
@@ -128,13 +132,14 @@ export function ShellBottomBar() {
   const {
     view,
     selectedWorkflowNode,
-    campaigns,
     wizardCurrentStep,
     budgetHelpShown,
+    aiReply,
   } = state;
+  useAiReplyAutoDismiss(aiReply, dispatch);
   const welcomeChat = useWelcomeChat();
   const chipsApi = usePromptChips();
-  const { drafts: draftsRef, clearQueue } = useDraftQueue();
+  const { drafts: draftsRef, clearQueue, parkDraft } = useDraftQueue();
   const { openSidebar } = useChat();
   // PromptInputProvider is mounted globally in page.tsx above ShellBottomBar,
   // so usePromptInputController() resolves here — the controller context is
@@ -142,6 +147,10 @@ export function ShellBottomBar() {
   const { textInput } = usePromptInputController();
 
   const editorRef = useRef<ChipEditableInputHandle>(null);
+
+  // Snapshot активного сегмента (тег + текст) — обновляется при изменении
+  // chips, нужен для парковки предыдущего тега при смене (M5/ТЗ §7.2).
+  const prevActiveRef = useRef<ChipSegment | null>(null);
 
   // M6: mirror the editor's single active tag/text into local flags so the
   // SuggestionBar (which picks welcome/context/apply-all) can react. The source
@@ -156,7 +165,25 @@ export function ShellBottomBar() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setActiveTag(seg ? seg.chip : null);
     setHasTypedText(seg ? seg.text.trim().length > 0 : false);
+    // Keep prevActiveRef snapshot fresh so parkPreviousIfNeeded picks up the
+    // latest (chip + currently-typed text) when the user switches tags.
+    if (seg) prevActiveRef.current = seg;
   }, [chipsApi.chips, textInput.value]);
+
+  /**
+   * Паркует предыдущий активный тег при смене тега (вызов из onTagSwap
+   * ChipEditableInput'а). Старый чип убираем ВСЕГДА: либо запаркован, либо
+   * затёрт. См. ТЗ §7.2 и `ChatComposer.parkPreviousIfNeeded`.
+   */
+  function parkPreviousIfNeeded() {
+    const prev = prevActiveRef.current;
+    if (!prev) return;
+    if (prev.text.trim().length > 0) {
+      parkDraft(prev.chip, prev.text);
+    }
+    chipsApi.removeChip(prev.chip.id);
+    prevActiveRef.current = null;
+  }
 
   function handlePromptSubmit(message: PromptInputMessage) {
     const rawText = message.text ?? "";
@@ -173,6 +200,7 @@ export function ShellBottomBar() {
       clearQueue();
       chipsApi.clearChips();
       editorRef.current?.clear();
+      prevActiveRef.current = null;
       return;
     }
 
@@ -231,6 +259,7 @@ export function ShellBottomBar() {
       });
       chipsApi.clearChips();
       editorRef.current?.clear();
+      prevActiveRef.current = null;
     }
     if (
       structural.ops.length === 0 &&
@@ -245,6 +274,35 @@ export function ShellBottomBar() {
     // sees the thinking animation before the result.
   }
 
+  function handlePickSuggestion(item: SuggestionItem) {
+    switch (item.action.kind) {
+      case "insert-text":
+        textInput.insertAtCursor(item.action.fullText, {
+          separator: "smart",
+          preserveTags: true,
+        });
+        return;
+      case "submit":
+        chatSubmit({ text: item.action.phrase, segments: [] });
+        editorRef.current?.clear();
+        chipsApi.clearChips();
+        return;
+      case "dispatch":
+        dispatch(item.action.action);
+        return;
+      case "chat-submit":
+        welcomeChat?.submitChip(item.action.chip);
+        return;
+      case "command":
+        if (item.action.command === "apply-all") {
+          chipsApi.clearChips();
+          editorRef.current?.clear();
+          textInput.insertAtCursor(APPLY_ALL_COMMAND, { separator: "none" });
+        }
+        return;
+    }
+  }
+
   const chatPlaceholder =
     isOnWelcome(state) ? "Задайте вопрос…" :
     isWorkflowView(state) ? "Опишите изменение сценария..." :
@@ -252,8 +310,6 @@ export function ShellBottomBar() {
     view.kind === "guided-signal" ? "Введите ваши параметры или задайте вопрос" :
     view.kind === "section" && (view.name === "Сигналы" || view.name === "Кампании") ? "Напишите, что вы хотите сделать" :
     "Выберите шаг или задайте вопрос…";
-
-  const onWelcome = isOnWelcome(state);
 
   return (
     <>
@@ -264,6 +320,31 @@ export function ShellBottomBar() {
         slot={
           <>
             <DraftQueueList variant="compact" onTakeDraft={() => {}} />
+            <AnimatePresence initial={false}>
+              {aiReply ? (
+                <motion.div
+                  key="ai-reply"
+                  initial={{ y: 6, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  exit={{ y: 6, opacity: 0 }}
+                  transition={{ duration: 0.26, ease: [0.23, 1, 0.32, 1] }}
+                  role="status"
+                  aria-live="polite"
+                  data-testid="ai-reply-slot"
+                  className="flex items-start gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/80"
+                >
+                  <Image
+                    src="/mascot-icon.svg"
+                    alt=""
+                    width={16}
+                    height={16}
+                    className="mt-0.5 shrink-0"
+                    aria-hidden
+                  />
+                  <span className="min-w-0 flex-1 leading-snug">{aiReply}</span>
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
             {view.kind === "guided-signal" &&
             wizardCurrentStep === 5 &&
             budgetHelpShown ? (
@@ -311,6 +392,7 @@ export function ShellBottomBar() {
             ref={editorRef}
             className="px-3 py-2"
             placeholder={chatPlaceholder}
+            onTagSwap={parkPreviousIfNeeded}
           />
           <PromptInputFooter>
             <PromptInputTools>
@@ -322,67 +404,14 @@ export function ShellBottomBar() {
           </PromptInputFooter>
         </PromptInput>
         <SuggestionBar
-          activeTag={activeTag}
-          hasTypedText={hasTypedText}
-          isWelcome={
-            onWelcome || (view.kind === "section" && view.name === "Кампании")
-          }
-          isStatistics={isOnStatisticsSection(state)}
-          welcomeSlot={
-            onWelcome && welcomeChat ? (
-              <OnboardingChatChips
-                chips={welcomeChat.chips}
-                onChipClick={welcomeChat.submitChip}
-              />
-            ) : view.kind === "section" &&
-              view.name === "Кампании" &&
-              campaigns.length > 0 ? (
-              <CampaignsPromptChips
-                onChipClick={(text) => {
-                  const { statuses, sort } = parseCampaignQuery(text);
-                  if (statuses.length > 0 || sort !== "default") {
-                    dispatch({ type: "campaigns_query_set", statuses, sort });
-                  }
-                }}
-              />
-            ) : null
-          }
-          onPickSuggestion={(fullText) => {
-            textInput.insertAtCursor(fullText, {
-              separator: "smart",
-              preserveTags: true,
-            });
-          }}
-          onPickApplyAll={() => {
-            chipsApi.clearChips();
-            editorRef.current?.clear();
-            textInput.insertAtCursor(APPLY_ALL_COMMAND, { separator: "none" });
-          }}
-          onPickStatsQuery={(phrase) => {
-            // Вставить фразу и тут же отправить через тот же путь, что Enter.
-            // chatSubmit маршрутизирует stats-запросы через useChatSubmit.
-            chatSubmit({ text: phrase, segments: [] });
-            editorRef.current?.clear();
-            chipsApi.clearChips();
-          }}
+          resolution={selectPromptSuggestions(state, {
+            activeTag,
+            hasTypedText,
+            queueLength: draftsRef.length,
+            welcomeChips: welcomeChat?.chips ?? [],
+          })}
+          onPick={(item) => handlePickSuggestion(item)}
         />
-        {view.kind === "guided-signal" &&
-          wizardCurrentStep === 5 &&
-          !budgetHelpShown && (
-            <div className="flex flex-wrap justify-start gap-2">
-              <motion.button
-                type="button"
-                onClick={() => dispatch({ type: "budget_help_shown" })}
-                initial={{ y: 6, opacity: 0, scale: 0.96 }}
-                animate={{ y: 0, opacity: 1, scale: 1 }}
-                transition={{ duration: 0.26, ease: [0.23, 1, 0.32, 1] }}
-                whileTap={{ scale: 0.97 }}
-                className="rounded-full border border-white/10 bg-[#171717] px-[13px] py-[7px] text-[12px] text-white transition-colors duration-150 ease-out hover:bg-[#1f1f1f]"
-              >
-                Как рассчитывается рекомендуемый бюджет?
-              </motion.button>
-            </div>
-          )}
       </PromptBar>
     </>
   );

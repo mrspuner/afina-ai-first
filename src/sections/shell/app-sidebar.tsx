@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import {
-  CirclePlus,
+  Search,
   Bell,
   Megaphone,
   BarChart2,
@@ -61,13 +61,13 @@ export function AppSidebar({
         </button>
 
         <nav className="flex flex-col gap-6 px-2">
-          {/* Запустить */}
+          {/* Последнее */}
           <button
             onClick={onLaunchOpen}
             className="flex h-[68px] flex-col items-center gap-1 rounded-md py-3 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
           >
-            <CirclePlus className="h-6 w-6" />
-            <span className="text-xs font-medium">Запустить</span>
+            <Search className="h-6 w-6" />
+            <span className="text-xs font-medium">Последнее</span>
           </button>
 
           {/* Основная навигация */}

@@ -43,19 +43,12 @@ export function CampaignScreen() {
           </p>
         </section>
 
-        {/* Block 2 — workflow mini preview */}
+        {/* Block 2 — workflow mini preview (clickable, opens workflow view) */}
         <section className="rounded-xl border border-border bg-card p-5">
           <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
             Workflow
           </p>
-          <div className="flex items-center gap-3">
-            <div className="flex-1">
-              <WorkflowMiniPreview signalType={signalType} />
-            </div>
-            <Button variant="outline" onClick={openWorkflow}>
-              Открыть workflow →
-            </Button>
-          </div>
+          <WorkflowMiniPreview signalType={signalType} onClick={openWorkflow} />
         </section>
 
         {/* Block 3 — providers */}

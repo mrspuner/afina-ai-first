@@ -1,14 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion } from "motion/react";
-import { ArrowLeft, X } from "lucide-react";
-import Image from "next/image";
-import { Button } from "@/components/ui/button";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useAppState, useAppDispatch } from "@/state/app-state-context";
 import { CanvasHeader, type CanvasHeaderToast } from "./canvas-header";
 import { WorkflowView } from "./workflow-view";
-import { TopUpModal, computeShortfall } from "@/sections/signals/top-up-modal";
 import { validateWorkflow } from "@/state/workflow-validation";
 import { normalizeNodeRef } from "@/state/structural-commands";
 import type {
@@ -26,7 +21,6 @@ const ERROR_TEXT: Record<string, string> = {
 };
 
 const TOAST_TIMEOUT_MS = 3000;
-const AI_REPLY_TIMEOUT_MS = 5000;
 
 export function WorkflowSection() {
   const {
@@ -36,10 +30,8 @@ export function WorkflowSection() {
     workflowStructuralCommands,
     workflowNodeFieldPatch,
     selectedWorkflowNode,
-    aiReply,
     signals,
     campaigns,
-    balance,
   } = useAppState();
   const dispatch = useAppDispatch();
 
@@ -47,13 +39,6 @@ export function WorkflowSection() {
   const [graphTick, setGraphTick] = useState(0);
   const [toast, setToast] = useState<CanvasHeaderToast | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const aiReplyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [topUpOpen, setTopUpOpen] = useState(false);
-
-  // Flat prototype cost for launching a campaign — keeps the create-entity →
-  // balance-check → top-up → launch mechanic identical between signals and
-  // campaigns, per spec.
-  const CAMPAIGN_LAUNCH_COST = 500;
 
   const handleCommandHandled = useCallback(
     () => dispatch({ type: "workflow_command_handled" }),
@@ -101,17 +86,6 @@ export function WorkflowSection() {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToast(null);
   }, []);
-
-  useEffect(() => {
-    if (!aiReply) return;
-    if (aiReplyTimerRef.current) clearTimeout(aiReplyTimerRef.current);
-    aiReplyTimerRef.current = setTimeout(() => {
-      dispatch({ type: "ai_reply_dismissed" });
-    }, AI_REPLY_TIMEOUT_MS);
-    return () => {
-      if (aiReplyTimerRef.current) clearTimeout(aiReplyTimerRef.current);
-    };
-  }, [aiReply, dispatch]);
 
   // Resolve node-commands to node ids via the current graph snapshot. A command
   // may carry an explicit `nodeId` (node-field/whole-node tag chips from the
@@ -175,27 +149,13 @@ export function WorkflowSection() {
       });
       return;
     }
-    // Reuse signal-flow mechanic: balance check → top-up modal → launch.
-    if (computeShortfall(balance, CAMPAIGN_LAUNCH_COST) > 0) {
-      setTopUpOpen(true);
-      return;
-    }
+    // Validation passed — payment (budget + balance) now happens on the
+    // dedicated CampaignPaymentScreen. canvas-header "Запустить" becomes a
+    // routing hop, not a launch.
     dispatch({
-      type: "campaign_launched",
-      id: currentCampaign.id,
-      timestamp: new Date().toISOString(),
+      type: "open_campaign_payment",
+      campaignId: currentCampaign.id,
     });
-  }
-
-  function handleCampaignTopUpSuccess(amount: number) {
-    if (!currentCampaign) return;
-    dispatch({ type: "balance_topup", amount });
-    dispatch({
-      type: "campaign_launched",
-      id: currentCampaign.id,
-      timestamp: new Date().toISOString(),
-    });
-    setTopUpOpen(false);
   }
 
   function handleSchedule(iso: string) {
@@ -253,30 +213,28 @@ export function WorkflowSection() {
 
   return (
     <div className="relative flex flex-1 flex-col">
-      {view.launched ? (
-        <ReadOnlyWorkflowHeader
-          campaignName={currentCampaign.name}
-          onBack={() =>
-            dispatch({ type: "campaign_opened", id: currentCampaign.id })
-          }
-        />
-      ) : (
-        <CanvasHeader
-          campaign={currentCampaign}
-          signal={currentSignal}
-          onRename={handleRename}
-          onSaveDraft={handleSaveDraft}
-          onLaunch={handleLaunch}
-          onSchedule={handleSchedule}
-          onPause={handlePause}
-          onResume={handleResume}
-          onDuplicate={handleDuplicate}
-          onGoToStats={handleGoToStats}
-          onCancelSchedule={handleCancelSchedule}
-          toast={toast}
-          onDismissToast={dismissToast}
-        />
-      )}
+      <CanvasHeader
+        campaign={currentCampaign}
+        signal={currentSignal}
+        onRename={handleRename}
+        onSaveDraft={handleSaveDraft}
+        onLaunch={handleLaunch}
+        onSchedule={handleSchedule}
+        onPause={handlePause}
+        onResume={handleResume}
+        onDuplicate={handleDuplicate}
+        onGoToStats={handleGoToStats}
+        onCancelSchedule={handleCancelSchedule}
+        toast={toast}
+        onDismissToast={dismissToast}
+        mode={view.launched ? "read-only" : "edit"}
+        onBack={
+          view.launched
+            ? () =>
+                dispatch({ type: "campaign_opened", id: currentCampaign.id })
+            : undefined
+        }
+      />
       <div className="relative flex flex-1 flex-col overflow-hidden">
         <WorkflowView
           key={currentCampaign.id}
@@ -299,73 +257,6 @@ export function WorkflowSection() {
         />
       </div>
 
-      <TopUpModal
-        open={topUpOpen}
-        onOpenChange={setTopUpOpen}
-        balance={balance}
-        cost={CAMPAIGN_LAUNCH_COST}
-        entityLabel={currentCampaign ? currentCampaign.name : undefined}
-        onPaymentSuccess={handleCampaignTopUpSuccess}
-      />
-
-      <AnimatePresence>
-        {aiReply && (
-          <motion.div
-            key="ai-reply"
-            initial={{ y: 10, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 10, opacity: 0 }}
-            transition={{ duration: 0.25, ease: [0.32, 0.72, 0, 1] }}
-            className="pointer-events-auto fixed left-[120px] right-0 z-30 px-8"
-            style={{ bottom: "calc(var(--promptbar-height, 140px) + 8px)" }}
-          >
-            <div
-              role="status"
-              aria-live="polite"
-              className="mx-auto flex w-full max-w-2xl items-start gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/80 backdrop-blur-sm"
-            >
-              <Image
-                src="/mascot-icon.svg"
-                alt=""
-                width={16}
-                height={16}
-                className="mt-0.5 shrink-0"
-                aria-hidden
-              />
-              <span className="min-w-0 flex-1 leading-snug">{aiReply}</span>
-              <button
-                type="button"
-                aria-label="Закрыть ответ AI"
-                onClick={() => dispatch({ type: "ai_reply_dismissed" })}
-                className="-mr-1 rounded-md p-1 text-white/50 transition-colors hover:bg-white/10 hover:text-white/80"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
-function ReadOnlyWorkflowHeader({
-  campaignName,
-  onBack,
-}: {
-  campaignName: string;
-  onBack: () => void;
-}) {
-  return (
-    <div className="flex items-center gap-3 border-b border-border px-8 py-4">
-      <Button variant="ghost" size="sm" onClick={onBack} aria-label="Назад">
-        <ArrowLeft className="h-4 w-4" />
-        Назад
-      </Button>
-      <span className="text-sm font-medium text-foreground">{campaignName}</span>
-      <span className="text-xs uppercase tracking-widest text-muted-foreground">
-        · workflow · просмотр
-      </span>
     </div>
   );
 }

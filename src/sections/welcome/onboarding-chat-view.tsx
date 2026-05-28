@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { cn } from "@/lib/utils";
-import type { Chip, Msg } from "./onboarding-chat";
+import type { Msg } from "./onboarding-chat";
 
 const BUBBLE_EASE = [0.32, 0.72, 0, 1] as const;
 const CONTENT_EASE = [0.23, 1, 0.32, 1] as const;
@@ -104,37 +104,3 @@ export function OnboardingChatHistory({ history }: { history: Msg[] }) {
   );
 }
 
-export function OnboardingChatChips({
-  chips,
-  onChipClick,
-}: {
-  chips: Chip[];
-  onChipClick: (chip: Chip) => void;
-}) {
-  return (
-    <div className="flex min-h-[30px] flex-wrap justify-start gap-2">
-      <AnimatePresence initial={false} mode="popLayout">
-        {chips.map((c, i) => (
-          <motion.button
-            key={c.id}
-            layout
-            type="button"
-            onClick={() => onChipClick(c)}
-            initial={{ y: 6, opacity: 0, scale: 0.96 }}
-            animate={{ y: 0, opacity: 1, scale: 1 }}
-            exit={{ y: -6, opacity: 0, scale: 0.96 }}
-            transition={{
-              duration: 0.26,
-              ease: CONTENT_EASE,
-              delay: i * 0.04,
-            }}
-            whileTap={{ scale: 0.97 }}
-            className="rounded-full border border-white/10 bg-[#171717] px-[13px] py-[7px] text-[12px] text-white transition-colors duration-150 ease-out hover:bg-[#1f1f1f]"
-          >
-            {c.label}
-          </motion.button>
-        ))}
-      </AnimatePresence>
-    </div>
-  );
-}

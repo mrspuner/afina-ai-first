@@ -1,5 +1,6 @@
 "use client";
 
+import { AnimatePresence, motion } from "motion/react";
 import { PromptInputProvider } from "@/components/ai-elements/prompt-input";
 import { PromptChipsProvider } from "@/state/prompt-chips-context";
 import { ChatProvider } from "@/state/chat-context";
@@ -22,11 +23,11 @@ import { SignalsSection } from "@/sections/signals/signals-section";
 import { CampaignsSection } from "@/sections/campaigns/campaigns-section";
 import { CampaignTypeView } from "@/sections/campaigns/campaign-type-view";
 import { WorkflowSection } from "@/sections/campaigns/workflow-section";
+import { CampaignPaymentScreen } from "@/sections/campaigns/campaign-payment-screen";
 import { CampaignScreen } from "@/sections/campaigns/campaign-screen";
 import { StatisticsSection } from "@/sections/statistics/statistics-section";
 import { SettingsSection } from "@/sections/settings/settings-section";
 import { DevPanel } from "@/components/dev/dev-panel";
-import { AnimatePresence, motion } from "motion/react";
 
 const SHELL_EASE = [0.32, 0.72, 0, 1] as const;
 
@@ -57,7 +58,7 @@ export default function Home() {
       return (
         <SurveySection
           withOnboardingScreens
-          onComplete={() => { /* catalog open routes the user from here */ }}
+          onComplete={() => { /* start_signal_flow routes the user from here */ }}
         />
       );
     }
@@ -72,6 +73,7 @@ export default function Home() {
         />
       );
     if (view.kind === "workflow") return <WorkflowSection />;
+    if (view.kind === "campaign-payment") return <CampaignPaymentScreen />;
     if (view.kind === "campaign") return <CampaignScreen />;
     if (view.kind === "section") {
       if (view.name === "Статистика") return <StatisticsSection />;
