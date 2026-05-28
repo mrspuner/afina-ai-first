@@ -93,21 +93,22 @@ function FirstTimeHero({ onOpenSurvey }: { onOpenSurvey: () => void }) {
         </p>
       </div>
 
-      <OnboardingStepCards />
+      <div className="flex w-full flex-col items-start gap-3">
+        <OnboardingStepCards />
 
-      <div className="flex w-full flex-row items-center gap-4 rounded-lg border border-border bg-card p-5">
-        <div className="flex flex-1 flex-col gap-1.5">
-          <h2 className="text-sm font-medium text-foreground">
-            Подберём сценарии под ваш бизнес
-          </h2>
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            Расскажите о себе за минуту — и афина предложит сценарии, которые
-            подойдут именно вашей кампании.
-          </p>
+        <div className="flex w-full flex-row items-center gap-4 rounded-lg border border-border bg-card p-5">
+          <div className="flex flex-1 flex-col gap-2">
+            <h2 className="text-base font-medium text-foreground">
+              Подберём сценарии под ваш бизнес
+            </h2>
+            <p className="text-sm leading-relaxed text-foreground/70">
+              За минуту афина предложит сценарии под вашу кампанию.
+            </p>
+          </div>
+          <Button onClick={onOpenSurvey} className="shrink-0">
+            Расскажите о себе
+          </Button>
         </div>
-        <Button onClick={onOpenSurvey} className="shrink-0">
-          Расскажите о себе
-        </Button>
       </div>
     </>
   );

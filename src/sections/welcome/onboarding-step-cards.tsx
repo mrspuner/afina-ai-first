@@ -43,10 +43,10 @@ export function OnboardingStepCards() {
     <div className="grid w-full grid-cols-3 gap-3">
       {PLATES.map((plate, i) => (
         <div key={plate.heading} className={plateClass()} style={staggerStyle(i)}>
-          <span className="text-sm font-medium text-foreground">
+          <span className="text-base font-medium text-foreground">
             {plate.heading}
           </span>
-          <span className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+          <span className="mt-2 text-sm leading-relaxed text-muted-foreground">
             {plate.description}
           </span>
         </div>
