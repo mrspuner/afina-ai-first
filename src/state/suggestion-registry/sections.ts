@@ -42,14 +42,6 @@ const CAMPAIGN_FILTER_CHIPS: Record<CampaignStatus, SuggestionItem> = {
       action: { type: "campaigns_query_set", statuses: ["paused"], sort: "default" },
     },
   },
-  scheduled: {
-    id: "sec-camp-scheduled",
-    label: "Запланированные",
-    action: {
-      kind: "dispatch",
-      action: { type: "campaigns_query_set", statuses: ["scheduled"], sort: "default" },
-    },
-  },
   completed: {
     id: "sec-camp-completed",
     label: "Завершённые",
@@ -112,7 +104,6 @@ function resolveCampaigns(s: CampaignsSub): SuggestionItem[] {
   const filterChips = (
     [
       "active",
-      "scheduled",
       "paused",
       "completed",
       "draft",
