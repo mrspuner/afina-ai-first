@@ -112,6 +112,7 @@ export function InlineEditableTitle({
     return (
       <input
         ref={inputRef}
+        aria-label="Название"
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}
