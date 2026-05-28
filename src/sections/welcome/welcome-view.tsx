@@ -47,7 +47,7 @@ export function WelcomeView({ chat }: { chat: OnboardingChatState }) {
                 initial={false}
                 exit={{ opacity: 0, y: -20, filter: "blur(10px)" }}
                 transition={{ duration: 0.42, ease: HERO_EASE }}
-                className="flex w-full flex-col items-start gap-8"
+                className="flex w-full flex-col items-start gap-5"
               >
                 {surveyCompleted ? (
                   <ReturningHero
@@ -83,20 +83,15 @@ function FirstTimeHero({ onOpenSurvey }: { onOpenSurvey: () => void }) {
           Добро пожаловать в афина
         </h1>
         <p className="text-[16px] leading-[22px] text-muted-foreground">
-          афина работает сценариями. Сценарий — это готовый план работы с
-          вашей аудиторией: он находит нужных клиентов, запускает кампанию и
-          показывает результат.
-        </p>
-        <p className="text-[16px] leading-[22px] text-muted-foreground">
-          Каждый сценарий состоит из трёх частей — сигнал, кампания и
-          статистика. Вот как это устроено:
+          афина работает сценариями — готовыми планами работы с вашей
+          аудиторией. Сценарий делится на три составляющие:
         </p>
       </div>
 
       <div className="flex w-full flex-col items-start gap-3">
         <OnboardingStepCards />
 
-        <div className="flex w-full flex-row items-center gap-4 rounded-lg border border-border bg-card p-5">
+        <div className="flex w-full flex-row items-center gap-4 rounded-lg border border-brand/30 bg-brand-muted p-6">
           <div className="flex flex-1 flex-col gap-2">
             <h2 className="text-base font-medium text-foreground">
               Подберём сценарии под ваш бизнес
