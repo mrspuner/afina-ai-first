@@ -103,7 +103,7 @@ export function SignalCard({
         <div className="flex items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-sm font-semibold text-foreground">
-              {type} · {formatNumber(count)}
+              {signal.name ?? type} · {formatNumber(count)}
             </p>
             {signal.isCustom && <Badge variant="secondary">Пользовательский</Badge>}
             {!isReady && (

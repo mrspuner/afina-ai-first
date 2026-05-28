@@ -46,7 +46,7 @@ export function SignalScreen() {
 
   function handleDownload() {
     // Prototype: a real backend would emit a CSV here.
-    console.log("download signal", signal.id);
+    console.log("download signal", signal!.id);
     window.alert(
       `Скачивание ${formatNumber(total)} сигналов (CSV) — в прототипе симулировано.`,
     );
