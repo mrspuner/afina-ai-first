@@ -1,5 +1,6 @@
 "use client";
 
+import { AnimatePresence, motion } from "motion/react";
 import { PromptInputProvider } from "@/components/ai-elements/prompt-input";
 import { PromptChipsProvider } from "@/state/prompt-chips-context";
 import { ChatProvider } from "@/state/chat-context";
@@ -8,8 +9,6 @@ import { DraftQueueProvider } from "@/state/draft-queue-context";
 import { ChatPanel } from "@/sections/shell/chat-panel";
 import { ChatDrawer } from "@/sections/shell/chat-drawer";
 import { useAppState, useAppDispatch } from "@/state/app-state-context";
-import { isOnboarding } from "@/state/app-state";
-import { AnimatePresence, motion } from "motion/react";
 import { useChat } from "@/state/chat-context";
 import { AppSidebar } from "@/sections/shell/app-sidebar";
 import { LaunchFlyout } from "@/sections/shell/launch-flyout";
@@ -29,12 +28,7 @@ import { StatisticsSection } from "@/sections/statistics/statistics-section";
 import { SettingsSection } from "@/sections/settings/settings-section";
 import { DevPanel } from "@/components/dev/dev-panel";
 
-/**
- * Same exponential curve as HERO_EASE in welcome-view.tsx — exit/enter the
- * chrome with no bounce and a duration that matches the welcome hero swap.
- */
-const CHROME_EASE = [0.32, 0.72, 0, 1] as const;
-const CHROME_DURATION = 0.42;
+const SHELL_EASE = [0.32, 0.72, 0, 1] as const;
 
 function BottomBarSlot() {
   const { view } = useAppState();
@@ -49,28 +43,23 @@ function BottomBarSlot() {
 }
 
 export default function Home() {
-  const state = useAppState();
-  const { view, launchFlyoutOpen, activeSection, surveyStatus } = state;
-  const onboarding = isOnboarding(state);
+  const { view, launchFlyoutOpen, activeSection } = useAppState();
   const dispatch = useAppDispatch();
   const welcomeChat = useOnboardingChat();
 
+  const isSurveyFullscreen = view.kind === "survey";
+
   function renderMain() {
     if (view.kind === "welcome") {
-      // First-entry 3-screen onboarding: site → enrich → interests →
-      // scenarios → wizard step-1. Skippable; once completed or skipped,
-      // surveyStatus closes the gate and we render WelcomeSection.
-      if (surveyStatus === "not_started") {
-        return (
-          <SurveySection
-            skippable
-            withOnboardingScreens
-            onComplete={() => { /* start_signal_flow routes the user from here */ }}
-            onSkip={() => { /* survey_skipped re-renders WelcomeSection */ }}
-          />
-        );
-      }
       return <WelcomeSection />;
+    }
+    if (view.kind === "survey") {
+      return (
+        <SurveySection
+          withOnboardingScreens
+          onComplete={() => { /* start_signal_flow routes the user from here */ }}
+        />
+      );
     }
     if (view.kind === "guided-signal" || view.kind === "awaiting-campaign")
       return <GuidedSignalSection />;
@@ -103,13 +92,13 @@ export default function Home() {
         <TriggerEditRegistryProvider>
         <div className="flex h-screen overflow-hidden bg-background">
           <AnimatePresence initial={false}>
-            {!onboarding && (
+            {!isSurveyFullscreen && (
               <motion.div
-                key="app-sidebar"
-                initial={{ opacity: 0, x: -24 }}
+                key="sidebar"
+                initial={{ opacity: 0, x: -16 }}
                 animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -24 }}
-                transition={{ duration: CHROME_DURATION, ease: CHROME_EASE }}
+                exit={{ opacity: 0, x: -16 }}
+                transition={{ duration: 0.28, ease: SHELL_EASE }}
               >
                 <AppSidebar
                   activeNav={activeSection ?? undefined}
@@ -121,22 +110,33 @@ export default function Home() {
               </motion.div>
             )}
           </AnimatePresence>
-          {!onboarding && (
+          {!isSurveyFullscreen && (
             <LaunchFlyout
               open={launchFlyoutOpen}
               onClose={() => dispatch({ type: "flyout_close" })}
             />
           )}
           <div className="relative flex flex-1 flex-col overflow-hidden">
-            {renderMain()}
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={view.kind}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.26, ease: SHELL_EASE }}
+                className="flex flex-1 flex-col overflow-hidden"
+              >
+                {renderMain()}
+              </motion.div>
+            </AnimatePresence>
             <AnimatePresence initial={false}>
-              {!onboarding && (
+              {!isSurveyFullscreen && (
                 <motion.div
                   key="bottom-bar"
-                  initial={{ opacity: 0, y: 16 }}
+                  initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 16 }}
-                  transition={{ duration: CHROME_DURATION, ease: CHROME_EASE }}
+                  exit={{ opacity: 0, y: 12 }}
+                  transition={{ duration: 0.28, ease: SHELL_EASE }}
                 >
                   <BottomBarSlot />
                 </motion.div>

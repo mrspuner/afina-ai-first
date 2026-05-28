@@ -102,6 +102,7 @@ export type SectionName = "Статистика" | "Сигналы" | "Камп�
 
 export type View =
   | { kind: "welcome" }
+  | { kind: "survey" }
   | { kind: "guided-signal"; initialScenario?: { id: string; name: string } }
   | { kind: "awaiting-campaign" }
   | { kind: "campaign-select" }
@@ -229,7 +230,7 @@ export type Action =
   | { type: "client_direction_set"; direction: string }
   | { type: "survey_updated"; patch: Partial<Survey> }
   | { type: "survey_completed"; survey: Survey }
-  | { type: "survey_skipped" }
+  | { type: "open_survey" }
   | { type: "survey_reset" }
   | { type: "settings_updated"; patch: Partial<AccountSettings> }
   | { type: "dev_survey_force_complete" }
@@ -676,8 +677,8 @@ export function appReducer(state: AppState, action: Action): AppState {
         clientDirection: businessDirectionFromSurvey(action.survey.directionId),
       };
 
-    case "survey_skipped":
-      return { ...state, surveyStatus: "skipped" };
+    case "open_survey":
+      return { ...state, view: { kind: "survey" } };
 
     case "survey_reset":
       return {
@@ -890,6 +891,9 @@ function rebuildViewFromAddress(addr: ViewAddress, campaigns: Campaign[]): View 
 export function viewToAddress(view: View): ViewAddress {
   switch (view.kind) {
     case "welcome":
+    case "survey":
+      // Survey — транзиентный fullscreen-стейт; back/forward не должен
+      // возвращать пользователя в survey как отдельный URL — мапим в welcome.
       return { kind: "welcome" };
     case "guided-signal":
       return {
@@ -927,15 +931,3 @@ export const isWorkflowView = (s: AppState) => s.view.kind === "workflow";
 export const isOnWelcome = (s: AppState) => s.view.kind === "welcome";
 export const isOnStatisticsSection = (s: AppState): boolean =>
   s.view.kind === "section" && s.view.name === "Статистика";
-
-/**
- * True while the first-entry onboarding (survey → interests → scenarios) is
- * in flight. Sidebar and PromptBar are hidden during this window; once the
- * user completes or skips, surveyStatus moves off "not_started" and the
- * predicate flips to false.
- *
- * Mirrors the implicit gate in `src/app/page.tsx` that picks between
- * `SurveySection` and `WelcomeSection`; keep them in sync.
- */
-export const isOnboarding = (s: AppState): boolean =>
-  s.view.kind === "welcome" && s.surveyStatus === "not_started";

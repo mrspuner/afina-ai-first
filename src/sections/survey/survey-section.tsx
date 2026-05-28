@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import { ArrowLeft } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { useAppDispatch } from "@/state/app-state-context";
 import type { Survey } from "@/types/survey";
 
@@ -18,14 +20,10 @@ type Phase =
   | { kind: "scenarios"; survey: Survey };
 
 interface SurveySectionProps {
-  // First-visit entry can offer "Пропустить"; gate before the wizard cannot.
-  skippable: boolean;
   // Called once the user finishes onboarding. The first-visit flow opens the
   // scenario catalog from inside this section; gate-mode flows just need the
   // user handed off to the wizard. The caller decides what to do next.
   onComplete: () => void;
-  // Optional: invoked on skip. Required iff `skippable`.
-  onSkip?: () => void;
   // When true, run the full 3-screen onboarding (form → enrich → interests →
   // scenarios → caller). When false (legacy gate before the wizard), stop
   // after the enrich animation and hand off to the wizard.
@@ -35,9 +33,7 @@ interface SurveySectionProps {
 }
 
 export function SurveySection({
-  skippable,
   onComplete,
-  onSkip,
   withOnboardingScreens = false,
   title,
   subtitle,
@@ -45,26 +41,26 @@ export function SurveySection({
   const dispatch = useAppDispatch();
   const [phase, setPhase] = useState<Phase>({ kind: "form" });
 
+  // Escape exits fullscreen survey — sidebar/promptbar are hidden, so without
+  // it the user is trapped until completion.
+  useEffect(() => {
+    function handler(e: KeyboardEvent) {
+      if (e.key === "Escape") dispatch({ type: "go_welcome" });
+    }
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [dispatch]);
+
   function handleSubmit(survey: Survey) {
     setPhase({ kind: "awaiting", survey });
-  }
-
-  function handleSkip() {
-    if (!skippable) return;
-    dispatch({ type: "survey_skipped" });
-    onSkip?.();
   }
 
   function handleAwaitingDone() {
     if (phase.kind !== "awaiting") return;
     if (withOnboardingScreens) {
-      // Move into the 3-screen onboarding. surveyStatus is committed only
-      // once the user actually reaches the scenarios screen, so refreshing
-      // mid-onboarding restarts cleanly.
       setPhase({ kind: "interests", survey: phase.survey });
       return;
     }
-    // Gate-mode: enrichment is the last step — commit survey + hand off.
     dispatch({ type: "survey_completed", survey: phase.survey });
     onComplete();
   }
@@ -82,7 +78,24 @@ export function SurveySection({
   }
 
   return (
-    <div className="flex flex-1 items-center justify-center px-8 pb-16 pt-[120px]">
+    <div className="relative flex flex-1 items-center justify-center px-8 pb-16 pt-[120px]">
+      <motion.div
+        initial={{ opacity: 0, x: -8 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.28, delay: 0.15, ease: [0.32, 0.72, 0, 1] }}
+        className="absolute left-6 top-6"
+      >
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => dispatch({ type: "go_welcome" })}
+          aria-label="Вернуться на главную"
+          className="text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Назад
+        </Button>
+      </motion.div>
       <AnimatePresence mode="wait">
         {phase.kind === "form" && (
           <motion.div
@@ -94,9 +107,7 @@ export function SurveySection({
             className="flex w-full justify-center"
           >
             <SurveyForm
-              skippable={skippable}
               onSubmit={handleSubmit}
-              onSkip={skippable ? handleSkip : undefined}
               title={title}
               subtitle={subtitle}
             />

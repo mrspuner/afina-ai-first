@@ -19,10 +19,4 @@ describe("shouldShowSurveyGate", () => {
       shouldShowSurveyGate({ surveyStatus: "not_started", isResuming: true })
     ).toBe(false);
   });
-
-  it("treats a skipped survey as still needing the site screen", () => {
-    expect(
-      shouldShowSurveyGate({ surveyStatus: "skipped", isResuming: false })
-    ).toBe(true);
-  });
 });

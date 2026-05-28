@@ -222,9 +222,6 @@ export function GuidedSignalSection() {
   if (showSurvey) {
     return (
       <SurveySection
-        // Mandatory at this entry point — spec: skip is only available on
-        // first visit (start screen).
-        skippable={false}
         onComplete={() => setGatePassed(true)}
       />
     );
