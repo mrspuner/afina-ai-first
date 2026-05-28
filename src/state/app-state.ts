@@ -6,7 +6,7 @@ import { EMPTY_SURVEY } from "@/types/survey";
 import type { SignalStatus } from "@/types/signal-status";
 import type { StepData } from "@/types/campaign";
 import type { NodeParams } from "@/types/workflow";
-import { SCENARIOS } from "@/data/scenarios";
+import { scenarioNameForSignal, defaultCampaignName } from "./scenario-display";
 import {
   DEFAULT_DIRECTION_ID,
   businessDirectionFromSurvey,
@@ -45,6 +45,8 @@ export const SIGNAL_TYPES = [
 export type Signal = {
   id: string;
   type: SignalType;
+  // User-editable display name; falls back to `type` when absent.
+  name?: string;
   count: number;
   segments: {
     max: number;
@@ -88,6 +90,7 @@ export type Campaign = {
    * (campaign-screen) keep working when the field is absent.
    */
   budget?: number;
+  scenario?: { id: string; name: string };
 };
 
 export type Preset = {
@@ -108,6 +111,7 @@ export type View =
   | { kind: "workflow"; campaign: { id: string; name: string }; launched: boolean }
   | { kind: "campaign-payment"; campaign: { id: string; name: string } }
   | { kind: "campaign"; campaign: { id: string; name: string } }
+  | { kind: "signal"; signal: { id: string } }
   | { kind: "section"; name: SectionName; campaignId?: string };
 
 // A "browser-history address" — what we persist to history.state so back/forward
@@ -122,6 +126,7 @@ export type ViewAddress =
   | { kind: "workflow"; campaignId: string }
   | { kind: "campaign-payment"; campaignId: string }
   | { kind: "campaign"; campaignId: string }
+  | { kind: "signal"; signalId: string }
   | { kind: "section"; name: SectionName; campaignId?: string };
 
 export type AppState = {
@@ -235,6 +240,8 @@ export type Action =
   | { type: "balance_topup"; amount: number }
   | { type: "signal_status_changed"; id: string; status: SignalStatus }
   | { type: "signal_deleted"; id: string }
+  | { type: "signal_opened"; id: string }
+  | { type: "signal_renamed"; id: string; name: string }
   | { type: "signals_badge_set"; value: boolean }
   | { type: "resume_signal_in_wizard"; signalId: string }
   | { type: "resume_signal_in_wizard_handled" }
@@ -329,11 +336,10 @@ export function appReducer(state: AppState, action: Action): AppState {
           activeSection: null,
         };
       }
-      const scenarioId = latestSignal.wizardData?.scenario ?? null;
-      const scenario = scenarioId
-        ? SCENARIOS.find((s) => s.id === scenarioId)
-        : null;
-      const campaignName = scenario?.name ?? "Новая кампания";
+      const scenarioName = scenarioNameForSignal(latestSignal);
+      const n =
+        state.campaigns.filter((c) => c.signalId === latestSignal.id).length + 1;
+      const campaignName = defaultCampaignName(scenarioName, n);
       const campaignId = `cmp_${nanoid(6)}`;
       const newCampaign: Campaign = {
         id: campaignId,
@@ -341,6 +347,7 @@ export function appReducer(state: AppState, action: Action): AppState {
         signalId: latestSignal.id,
         status: "draft",
         createdAt: new Date().toISOString(),
+        scenario: { id: latestSignal.wizardData?.scenario ?? "", name: scenarioName },
       };
       return {
         ...state,
@@ -399,12 +406,14 @@ export function appReducer(state: AppState, action: Action): AppState {
       if (!signal) return state;
       const n =
         state.campaigns.filter((c) => c.signalId === signal.id).length + 1;
+      const scenarioName = scenarioNameForSignal(signal);
       const newCampaign: Campaign = {
         id: `cmp_${nanoid(6)}`,
-        name: `${signal.type} #${n}`,
+        name: defaultCampaignName(scenarioName, n),
         signalId: signal.id,
         status: "draft",
         createdAt: new Date().toISOString(),
+        scenario: { id: signal.wizardData?.scenario ?? "", name: scenarioName },
       };
       return {
         ...state,
@@ -423,15 +432,11 @@ export function appReducer(state: AppState, action: Action): AppState {
     case "campaign_opened": {
       const c = state.campaigns.find((cc) => cc.id === action.id);
       if (!c) return state;
-      const launched =
-        c.status === "active" || c.status === "paused" || c.status === "completed";
-      // Launched campaigns route to the new campaign feed; drafts
-      // still go straight into the workflow editor (existing behaviour).
+      // Every status now lands on the campaign card; the card decides the
+      // next step (workflow, payment, stats, duplicate).
       return {
         ...state,
-        view: launched
-          ? { kind: "campaign", campaign: { id: c.id, name: c.name } }
-          : { kind: "workflow", campaign: { id: c.id, name: c.name }, launched: false },
+        view: { kind: "campaign", campaign: { id: c.id, name: c.name } },
         activeSection: null,
         campaignFilter: [],
         campaignSort: "default",
@@ -502,6 +507,7 @@ export function appReducer(state: AppState, action: Action): AppState {
         signalId: original.signalId,
         status: "draft",
         createdAt: new Date().toISOString(),
+        scenario: original.scenario,
       };
       return {
         ...state,
@@ -749,6 +755,28 @@ export function appReducer(state: AppState, action: Action): AppState {
         signals: state.signals.filter((s) => s.id !== action.id),
       };
 
+    case "signal_opened": {
+      const s = state.signals.find((ss) => ss.id === action.id);
+      if (!s) return state;
+      return {
+        ...state,
+        view: { kind: "signal", signal: { id: s.id } },
+        activeSection: null,
+      };
+    }
+
+    case "signal_renamed": {
+      const name = action.name.trim();
+      if (!name) return state;
+      if (!state.signals.some((s) => s.id === action.id)) return state;
+      return {
+        ...state,
+        signals: state.signals.map((s) =>
+          s.id === action.id ? { ...s, name } : s
+        ),
+      };
+    }
+
     case "signals_badge_set":
       return {
         ...state,
@@ -912,6 +940,8 @@ function rebuildViewFromAddress(addr: ViewAddress, campaigns: Campaign[]): View 
       if (!c) return { kind: "section", name: "Кампании" };
       return { kind: "campaign", campaign: { id: c.id, name: c.name } };
     }
+    case "signal":
+      return { kind: "signal", signal: { id: addr.signalId } };
     case "section":
       return { kind: "section", name: addr.name, campaignId: addr.campaignId };
   }
@@ -940,6 +970,8 @@ export function viewToAddress(view: View): ViewAddress {
       return { kind: "campaign-payment", campaignId: view.campaign.id };
     case "campaign":
       return { kind: "campaign", campaignId: view.campaign.id };
+    case "signal":
+      return { kind: "signal", signalId: view.signal.id };
     case "section":
       return { kind: "section", name: view.name, campaignId: view.campaignId };
   }

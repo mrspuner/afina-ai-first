@@ -234,18 +234,18 @@ describe("appReducer — campaign_from_signal", () => {
     const c = next.campaigns[0];
     expect(c.signalId).toBe("sig_A");
     expect(c.status).toBe("draft");
-    expect(c.name).toBe("Апсейл #1");
+    expect(c.name).toBe("Апсейл №1");
     expect(c.id).toMatch(/^cmp_/);
     expect(typeof c.createdAt).toBe("string");
   });
 
-  it("numbers the second campaign per signal as #2", () => {
+  it("numbers the second campaign per signal as №2", () => {
     const signal = makeSignal({ id: "sig_A", type: "Апсейл" });
-    const existing = makeCampaign({ id: "cmp_old", signalId: "sig_A", name: "Апсейл #1" });
+    const existing = makeCampaign({ id: "cmp_old", signalId: "sig_A", name: "Апсейл №1" });
     const state: AppState = { ...initialState, signals: [signal], campaigns: [existing] };
     const next = appReducer(state, { type: "campaign_from_signal", signalId: "sig_A" });
     expect(next.campaigns).toHaveLength(2);
-    expect(next.campaigns[1].name).toBe("Апсейл #2");
+    expect(next.campaigns[1].name).toBe("Апсейл №2");
   });
 
   it("navigates to workflow view with launched=false", () => {
@@ -256,7 +256,7 @@ describe("appReducer — campaign_from_signal", () => {
     if (next.view.kind !== "workflow") throw new Error("unreachable");
     expect(next.view.launched).toBe(false);
     expect(next.view.campaign.id).toBe(next.campaigns[0].id);
-    expect(next.view.campaign.name).toBe("Регистрация #1");
+    expect(next.view.campaign.name).toBe("Регистрация №1");
   });
 
   it("is a no-op when signalId is unknown", () => {
@@ -406,14 +406,15 @@ describe("appReducer — workflow node selection + AI cycle", () => {
 });
 
 describe("appReducer — campaign_opened", () => {
-  it("opens draft campaign in workflow view with launched=false", () => {
+  it("opens draft campaign in the campaign card view", () => {
+    // campaign_opened now routes every status to the campaign card
+    // (the card itself decides the next step: workflow, payment, etc.)
     const c = makeCampaign({ id: "cmp_A", name: "Draft A", status: "draft" });
     const state: AppState = { ...initialState, campaigns: [c] };
     const next = appReducer(state, { type: "campaign_opened", id: "cmp_A" });
     expect(next.view).toEqual({
-      kind: "workflow",
+      kind: "campaign",
       campaign: { id: "cmp_A", name: "Draft A" },
-      launched: false,
     });
   });
 
@@ -1320,5 +1321,58 @@ describe("ViewAddress — campaign-payment round-trip", () => {
       address: { kind: "campaign-payment", campaignId: "cmp_missing" },
     });
     expect(next.view).toEqual({ kind: "section", name: "Кампании" });
+  });
+});
+
+describe("appReducer — entity cards", () => {
+  it("campaign_opened routes every status to the campaign card", () => {
+    for (const status of ["draft", "active", "paused", "completed"] as const) {
+      const state: AppState = {
+        ...initialState,
+        campaigns: [makeCampaign({ id: "cmp_A", name: "C", status })],
+      };
+      const next = appReducer(state, { type: "campaign_opened", id: "cmp_A" });
+      expect(next.view).toEqual({
+        kind: "campaign",
+        campaign: { id: "cmp_A", name: "C" },
+      });
+    }
+  });
+
+  it("signal_opened opens the signal card", () => {
+    const state: AppState = {
+      ...initialState,
+      signals: [makeSignal({ id: "sig_1" })],
+    };
+    const next = appReducer(state, { type: "signal_opened", id: "sig_1" });
+    expect(next.view).toEqual({ kind: "signal", signal: { id: "sig_1" } });
+  });
+
+  it("signal_opened is a no-op for a missing signal", () => {
+    const next = appReducer(initialState, { type: "signal_opened", id: "nope" });
+    expect(next.view).toEqual(initialState.view);
+  });
+
+  it("signal_renamed updates the signal name", () => {
+    const state: AppState = {
+      ...initialState,
+      signals: [makeSignal({ id: "sig_1" })],
+    };
+    const next = appReducer(state, { type: "signal_renamed", id: "sig_1", name: "Тёплая база" });
+    expect(next.signals[0].name).toBe("Тёплая база");
+  });
+
+  it("signal_renamed ignores blank names", () => {
+    const state: AppState = {
+      ...initialState,
+      signals: [makeSignal({ id: "sig_1", name: "Keep" })],
+    };
+    const next = appReducer(state, { type: "signal_renamed", id: "sig_1", name: "   " });
+    expect(next.signals[0].name).toBe("Keep");
+  });
+
+  it("signal view round-trips through the address", () => {
+    const view: View = { kind: "signal", signal: { id: "sig_1" } };
+    expect(viewToAddress(view)).toEqual({ kind: "signal", signalId: "sig_1" });
   });
 });
