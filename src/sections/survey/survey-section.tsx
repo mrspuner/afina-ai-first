@@ -18,14 +18,10 @@ type Phase =
   | { kind: "scenarios"; survey: Survey };
 
 interface SurveySectionProps {
-  // First-visit entry can offer "Пропустить"; gate before the wizard cannot.
-  skippable: boolean;
   // Called once the user finishes onboarding. The first-visit flow opens the
   // scenario catalog from inside this section; gate-mode flows just need the
   // user handed off to the wizard. The caller decides what to do next.
   onComplete: () => void;
-  // Optional: invoked on skip. Required iff `skippable`.
-  onSkip?: () => void;
   // When true, run the full 3-screen onboarding (form → enrich → interests →
   // scenarios → caller). When false (legacy gate before the wizard), stop
   // after the enrich animation and hand off to the wizard.
@@ -35,9 +31,7 @@ interface SurveySectionProps {
 }
 
 export function SurveySection({
-  skippable,
   onComplete,
-  onSkip,
   withOnboardingScreens = false,
   title,
   subtitle,
@@ -49,22 +43,12 @@ export function SurveySection({
     setPhase({ kind: "awaiting", survey });
   }
 
-  function handleSkip() {
-    if (!skippable) return;
-    dispatch({ type: "survey_skipped" });
-    onSkip?.();
-  }
-
   function handleAwaitingDone() {
     if (phase.kind !== "awaiting") return;
     if (withOnboardingScreens) {
-      // Move into the 3-screen onboarding. surveyStatus is committed only
-      // once the user actually reaches the scenarios screen, so refreshing
-      // mid-onboarding restarts cleanly.
       setPhase({ kind: "interests", survey: phase.survey });
       return;
     }
-    // Gate-mode: enrichment is the last step — commit survey + hand off.
     dispatch({ type: "survey_completed", survey: phase.survey });
     onComplete();
   }
@@ -94,9 +78,7 @@ export function SurveySection({
             className="flex w-full justify-center"
           >
             <SurveyForm
-              skippable={skippable}
               onSubmit={handleSubmit}
-              onSkip={skippable ? handleSkip : undefined}
               title={title}
               subtitle={subtitle}
             />

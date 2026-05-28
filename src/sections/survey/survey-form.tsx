@@ -13,21 +13,15 @@ import {
 import type { Survey } from "@/types/survey";
 
 interface SurveyFormProps {
-  // Whether to render the "пропустить" button (true on first visit only).
-  skippable: boolean;
   onSubmit: (survey: Survey) => void;
-  onSkip?: () => void;
-  // Optional copy override — different entry points may want different titles.
   title?: string;
   subtitle?: string;
 }
 
 export function SurveyForm({
-  skippable,
   onSubmit,
-  onSkip,
-  title = "Расскажите о компании",
-  subtitle = "Это поможет настроить релевантные сигналы. Займёт минуту.",
+  title = "С чего начнём — дайте ссылку на ваш сайт",
+  subtitle = "По сайту афина поймёт, чем вы занимаетесь, и подберёт подходящие сценарии.",
 }: SurveyFormProps) {
   const { survey } = useAppState();
   const dispatch = useAppDispatch();
@@ -73,7 +67,6 @@ export function SurveyForm({
       <Field
         id="survey-website"
         label="Сайт компании"
-        hint="По нему мы предзаполним интересы"
         error={
           showErrors && !websiteOk
             ? "Введите адрес вида example.com"
@@ -91,12 +84,7 @@ export function SurveyForm({
           aria-invalid={showErrors && !websiteOk ? true : undefined}
         />
       </Field>
-      <div className="mt-8 flex items-center justify-end gap-2">
-        {skippable && onSkip ? (
-          <Button type="button" variant="ghost" onClick={onSkip}>
-            Пропустить
-          </Button>
-        ) : null}
+      <div className="mt-8 flex items-center justify-end">
         <Button type="submit" variant="default" size="lg">
           Продолжить
         </Button>

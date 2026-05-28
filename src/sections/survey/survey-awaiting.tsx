@@ -38,12 +38,12 @@ export function SurveyAwaiting({ onDone, websiteHostname }: SurveyAwaitingProps)
       className="w-full max-w-md text-center"
     >
       <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-        Обогащение данными
+        Изучаем ваш бизнес
       </h1>
       <p className="mt-1.5 text-sm text-muted-foreground">
         {websiteHostname
-          ? `Изучаем ${websiteHostname} и дополняем профиль компании`
-          : "Дополняем профиль компании данными"}
+          ? `Анализируем ${websiteHostname}…`
+          : "афина анализирует сайт и сопоставляет его с данными об аудитории."}
       </p>
 
       <div className="mt-8 flex flex-col gap-3">

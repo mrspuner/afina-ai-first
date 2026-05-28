@@ -22,7 +22,7 @@ export function OnboardingScenariosScreen({ onChooseScenario }: OnboardingScenar
         transition={{ duration: 0.45, delay: 0.05, ease: [0.23, 1, 0.32, 1] }}
         className="text-[38px] font-semibold leading-[1.1] tracking-tight"
       >
-        Мы нашли {scenarioCount} сценариев<br />специально для вас
+        Готово — подобрали {scenarioCount} сценариев<br />под ваш бизнес
       </motion.h1>
       <motion.p
         initial={{ opacity: 0, y: 8 }}
@@ -30,7 +30,7 @@ export function OnboardingScenariosScreen({ onChooseScenario }: OnboardingScenar
         transition={{ duration: 0.45, delay: 0.15, ease: [0.23, 1, 0.32, 1] }}
         className="max-w-md text-sm text-muted-foreground"
       >
-        Каждый сценарий — готовая связка сигнала и кампании, адаптированная под ваш бизнес.
+        Каждый сценарий заточен под вашу аудиторию. Выберите, с какого начать.
       </motion.p>
       <motion.div
         initial={{ opacity: 0, y: 8 }}

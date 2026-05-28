@@ -786,25 +786,24 @@ describe("appReducer — survey actions", () => {
     expect(next.clientDirection).toBe("finance");
   });
 
-  it("survey_skipped flips status without writing data", () => {
-    const next = appReducer(initialState, { type: "survey_skipped" });
-    expect(next.surveyStatus).toBe("skipped");
-    expect(next.survey).toEqual({
-      companyName: "",
-      companyWebsite: "",
-      directionId: null,
-    });
+  it("open_survey switches view.kind to survey", () => {
+    const next = appReducer(initialState, { type: "open_survey" });
+    expect(next.view).toEqual({ kind: "survey" });
   });
 
-  it("does not mutate unrelated slices", () => {
+  it("open_survey does not mutate survey data or surveyStatus", () => {
     const state: AppState = {
       ...initialState,
-      signals: [makeSignal()],
-      campaigns: [makeCampaign()],
+      survey: {
+        companyName: "Acme",
+        companyWebsite: "https://acme.example",
+        directionId: "auto",
+      },
+      surveyStatus: "not_started",
     };
-    const next = appReducer(state, { type: "survey_skipped" });
-    expect(next.signals).toBe(state.signals);
-    expect(next.campaigns).toBe(state.campaigns);
+    const next = appReducer(state, { type: "open_survey" });
+    expect(next.survey).toBe(state.survey);
+    expect(next.surveyStatus).toBe("not_started");
   });
 
   it("dev_survey_force_complete flips status without touching survey data or direction", () => {

@@ -6,7 +6,7 @@ export interface Survey {
   directionId: DirectionId | null;
 }
 
-export type SurveyStatus = "not_started" | "completed" | "skipped";
+export type SurveyStatus = "not_started" | "completed";
 
 export const EMPTY_SURVEY: Survey = {
   companyName: "",

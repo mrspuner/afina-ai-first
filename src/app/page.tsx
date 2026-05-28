@@ -26,6 +26,9 @@ import { CampaignScreen } from "@/sections/campaigns/campaign-screen";
 import { StatisticsSection } from "@/sections/statistics/statistics-section";
 import { SettingsSection } from "@/sections/settings/settings-section";
 import { DevPanel } from "@/components/dev/dev-panel";
+import { AnimatePresence, motion } from "motion/react";
+
+const SHELL_EASE = [0.32, 0.72, 0, 1] as const;
 
 function BottomBarSlot() {
   const { view } = useAppState();
@@ -40,26 +43,23 @@ function BottomBarSlot() {
 }
 
 export default function Home() {
-  const { view, launchFlyoutOpen, activeSection, catalog, surveyStatus } = useAppState();
+  const { view, launchFlyoutOpen, activeSection, catalog } = useAppState();
   const dispatch = useAppDispatch();
   const welcomeChat = useOnboardingChat();
 
+  const isSurveyFullscreen = view.kind === "survey";
+
   function renderMain() {
     if (view.kind === "welcome") {
-      // First-entry 3-screen onboarding: site → enrich → interests →
-      // scenarios → catalog. Skippable; once completed or skipped,
-      // surveyStatus closes the gate and we render WelcomeSection.
-      if (surveyStatus === "not_started") {
-        return (
-          <SurveySection
-            skippable
-            withOnboardingScreens
-            onComplete={() => { /* catalog open routes the user from here */ }}
-            onSkip={() => { /* survey_skipped re-renders WelcomeSection */ }}
-          />
-        );
-      }
       return <WelcomeSection />;
+    }
+    if (view.kind === "survey") {
+      return (
+        <SurveySection
+          withOnboardingScreens
+          onComplete={() => { /* catalog open routes the user from here */ }}
+        />
+      );
     }
     if (view.kind === "guided-signal" || view.kind === "awaiting-campaign")
       return <GuidedSignalSection />;
@@ -90,25 +90,62 @@ export default function Home() {
         <DraftQueueProvider>
         <TriggerEditRegistryProvider>
         <div className="flex h-screen overflow-hidden bg-background">
-          <AppSidebar
-            activeNav={activeSection ?? undefined}
-            onNavChange={(nav) => dispatch({ type: "sidebar_nav", section: nav })}
-            onLaunchOpen={() => dispatch({ type: "flyout_open" })}
-            onLogoClick={() => dispatch({ type: "go_welcome" })}
-            flyoutOpen={launchFlyoutOpen}
-          />
-          <LaunchFlyout
-            open={launchFlyoutOpen}
-            onClose={() => dispatch({ type: "flyout_close" })}
-          />
+          <AnimatePresence initial={false}>
+            {!isSurveyFullscreen && (
+              <motion.div
+                key="sidebar"
+                initial={{ opacity: 0, x: -16 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -16 }}
+                transition={{ duration: 0.28, ease: SHELL_EASE }}
+              >
+                <AppSidebar
+                  activeNav={activeSection ?? undefined}
+                  onNavChange={(nav) => dispatch({ type: "sidebar_nav", section: nav })}
+                  onLaunchOpen={() => dispatch({ type: "flyout_open" })}
+                  onLogoClick={() => dispatch({ type: "go_welcome" })}
+                  flyoutOpen={launchFlyoutOpen}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+          {!isSurveyFullscreen && (
+            <LaunchFlyout
+              open={launchFlyoutOpen}
+              onClose={() => dispatch({ type: "flyout_close" })}
+            />
+          )}
           <ScenarioCatalogModal
             open={catalog !== null}
             onClose={() => dispatch({ type: "catalog_close" })}
             onSelect={(scenarioId) => dispatch({ type: "catalog_select", scenarioId })}
           />
           <div className="relative flex flex-1 flex-col overflow-hidden">
-            {renderMain()}
-            <BottomBarSlot />
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={view.kind}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.26, ease: SHELL_EASE }}
+                className="flex flex-1 flex-col overflow-hidden"
+              >
+                {renderMain()}
+              </motion.div>
+            </AnimatePresence>
+            <AnimatePresence initial={false}>
+              {!isSurveyFullscreen && (
+                <motion.div
+                  key="bottom-bar"
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 12 }}
+                  transition={{ duration: 0.28, ease: SHELL_EASE }}
+                >
+                  <BottomBarSlot />
+                </motion.div>
+              )}
+            </AnimatePresence>
             <ChatDrawer placeholder="Введите ваши параметры или задайте вопрос" />
             <DevPanel />
           </div>
