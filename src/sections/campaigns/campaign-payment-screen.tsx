@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
-import { ArrowLeft } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ArrowLeft, Check, CircleDashed, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
@@ -64,6 +64,11 @@ export function CampaignPaymentScreen() {
   const enoughBalance = shortfall <= 0;
 
   const [topUpOpen, setTopUpOpen] = useState(false);
+  // Local "launching" state: when set, swap form for the launch animation.
+  // The actual campaign_launched dispatch fires after the animation completes,
+  // so the user sees feedback before being navigated to CampaignScreen.
+  const [launching, setLaunching] = useState(false);
+  const launchPayloadRef = useRef<{ id: string; budget: number } | null>(null);
 
   function handleBack() {
     if (!campaign) return;
@@ -74,6 +79,11 @@ export function CampaignPaymentScreen() {
     });
   }
 
+  function startLaunchAnimation(campaignId: string, budget: number) {
+    launchPayloadRef.current = { id: campaignId, budget };
+    setLaunching(true);
+  }
+
   function handleLaunch() {
     if (!campaign) return;
     if (activeBudget <= 0) return;
@@ -81,24 +91,14 @@ export function CampaignPaymentScreen() {
       setTopUpOpen(true);
       return;
     }
-    dispatch({
-      type: "campaign_launched",
-      id: campaign.id,
-      timestamp: new Date().toISOString(),
-      budget: activeBudget,
-    });
+    startLaunchAnimation(campaign.id, activeBudget);
   }
 
   function handleTopUpSuccess(amount: number) {
     if (!campaign) return;
     dispatch({ type: "balance_topup", amount });
-    dispatch({
-      type: "campaign_launched",
-      id: campaign.id,
-      timestamp: new Date().toISOString(),
-      budget: activeBudget,
-    });
     setTopUpOpen(false);
+    startLaunchAnimation(campaign.id, activeBudget);
   }
 
   function handleCustomChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -118,6 +118,23 @@ export function CampaignPaymentScreen() {
       <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
         Кампания не найдена.
       </div>
+    );
+  }
+
+  if (launching) {
+    return (
+      <LaunchAnimation
+        onDone={() => {
+          const payload = launchPayloadRef.current;
+          if (!payload) return;
+          dispatch({
+            type: "campaign_launched",
+            id: payload.id,
+            timestamp: new Date().toISOString(),
+            budget: payload.budget,
+          });
+        }}
+      />
     );
   }
 
@@ -310,5 +327,80 @@ function RadioDot({ active }: { active: boolean }) {
           : "border-border bg-transparent"
       )}
     />
+  );
+}
+
+const LAUNCH_STEPS = [
+  "База загружена и проверена",
+  "Передаём в кампанию",
+  "Подбираем сигналы",
+  "Сигналы готовы",
+] as const;
+const LAUNCH_STEP_INTERVAL = 900;
+
+function LaunchAnimation({ onDone }: { onDone: () => void }) {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const onDoneRef = useRef(onDone);
+  onDoneRef.current = onDone;
+
+  useEffect(() => {
+    const timers: number[] = [];
+    LAUNCH_STEPS.forEach((_, i) => {
+      timers.push(
+        window.setTimeout(() => setActiveIndex(i + 1), (i + 1) * LAUNCH_STEP_INTERVAL)
+      );
+    });
+    timers.push(
+      window.setTimeout(
+        () => onDoneRef.current(),
+        LAUNCH_STEPS.length * LAUNCH_STEP_INTERVAL + 400
+      )
+    );
+    return () => timers.forEach((id) => window.clearTimeout(id));
+  }, []);
+
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center px-8 pb-promptbar pt-[120px]">
+      <div className="flex w-full max-w-md flex-col gap-6">
+        <div className="flex flex-col gap-2">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+            Запускаем кампанию
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            афина подбирает сигналы и готовит запуск. Это займёт несколько секунд.
+          </p>
+        </div>
+        <ol className="flex flex-col gap-2.5 rounded-lg border border-border bg-card p-5">
+          {LAUNCH_STEPS.map((label, idx) => {
+            const done = idx < activeIndex;
+            const active = idx === activeIndex;
+            return (
+              <li key={label} className="flex items-center gap-3">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center">
+                  {done ? (
+                    <Check className="h-4 w-4 text-green-600" />
+                  ) : active ? (
+                    <Loader2 className="h-4 w-4 animate-spin text-foreground" />
+                  ) : (
+                    <CircleDashed className="h-4 w-4 text-muted-foreground/60" />
+                  )}
+                </span>
+                <span
+                  className={
+                    done
+                      ? "text-sm text-muted-foreground line-through decoration-muted-foreground/30"
+                      : active
+                      ? "text-sm font-medium text-foreground"
+                      : "text-sm text-muted-foreground"
+                  }
+                >
+                  {label}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+      </div>
+    </div>
   );
 }
