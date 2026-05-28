@@ -6,7 +6,6 @@ import { StepContent } from "@/sections/signals/steps/step-content";
 import { StepProps } from "@/types/campaign";
 import { ScenarioCard } from "@/sections/signals/scenario-card";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import {
   SCENARIOS,
@@ -92,24 +91,44 @@ export function Step1Scenario({ data, onNext }: StepProps) {
           })}
         </div>
 
-        <ScrollArea className="max-h-[420px] pr-2">
-          {filtered.length === 0 ? (
-            <p className="py-10 text-center text-sm text-muted-foreground">
-              Ничего не нашлось. Измените запрос или сбросьте фильтр.
-            </p>
-          ) : (
-            <div className="grid grid-cols-3 gap-3">
-              {filtered.map((s) => (
-                <ScenarioCard
-                  key={s.id}
-                  scenario={s}
-                  selected={selectedId === s.id}
-                  onClick={handleSelect}
-                />
-              ))}
-            </div>
-          )}
-        </ScrollArea>
+        <div className="relative">
+          <div
+            className={cn(
+              "max-h-[420px] overflow-y-auto pr-2",
+              "[scrollbar-width:thin]",
+              "[&::-webkit-scrollbar]:w-1.5",
+              "[&::-webkit-scrollbar-track]:bg-transparent",
+              "[&::-webkit-scrollbar-thumb]:rounded-full",
+              "[&::-webkit-scrollbar-thumb]:bg-border/60",
+              "hover:[&::-webkit-scrollbar-thumb]:bg-border"
+            )}
+          >
+            {filtered.length === 0 ? (
+              <p className="py-10 text-center text-sm text-muted-foreground">
+                Ничего не нашлось. Измените запрос или сбросьте фильтр.
+              </p>
+            ) : (
+              <div className="grid grid-cols-3 gap-3 pb-1">
+                {filtered.map((s) => (
+                  <ScenarioCard
+                    key={s.id}
+                    scenario={s}
+                    selected={selectedId === s.id}
+                    onClick={handleSelect}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 top-0 h-6 bg-gradient-to-b from-background to-transparent"
+          />
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-background to-transparent"
+          />
+        </div>
       </div>
     </StepContent>
   );
