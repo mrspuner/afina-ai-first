@@ -31,14 +31,19 @@ export function WelcomeView({ chat }: { chat: OnboardingChatState }) {
         className="flex w-full max-w-2xl flex-col items-start gap-8"
       >
         {done ? (
-          <div className="flex w-full flex-col items-start gap-2">
-            <h1 className="text-[28px] font-bold leading-8 text-foreground">
-              Добро пожаловать
-            </h1>
-            <p className="text-[18px] leading-[22px] text-muted-foreground">
-              Что вы хотите сделать
-            </p>
-          </div>
+          <>
+            <div className="flex w-full flex-col items-start gap-2">
+              <h1 className="text-[28px] font-bold leading-8 text-foreground">
+                Добро пожаловать в афина
+              </h1>
+              <p className="text-[18px] leading-[26px] text-muted-foreground">
+                Запустите ещё один сценарий — афина подобрала несколько под ваш бизнес.
+              </p>
+            </div>
+            <Button size="lg" onClick={() => dispatch({ type: "start_signal_flow" })}>
+              Запустить новый сценарий →
+            </Button>
+          </>
         ) : (
           <AnimatePresence initial={false} mode="popLayout">
             {!conversationStarted && (

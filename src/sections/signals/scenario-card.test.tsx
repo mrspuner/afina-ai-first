@@ -13,34 +13,6 @@ const SCENARIO: Scenario = {
   isCurated: false,
 };
 
-describe("ScenarioCard — internal button", () => {
-  it("renders 'Запустить сценарий' button in compact variant", () => {
-    render(<ScenarioCard scenario={SCENARIO} onClick={() => {}} />);
-    expect(
-      screen.getByRole("button", { name: "Запустить сценарий" })
-    ).toBeInTheDocument();
-  });
-
-  it("renders 'Запустить сценарий' button in catalog variant", () => {
-    render(
-      <ScenarioCard scenario={SCENARIO} onClick={() => {}} variant="catalog" />
-    );
-    expect(
-      screen.getByRole("button", { name: "Запустить сценарий" })
-    ).toBeInTheDocument();
-  });
-
-  it("clicking internal button calls onClick exactly once (stopPropagation)", () => {
-    const onClick = vi.fn();
-    render(<ScenarioCard scenario={SCENARIO} onClick={onClick} />);
-    fireEvent.click(
-      screen.getByRole("button", { name: "Запустить сценарий" })
-    );
-    expect(onClick).toHaveBeenCalledTimes(1);
-    expect(onClick).toHaveBeenCalledWith("test-scenario");
-  });
-});
-
 describe("ScenarioCard — card-level click", () => {
   it("clicking the card surface calls onClick with scenario id", () => {
     const onClick = vi.fn();

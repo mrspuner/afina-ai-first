@@ -1,8 +1,7 @@
 "use client";
 
-import type { KeyboardEvent, MouseEvent } from "react";
+import type { KeyboardEvent } from "react";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
 import type { Scenario } from "@/data/scenarios";
 
 interface ScenarioCardProps {
@@ -32,13 +31,6 @@ export function ScenarioCard({
       e.preventDefault();
       onClick(scenario.id);
     }
-  }
-
-  function handleButtonClick(e: MouseEvent<HTMLButtonElement>) {
-    // Stop the card-level click from also firing — otherwise onClick would
-    // be invoked twice (button + bubbled card click).
-    e.stopPropagation();
-    onClick(scenario.id);
   }
 
   // Catalog variant: оба текста белые, фон темнее, чем bg-popover диалога.
@@ -76,14 +68,6 @@ export function ScenarioCard({
           {scenario.description}
         </span>
       </div>
-      <Button
-        variant="secondary"
-        size="default"
-        onClick={handleButtonClick}
-        className="mt-3"
-      >
-        Запустить сценарий
-      </Button>
     </div>
   );
 }
