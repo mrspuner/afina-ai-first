@@ -1371,6 +1371,15 @@ describe("appReducer — entity cards", () => {
     expect(next.signals[0].name).toBe("Keep");
   });
 
+  it("signal_renamed is a no-op for a missing signal", () => {
+    const state: AppState = {
+      ...initialState,
+      signals: [makeSignal({ id: "sig_1", name: "Keep" })],
+    };
+    const next = appReducer(state, { type: "signal_renamed", id: "nope", name: "X" });
+    expect(next.signals).toEqual(state.signals);
+  });
+
   it("signal view round-trips through the address", () => {
     const view: View = { kind: "signal", signal: { id: "sig_1" } };
     expect(viewToAddress(view)).toEqual({ kind: "signal", signalId: "sig_1" });
