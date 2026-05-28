@@ -49,6 +49,14 @@ export default function Home() {
 
   const isSurveyFullscreen = view.kind === "survey";
 
+  // Routing key for the renderMain animation. View kinds that render the
+  // SAME section component must collapse to one key, otherwise switching
+  // between them (e.g. signal_added flips guided-signal → awaiting-campaign,
+  // both routed to GuidedSignalSection) causes a remount and wipes the
+  // section's local state (pendingSignalId, current wizard step, etc).
+  const viewKey =
+    view.kind === "awaiting-campaign" ? "guided-signal" : view.kind;
+
   function renderMain() {
     if (view.kind === "welcome") {
       return <WelcomeSection />;
@@ -119,7 +127,7 @@ export default function Home() {
           <div className="relative flex flex-1 flex-col overflow-hidden">
             <AnimatePresence mode="wait">
               <motion.div
-                key={view.kind}
+                key={viewKey}
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -8 }}
