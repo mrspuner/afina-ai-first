@@ -91,15 +91,18 @@ describe("selectPromptSuggestions — section.campaigns", () => {
 });
 
 describe("selectPromptSuggestions — section.statistics", () => {
-  it("использует period+rows из state.stats", () => {
+  it("отдаёт три канонических запроса статистики", () => {
     const base = withView({ kind: "section", name: "Статистика" });
     const r = selectPromptSuggestions(
       { ...base, stats: { ...base.stats, period: { preset: "this-year" }, rows: "days" } },
       ctx()
     );
     if (r.kind !== "items") throw new Error();
-    expect(r.items.some((i) => i.label.includes("прошлым годом"))).toBe(true);
-    expect(r.items.some((i) => i.label.includes("Лучший день"))).toBe(true);
+    expect(r.items.map((i) => i.id)).toEqual([
+      "sec-stats-by-campaigns",
+      "sec-stats-top-campaigns",
+      "sec-stats-compare-channels",
+    ]);
   });
 });
 

@@ -111,6 +111,8 @@ export function CampaignScreen() {
       onRename={(name) =>
         dispatch({ type: "campaign_renamed", id: campaign.id, name })
       }
+      onBack={() => dispatch({ type: "sidebar_nav", section: "Кампании" })}
+      backLabel="К кампаниям"
       badge={<StatusBadge status={status} />}
       tags={
         <>

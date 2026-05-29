@@ -200,9 +200,21 @@ export function NodeCardBody({ id, data }: NodeCardBodyProps) {
       {rows.length > 0 && (
         <div className="flex flex-col gap-0.5">
           {rows.map((row) => {
-            const editability = data.params
-              ? getFieldMeta(data.params.kind, row.label)?.editability
+            const meta = data.params
+              ? getFieldMeta(data.params.kind, row.label)
               : undefined;
+            const editability = meta?.editability;
+            // Persistent yellow dot on a field whose param was edited.
+            const isDirty = meta?.paramKey
+              ? data.dirtyParams?.includes(meta.paramKey) ?? false
+              : false;
+            const dirtyDot = isDirty ? (
+              <span
+                aria-hidden
+                title="Параметр изменён"
+                className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#FFEC00]"
+              />
+            ) : null;
             const isEditingRow = editing?.label === row.label;
             const rowGrid =
               "grid grid-cols-[minmax(72px,max-content)_1fr_auto] items-center gap-x-2.5 text-[11px]";
@@ -256,7 +268,7 @@ export function NodeCardBody({ id, data }: NodeCardBodyProps) {
                   <span className="truncate text-foreground" title={row.value}>
                     {row.value}
                   </span>
-                  <span />
+                  <span className="flex items-center justify-end">{dirtyDot}</span>
                 </div>
               );
             }
@@ -288,7 +300,8 @@ export function NodeCardBody({ id, data }: NodeCardBodyProps) {
                 <span className="truncate text-foreground" title={row.value}>
                   {row.value}
                 </span>
-                <span className="ml-1 flex shrink-0 items-center text-muted-foreground/50 transition-colors group-hover:text-muted-foreground">
+                <span className="ml-1 flex shrink-0 items-center gap-1.5 text-muted-foreground/50 transition-colors group-hover:text-muted-foreground">
+                  {dirtyDot}
                   {icon}
                 </span>
               </button>

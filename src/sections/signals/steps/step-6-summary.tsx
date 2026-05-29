@@ -27,19 +27,17 @@ function SummaryRow({
     <div
       onClick={onClick}
       className={cn(
-        "flex items-start justify-between gap-4 py-3 transition-colors",
+        "grid grid-cols-[180px_1fr] items-start gap-4 py-3 transition-colors",
         onClick && "cursor-pointer rounded px-2 -mx-2 hover:bg-accent"
       )}
     >
-      <span className="shrink-0 text-sm text-muted-foreground">{label}</span>
-      <div className="flex items-center gap-2">
-        <span className="text-right text-sm font-medium text-foreground">
-          {value}
-        </span>
+      <span className="text-sm text-muted-foreground">{label}</span>
+      <div className="flex items-start justify-between gap-2">
+        <span className="text-sm font-medium text-foreground">{value}</span>
         {onClick && (
           <Settings
             aria-hidden
-            className="h-3.5 w-3.5 text-muted-foreground/60 shrink-0"
+            className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60"
           />
         )}
       </div>

@@ -71,7 +71,9 @@ export function ChatDrawer({ placeholder }: { placeholder: string }) {
         composerRef.current?.insertSuggestion(item.action.prompt);
         return;
       case "submit":
-        submit({ text: item.action.phrase, segments: [] });
+        // Только вставляем фразу — действие выполнится по Enter через submit
+        // (не сразу по клику; см. ChatPanel.handlePick).
+        composerRef.current?.insertSuggestion(item.action.phrase);
         return;
       case "dispatch":
         dispatch(item.action.action);

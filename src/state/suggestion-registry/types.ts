@@ -104,6 +104,8 @@ export type WizardSub =
  */
 export type Scope =
   | { kind: "node-context"; nodeType: WorkflowNodeType; paramLabel?: string }
+  /** Активный trigger-тег в баре (выбран конкретный триггер на шаге 2). */
+  | { kind: "trigger-context" }
   | { kind: "draft-queue" }
   | { kind: "welcome-wave"; chips: readonly WelcomeChip[] }
   | { kind: "section"; sub: SectionSub }

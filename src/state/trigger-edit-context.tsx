@@ -23,6 +23,14 @@ export interface TriggerEditApi {
   randomRemix: () => void;
   /** Найти triggerId по label — нужно баром, чтобы из чипсины (label) получить id. */
   resolveTriggerIdByLabel: (label: string) => string | null;
+  /**
+   * «Проверить доступность доменов» — случайно исключает несколько активных
+   * системных доменов (по обычной механике delta.excluded) и возвращает число
+   * исключённых, чтобы бар собрал ответ ассистента. Если передан `triggerId`
+   * (активный trigger-тег в баре) — проверяет только этот триггер; иначе все
+   * выбранные.
+   */
+  checkDomainAvailability: (triggerId?: string) => number;
 }
 
 export const NOOP_TRIGGER_EDIT_API: TriggerEditApi = {
@@ -30,6 +38,7 @@ export const NOOP_TRIGGER_EDIT_API: TriggerEditApi = {
   highlightTrigger: () => {},
   randomRemix: () => {},
   resolveTriggerIdByLabel: () => null,
+  checkDomainAvailability: () => 0,
 };
 
 /**

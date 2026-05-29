@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Pencil } from "lucide-react";
+import { ArrowLeft, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -17,6 +17,10 @@ interface EntityCardShellProps {
   title: string;
   /** When supplied, the title becomes inline-editable. */
   onRename?: (name: string) => void;
+  /** When supplied, a back button is shown above the header. */
+  onBack?: () => void;
+  /** Label for the back button (e.g. "К сигналам"). */
+  backLabel?: string;
   badge?: ReactNode;
   tags?: ReactNode;
   meta?: ReactNode;
@@ -28,6 +32,8 @@ interface EntityCardShellProps {
 export function EntityCardShell({
   title,
   onRename,
+  onBack,
+  backLabel = "Назад",
   badge,
   tags,
   meta,
@@ -38,6 +44,16 @@ export function EntityCardShell({
   return (
     <div className="flex flex-1 flex-col overflow-y-auto px-8 pb-promptbar pt-[120px]">
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            className="-ml-2 inline-flex w-fit items-center gap-1.5 rounded-md px-2 py-1 text-sm text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+          >
+            <ArrowLeft className="h-4 w-4" aria-hidden />
+            {backLabel}
+          </button>
+        )}
         {/* Header */}
         <section className="flex flex-col gap-3">
           <div className="flex items-start justify-between gap-3">

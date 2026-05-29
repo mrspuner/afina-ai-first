@@ -3,7 +3,14 @@
 import { Button } from "@/components/ui/button";
 import { isCampaignDone } from "@/state/app-state";
 import { useAppDispatch, useAppState } from "@/state/app-state-context";
+import { curatedScenarioCount } from "@/data/scenarios";
+import { pluralRu } from "@/lib/plural-ru";
 import { OnboardingStepCards } from "./onboarding-step-cards";
+
+const SCENARIOS_PICKED_TITLE = `Подобрали ${curatedScenarioCount} ${pluralRu(
+  curatedScenarioCount,
+  ["сценарий", "сценария", "сценариев"],
+)} под ваш бизнес`;
 
 /**
  * Welcome-экран. Статичен: онбординг-вопросы теперь уходят в общий чат/drawer
@@ -59,7 +66,7 @@ function FirstTimeHero({
           <div className="flex flex-1 flex-col gap-2">
             <h2 className="text-base font-medium text-foreground">
               {surveyCompleted
-                ? "Подобрали 24 сценария под ваш бизнес"
+                ? SCENARIOS_PICKED_TITLE
                 : "Расскажите о вашей задаче — подберём сценарии"}
             </h2>
             <p className="text-sm leading-relaxed text-foreground/70">

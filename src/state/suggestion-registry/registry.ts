@@ -9,7 +9,7 @@
 import type { Scope, SuggestionItem } from "./types";
 import { resolveNodeContext } from "./node-context";
 import { resolveSection } from "./sections";
-import { resolveWizardStep } from "./wizard";
+import { resolveWizardStep, resolveTriggerContext } from "./wizard";
 import { resolveCampaignFeed, resolveAwaitingCampaign, resolveCampaignSelect } from "./views";
 import type { CampaignStatus } from "@/state/app-state";
 import { resolveDraftQueue } from "./commands";
@@ -19,6 +19,8 @@ export function resolveSuggestions(scope: Scope): SuggestionItem[] {
   switch (scope.kind) {
     case "node-context":
       return resolveNodeContext(scope.nodeType, scope.paramLabel);
+    case "trigger-context":
+      return resolveTriggerContext();
     case "draft-queue":
       return resolveDraftQueue();
     case "welcome-wave":

@@ -145,6 +145,12 @@ export function selectPromptSuggestions(
         paramLabel: payload.paramLabel,
       });
     }
+    // Активный trigger-тег (выбран конкретный триггер на шаге 2) → показываем
+    // ТОЛЬКО чип «Проверить доступность доменов»; все прочие подсказки уходят.
+    if (ctx.activeTag.kind === "trigger") {
+      return resolved({ kind: "trigger-context" });
+    }
+    // Прочие теги (section) — прячем подсказки.
     return { kind: "hidden" };
   }
 

@@ -6,6 +6,8 @@ import type {
   Signal,
   SignalType,
 } from "./app-state";
+import type { StepData } from "@/types/campaign";
+import { SCENARIOS } from "@/data/scenarios";
 
 const SIGNAL_TYPES: SignalType[] = [
   "Регистрация",
@@ -63,6 +65,63 @@ function splitSegments(count: number, rng: () => number): Signal["segments"] {
   return { max, high, mid, low };
 }
 
+// Plausible filler for the "Настройки сигнала" table on preset (demo) signals.
+// Interests/triggers are stored as display strings (the screen joins them
+// verbatim), so readable labels are enough — no id lookup needed.
+const INTERESTS_POOL = [
+  "Ипотека и кредиты",
+  "Автокредитование",
+  "Инвестиции и вклады",
+  "Премиальные продукты",
+  "Рефинансирование",
+  "Страхование",
+  "Дебетовые карты",
+  "Новостройки",
+  "Лизинг",
+  "Кэшбэк-программы",
+];
+
+const TRIGGERS_POOL = [
+  "Посещение сайтов банков",
+  "Сравнение кредитных ставок",
+  "Заявка на ипотеку онлайн",
+  "Кредитный калькулятор",
+  "Поиск автомобиля в кредит",
+  "Просмотр тарифов вкладов",
+  "Брошенная заявка на карту",
+  "Чтение обзоров инвестпродуктов",
+];
+
+const SEGMENT_SETS: string[][] = [
+  ["max", "high"],
+  ["max", "very-high", "high"],
+  ["high", "medium"],
+  ["max", "high", "medium"],
+];
+
+function rndSample<T>(rng: () => number, arr: readonly T[], n: number): T[] {
+  const pool = [...arr];
+  const out: T[] = [];
+  for (let i = 0; i < n && pool.length; i++) {
+    out.push(pool.splice(Math.floor(rng() * pool.length), 1)[0]);
+  }
+  return out;
+}
+
+function buildWizardData(type: SignalType, rng: () => number): StepData {
+  const scenarioId =
+    SCENARIOS.find((s) => s.isBase && s.signalType === type)?.id ?? null;
+  return {
+    scenario: scenarioId,
+    interests: rndSample(rng, INTERESTS_POOL, rndInt(rng, 2, 4)),
+    triggers: rndSample(rng, TRIGGERS_POOL, rndInt(rng, 2, 3)),
+    triggerConfig: {},
+    segments: rndPick(rng, SEGMENT_SETS),
+    budget: rndInt(rng, 30, 300) * 1000,
+    file: null,
+  };
+}
+
 export type PresetKey = "empty" | "mid" | "full";
 
 type GenerateSignalsOpts = {
@@ -88,6 +147,7 @@ export function generateSignals(opts: GenerateSignalsOpts): Signal[] {
       segments: splitSegments(count, rng),
       createdAt,
       updatedAt,
+      wizardData: buildWizardData(type, rng),
     });
   }
   return out;

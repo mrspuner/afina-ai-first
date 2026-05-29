@@ -122,6 +122,13 @@ export interface WorkflowNodeData extends Record<string, unknown> {
   isSuccess?: boolean;
   processing?: boolean;
   justUpdated?: boolean;
+  /**
+   * Persistent "this parameter was changed" markers — the list of NodeParams
+   * keys edited via the prompt bar (e.g. ["text", "alphaName"]). Rendered as a
+   * yellow dot next to each changed field in the expanded card. Unlike
+   * `justUpdated` (a one-off green flash on the whole node), this stays on.
+   */
+  dirtyParams?: string[];
   params?: NodeParams;
 }
 

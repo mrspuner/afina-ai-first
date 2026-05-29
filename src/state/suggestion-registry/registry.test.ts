@@ -118,41 +118,32 @@ describe("registry — section.campaigns (filter-aware)", () => {
   });
 });
 
-describe("registry — section.statistics (period+rowKind)", () => {
-  it("period=today, rowKind=campaigns → сравни со вчера + по каналам", () => {
+describe("registry — section.statistics (3 рабочих запроса)", () => {
+  it("всегда отдаёт ровно три канонических запроса", () => {
     const items = resolveSuggestions({
       kind: "section",
       sub: { kind: "statistics", period: "today", rowKind: "campaigns" },
     });
-    assertValid(items, "stats/today/campaigns");
-    expect(items.some((i) => i.label.includes("вчера"))).toBe(true);
-    expect(items.some((i) => i.label.includes("каналам"))).toBe(true);
+    assertValid(items, "stats");
+    expect(items).toHaveLength(3);
+    expect(items.every((i) => i.action.kind === "submit")).toBe(true);
+    expect(items.map((i) => i.id)).toEqual([
+      "sec-stats-by-campaigns",
+      "sec-stats-top-campaigns",
+      "sec-stats-compare-channels",
+    ]);
   });
 
-  it("period=this-month → сравни с прошлым месяцем", () => {
-    const items = resolveSuggestions({
-      kind: "section",
-      sub: { kind: "statistics", period: "this-month", rowKind: "campaigns" },
-    });
-    expect(items.some((i) => i.label.includes("прошлым месяцем"))).toBe(true);
-  });
-
-  it("rowKind=days → лучший день + тренд", () => {
-    const items = resolveSuggestions({
+  it("набор не зависит от period/rowKind", () => {
+    const a = resolveSuggestions({
       kind: "section",
       sub: { kind: "statistics", period: "this-month", rowKind: "days" },
     });
-    expect(items.some((i) => i.label.includes("Лучший день"))).toBe(true);
-    expect(items.some((i) => i.label.includes("тренд"))).toBe(true);
-  });
-
-  it("rowKind=channels → не предлагает 'разбей по каналам' (уже там)", () => {
-    const items = resolveSuggestions({
+    const b = resolveSuggestions({
       kind: "section",
-      sub: { kind: "statistics", period: "this-month", rowKind: "channels" },
+      sub: { kind: "statistics", period: "this-year", rowKind: "channels" },
     });
-    expect(items.some((i) => i.label.includes("по каналам"))).toBe(false);
-    expect(items.some((i) => i.label.includes("по кампаниям"))).toBe(true);
+    expect(a.map((i) => i.id)).toEqual(b.map((i) => i.id));
   });
 });
 
@@ -239,22 +230,31 @@ describe("registry — wizard sub-states", () => {
     expect(items.some((i) => i.id === "wiz-1-which")).toBe(true);
   });
 
-  it("step 2 пусто-пусто → 3 стартовых вопроса", () => {
+  it("step 2 пусто-пусто → 3 стартовых вопроса, без проверки доменов", () => {
     const items = resolveSuggestions({
       kind: "wizard-step",
       sub: { step: 2, hasInterests: false, hasDomains: false },
     });
     expect(items.every((i) => i.action.kind === "ask")).toBe(true);
     expect(items.some((i) => i.id === "wiz-2-where-start")).toBe(true);
+    expect(items.some((i) => i.id === "wiz-2-check-domains")).toBe(false);
   });
 
-  it("step 2 интересы+домены → вопросы про сужение/расширение", () => {
+  it("step 2 интересы+домены → вопросы про сужение/расширение, без проверки доменов", () => {
     const items = resolveSuggestions({
       kind: "wizard-step",
       sub: { step: 2, hasInterests: true, hasDomains: true },
     });
     expect(items.some((i) => i.id === "wiz-2-narrow-q")).toBe(true);
     expect(items.some((i) => i.id === "wiz-2-widen-q")).toBe(true);
+    expect(items.some((i) => i.id === "wiz-2-check-domains")).toBe(false);
+  });
+
+  it("trigger-context → только чип проверки доменов", () => {
+    const items = resolveSuggestions({ kind: "trigger-context" });
+    expect(items).toHaveLength(1);
+    expect(items[0].id).toBe("wiz-2-check-domains");
+    expect(items[0].action.kind).toBe("submit");
   });
 
   it("step 2 только интересы → 'Зачем триггеры?'", () => {

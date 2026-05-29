@@ -38,11 +38,45 @@ describe("matchStatsQuery — top-campaigns-income-june (Q2)", () => {
   it("без 'кампани' does NOT match Q2", () => {
     expect(matchStatsQuery("топ-10 по доходу за июнь")).toBeNull();
   });
-  it("без 'июн' does NOT match Q2", () => {
-    expect(matchStatsQuery("топ-10 кампаний по доходу")).toBeNull();
+  it("без 'июн' falls through to generic top-campaigns-income", () => {
+    expect(matchStatsQuery("топ-10 кампаний по доходу")?.id).toBe(
+      "top-campaigns-income"
+    );
   });
-  it("'июль' instead of 'июнь' does NOT match Q2", () => {
-    expect(matchStatsQuery("топ-10 кампаний по доходу за июль")).toBeNull();
+  it("'июль' instead of 'июнь' falls through to generic (not the June query)", () => {
+    expect(matchStatsQuery("топ-10 кампаний по доходу за июль")?.id).toBe(
+      "top-campaigns-income"
+    );
+  });
+});
+
+describe("matchStatsQuery — expanded intents", () => {
+  it("'разбей по каналам' → breakdown-by-channels", () => {
+    expect(matchStatsQuery("разбей по каналам")?.id).toBe("breakdown-by-channels");
+  });
+  it("'разбей по креативам' → breakdown-by-creatives", () => {
+    expect(matchStatsQuery("разбей по креативам")?.id).toBe("breakdown-by-creatives");
+  });
+  it("'разбей по кампаниям' → group-by-campaigns", () => {
+    expect(matchStatsQuery("разбей по кампаниям")?.id).toBe("group-by-campaigns");
+  });
+  it("'топ-10 по конверсии' → top-by-conversion", () => {
+    expect(matchStatsQuery("топ-10 по конверсии")?.id).toBe("top-by-conversion");
+  });
+  it("'найди лучший день по доходу' → best-day-income", () => {
+    expect(matchStatsQuery("найди лучший день по доходу")?.id).toBe("best-day-income");
+  });
+  it("'покажи тренд за период' → trend-by-period", () => {
+    expect(matchStatsQuery("покажи тренд за период")?.id).toBe("trend-by-period");
+  });
+  it("'сравни с прошлым месяцем' → compare-prev-period", () => {
+    expect(matchStatsQuery("сравни с прошлым месяцем")?.id).toBe("compare-prev-period");
+  });
+  it("'сравни со вчера' → compare-prev-period", () => {
+    expect(matchStatsQuery("сравни со вчера")?.id).toBe("compare-prev-period");
+  });
+  it("compare-channels still wins over compare-prev-period", () => {
+    expect(matchStatsQuery("сравни эффективность каналов")?.id).toBe("compare-channels");
   });
 });
 

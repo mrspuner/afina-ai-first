@@ -37,7 +37,7 @@ import { decideEnterAction, APPLY_ALL_COMMAND } from "@/state/prompt-bar-enter";
 import { useDraftQueue } from "@/state/draft-queue-context";
 import { useWelcomeChat } from "@/sections/welcome/welcome-chat-context";
 import { selectPromptSuggestions } from "@/state/select-prompt-suggestions";
-import type { SuggestionItem } from "@/state/suggestion-registry";
+import type { SuggestionAction, SuggestionItem } from "@/state/suggestion-registry";
 import { PromptBar } from "./prompt-bar";
 import { SuggestionBar } from "./suggestion-bar";
 import { useChat } from "@/state/chat-context";
@@ -141,6 +141,34 @@ export function ShellBottomBar() {
 
   const editorRef = useRef<ChipEditableInputHandle>(null);
 
+  // Suggestions never fire on click — they only insert their text into the
+  // bar. When a chip carries an action (submit/dispatch/chat-submit), the
+  // action is parked here and runs on confirm (Enter / submit button), but
+  // only if the user left the inserted text untouched. Editing it falls back
+  // to normal submit routing. "ask"/"command" chips need no deferred action.
+  const pendingActionRef = useRef<{ action: SuggestionAction; text: string } | null>(
+    null
+  );
+
+  function runPendingAction(action: SuggestionAction, segments: ChipSegment[]) {
+    switch (action.kind) {
+      case "submit":
+        // Pass the live segments so a phrase tied to an active tag (e.g. the
+        // trigger-scoped "проверить доступность доменов") keeps that context.
+        chatSubmit({ text: action.phrase, segments });
+        return;
+      case "dispatch":
+        dispatch(action.action);
+        return;
+      case "chat-submit":
+        welcomeChat?.submitChip(action.chip);
+        return;
+      case "ask":
+      case "command":
+        return;
+    }
+  }
+
   // Snapshot активного сегмента (тег + текст) — обновляется при изменении
   // chips, нужен для парковки предыдущего тега при смене (M5/ТЗ §7.2).
   const prevActiveRef = useRef<ChipSegment | null>(null);
@@ -181,6 +209,18 @@ export function ShellBottomBar() {
   function handlePromptSubmit(message: PromptInputMessage) {
     const rawText = message.text ?? "";
     const segments = editorRef.current?.getSegments() ?? [];
+
+    // A parked suggestion action fires only when its inserted text reaches
+    // submit unchanged. If the user edited it, drop the action and let the
+    // edited text route normally below.
+    const pending = pendingActionRef.current;
+    pendingActionRef.current = null;
+    if (pending && rawText.trim() === pending.text.trim()) {
+      runPendingAction(pending.action, segments);
+      editorRef.current?.clear();
+      chipsApi.clearChips();
+      return;
+    }
 
     const decision = decideEnterAction({
       hasActiveTag: segments.length > 0,
@@ -334,28 +374,26 @@ export function ShellBottomBar() {
   }
 
   function handlePickSuggestion(item: SuggestionItem) {
+    // Every chip only *inserts* text into the bar. The user sees it in the
+    // PromptBar and decides whether to send as-is (Enter) or edit. Any
+    // associated action is parked and fires on confirm via handlePromptSubmit.
+    function insert(text: string, action: SuggestionAction | null) {
+      textInput.insertAtCursor(text, { separator: "smart", preserveTags: true });
+      pendingActionRef.current = action ? { action, text } : null;
+    }
+
     switch (item.action.kind) {
       case "ask":
-        // Клик по вопросу-чипу вставляет текст в инпут — пользователь видит
-        // его в PromptBar и решает, отправить как есть (Enter) или поправить.
-        // Сам Enter маршрутизируется в `handlePromptSubmit` ниже, где для
-        // разделов без специальной обработки фраза уходит в `chatSubmit` и
-        // получает inline-ответ через TransientReply.
-        textInput.insertAtCursor(item.action.prompt, {
-          separator: "smart",
-          preserveTags: true,
-        });
+        insert(item.action.prompt, null);
         return;
       case "submit":
-        chatSubmit({ text: item.action.phrase, segments: [] });
-        editorRef.current?.clear();
-        chipsApi.clearChips();
+        insert(item.action.phrase, item.action);
         return;
       case "dispatch":
-        dispatch(item.action.action);
-        return;
       case "chat-submit":
-        welcomeChat?.submitChip(item.action.chip);
+        // No natural text payload — show the human label, run the action on
+        // confirm (or fall back to normal routing if the label is edited).
+        insert(item.label, item.action);
         return;
       case "command":
         if (item.action.command === "apply-all") {
@@ -363,6 +401,7 @@ export function ShellBottomBar() {
           editorRef.current?.clear();
           textInput.insertAtCursor(APPLY_ALL_COMMAND, { separator: "none" });
         }
+        pendingActionRef.current = null;
         return;
     }
   }

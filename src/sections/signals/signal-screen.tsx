@@ -16,11 +16,9 @@ function formatNumber(n: number): string {
 
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-start justify-between gap-4 py-3">
-      <span className="shrink-0 text-sm text-muted-foreground">{label}</span>
-      <span className="text-right text-sm font-medium text-foreground">
-        {value}
-      </span>
+    <div className="grid grid-cols-[180px_1fr] items-start gap-4 py-3">
+      <span className="text-sm text-muted-foreground">{label}</span>
+      <span className="text-sm font-medium text-foreground">{value}</span>
     </div>
   );
 }
@@ -36,6 +34,10 @@ export function SignalScreen() {
 
   const status = signal.status ?? "ready";
   const isReady = status === "ready";
+  // Once the signal is delivered, the budget shown is what was actually spent,
+  // not a planned cap — reflect that in the label.
+  const isDelivered = status === "ready" || status === "expired";
+  const budgetLabel = isDelivered ? "Фактический бюджет" : "Максимальный бюджет";
   const total =
     signal.segments.max +
     signal.segments.high +
@@ -56,12 +58,9 @@ export function SignalScreen() {
     <EntityCardShell
       title={title}
       onRename={(name) => dispatch({ type: "signal_renamed", id: signal.id, name })}
+      onBack={() => dispatch({ type: "sidebar_nav", section: "Сигналы" })}
+      backLabel="К сигналам"
       badge={!isReady ? <CardTag>{SIGNAL_STATUS_LABEL[status]}</CardTag> : undefined}
-      tags={
-        <CardTag>
-          {signal.type} · {formatNumber(signal.count)}
-        </CardTag>
-      }
       meta={
         <span className="inline-flex items-center gap-1.5">
           <CheckCircle2 className="h-4 w-4 text-emerald-500" aria-hidden />
@@ -113,7 +112,7 @@ export function SignalScreen() {
           />
           <SummaryRow label="Файл с базой" value={wd?.file ? wd.file.name : "—"} />
           <SummaryRow
-            label="Максимальный бюджет"
+            label={budgetLabel}
             value={wd?.budget ? `₽ ${wd.budget.toLocaleString("ru-RU")}` : "—"}
           />
         </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Check, Plus, X, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -229,6 +229,7 @@ interface TriggerCardProps {
   delta: TriggerDelta;
   highlight: boolean;
   onToggle: () => void;
+  onCheckboxToggle: () => void;
   onRemoveDelta: (bucket: "added" | "excluded", domain: string) => void;
   onExcludeSystemDomain: (domain: string) => void;
   onRestoreSystemDomain: (domain: string) => void;
@@ -287,6 +288,7 @@ function TriggerCard({
   delta,
   highlight,
   onToggle,
+  onCheckboxToggle,
   onRemoveDelta,
   onExcludeSystemDomain,
   onRestoreSystemDomain,
@@ -312,35 +314,42 @@ function TriggerCard({
         highlight && "ring-2 ring-brand transition-shadow"
       )}
     >
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-pressed={selected}
-        aria-label={
-          selected ? "Свернуть и убрать триггер" : "Выбрать и раскрыть триггер"
-        }
-        className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm"
-      >
-        <span
-          aria-hidden
+      <div className="flex w-full items-center gap-2 px-3 py-2.5 text-sm">
+        {/* Чекбокс — самостоятельный тоггл: доступен всегда, выключает даже
+            активный триггер. Отделён от клика по названию, чтобы тот только
+            выбирал+раскрывал, но не снимал выбор. */}
+        <button
+          type="button"
+          role="checkbox"
+          aria-checked={selected}
+          aria-label={selected ? "Снять выбор триггера" : "Выбрать триггер"}
+          onClick={(e) => {
+            e.stopPropagation();
+            onCheckboxToggle();
+          }}
           className={cn(
-            "flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border transition-colors",
+            "nodrag flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border transition-colors",
             selected
               ? "border-primary bg-primary text-primary-foreground"
-              : "border-border bg-background"
+              : "border-border bg-background hover:border-brand/50"
           )}
         >
           {selected && <Check className="h-3 w-3" />}
-        </span>
-        <span
+        </button>
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-label={
+            selected ? "Триггер выбран — открыть в строке" : "Выбрать и раскрыть триггер"
+          }
           className={cn(
-            "flex-1 font-medium",
+            "flex-1 text-left font-medium",
             selected ? "text-foreground" : "text-muted-foreground"
           )}
         >
           {trigger.label}
-        </span>
-      </button>
+        </button>
+      </div>
 
       {/* Collapsed (unselected): read-only system-domain preview as chips +
           "+N". Clicking it selects + expands the card — there is no separate
@@ -411,7 +420,7 @@ function TriggerCard({
 export function Step2Interests({ data, onNext }: StepProps) {
   const { clientDirection, wizardRemixToken } = useAppState();
   const dispatch = useAppDispatch();
-  const { pushChip, clearChips } = usePromptChips();
+  const { pushChip, clearChips, removeChip } = usePromptChips();
   const { textInput } = usePromptInputController();
   const vertical = useMemo(
     () => resolveVertical(clientDirection),
@@ -521,18 +530,28 @@ export function Step2Interests({ data, onNext }: StepProps) {
     });
   }
 
-  // M2 (revised) — Selection IS expansion: clicking the card selects it
-  // (highlighted, open, editable — system domains can be excluded, new ones
-  // added); clicking again deselects it (collapsed to a read-only domain
-  // preview). S1 — клик по карточке также отправляет триггер тегом в PromptBar,
-  // чтобы можно было сразу дать по нему AI-команду.
-  function toggleTriggerSelection(triggerId: string, triggerLabel: string) {
+  // Клик по карточке ВСЕГДА выбирает триггер (никогда не снимает выбор) и
+  // отправляет его тегом в PromptBar — чтобы по нему можно было сразу дать
+  // команду (например, «проверить доступность доменов»). Уже выбранный триггер
+  // остаётся выбранным; невыбранный — активируется (появляется чекбокс).
+  function selectTrigger(triggerId: string, triggerLabel: string) {
     setSelectedTriggers((prev) =>
-      prev.includes(triggerId)
-        ? prev.filter((t) => t !== triggerId)
-        : [...prev, triggerId]
+      prev.includes(triggerId) ? prev : [...prev, triggerId]
     );
     pushTriggerChip(triggerId, triggerLabel);
+  }
+
+  // Клик по чекбоксу — независимый тоггл выбора (включить/выключить), доступен
+  // всегда. Включение также кладёт тег в бар; выключение убирает его, чтобы
+  // контекст триггера в PromptBar не «завис» на снятом триггере.
+  function toggleTriggerCheckbox(triggerId: string, triggerLabel: string) {
+    if (selectedTriggers.includes(triggerId)) {
+      setSelectedTriggers((prev) => prev.filter((t) => t !== triggerId));
+      removeChip(`trigger_${triggerId}`);
+    } else {
+      setSelectedTriggers((prev) => [...prev, triggerId]);
+      pushTriggerChip(triggerId, triggerLabel);
+    }
   }
 
   function handleApplyParsed(
@@ -662,6 +681,17 @@ export function Step2Interests({ data, onNext }: StepProps) {
 
   // ---- TriggerEditApi for the PromptBar bridge ----
 
+  // Mirror selection/deltas into refs so the (stable) api can read the latest
+  // values without re-creating itself on every selection change.
+  const selectedTriggersRef = useRef(selectedTriggers);
+  const deltasRef = useRef(deltas);
+  useEffect(() => {
+    selectedTriggersRef.current = selectedTriggers;
+  }, [selectedTriggers]);
+  useEffect(() => {
+    deltasRef.current = deltas;
+  }, [deltas]);
+
   const triggerEditApi = useMemo<TriggerEditApi>(() => ({
     applyToTrigger: (triggerId, parsed) => {
       handleApplyParsed(triggerId, parsed);
@@ -676,6 +706,41 @@ export function Step2Interests({ data, onNext }: StepProps) {
     resolveTriggerIdByLabel: (label) => {
       const found = availableTriggers.find(({ trigger }) => trigger.label === label);
       return found ? found.trigger.id : null;
+    },
+    checkDomainAvailability: (triggerId?: string) => {
+      // Scope to the active trigger when given (its tag is in the bar),
+      // otherwise fall back to all selected triggers.
+      const scope = triggerId ? [triggerId] : selectedTriggersRef.current;
+      // Pool of currently-active system domains for the scoped trigger(s).
+      const pool: Array<{ triggerId: string; domain: string }> = [];
+      for (const tId of scope) {
+        const delta = deltasRef.current[tId] ?? EMPTY_DELTA;
+        const { active } = splitSystemDomains(getTriggerDomains(tId), delta);
+        for (const domain of active) pool.push({ triggerId: tId, domain });
+      }
+      if (pool.length === 0) return 0;
+
+      // Exclude 1–4 random domains (capped by pool size).
+      const n = 1 + Math.floor(Math.random() * Math.min(4, pool.length));
+      const chosen = pickN(pool, n, Math.random);
+      const byTrigger = new Map<string, string[]>();
+      for (const { triggerId, domain } of chosen) {
+        byTrigger.set(triggerId, [...(byTrigger.get(triggerId) ?? []), domain]);
+      }
+
+      setDeltas((prev) => {
+        const next = { ...prev };
+        for (const [triggerId, domainsToExclude] of byTrigger) {
+          const current = next[triggerId] ?? EMPTY_DELTA;
+          const updated = applyEditToDelta(current, [], domainsToExclude);
+          if (isDeltaEmpty(updated)) delete next[triggerId];
+          else next[triggerId] = updated;
+        }
+        return next;
+      });
+      setHighlightedTriggerIds(new Set(byTrigger.keys()));
+      window.setTimeout(() => setHighlightedTriggerIds(new Set()), 800);
+      return chosen.length;
     },
   }), [availableTriggers, dispatch]);
 
@@ -785,7 +850,10 @@ export function Step2Interests({ data, onNext }: StepProps) {
                   selected={selectedTriggers.includes(trigger.id)}
                   delta={deltas[trigger.id] ?? EMPTY_DELTA}
                   highlight={highlightedTriggerIds.has(trigger.id)}
-                  onToggle={() => toggleTriggerSelection(trigger.id, trigger.label)}
+                  onToggle={() => selectTrigger(trigger.id, trigger.label)}
+                  onCheckboxToggle={() =>
+                    toggleTriggerCheckbox(trigger.id, trigger.label)
+                  }
                   onRemoveDelta={(bucket, domain) =>
                     handleRemoveDelta(trigger.id, bucket, domain)
                   }

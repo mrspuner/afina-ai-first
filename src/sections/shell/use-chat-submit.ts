@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 import { useChat } from "@/state/chat-context";
 import { useTriggerEdit } from "@/state/trigger-edit-context";
 import { useAppState, useAppDispatch } from "@/state/app-state-context";
@@ -11,6 +11,7 @@ import {
   warmFallbackReply,
 } from "@/lib/informational-replies";
 import { parseTriggerCommand } from "@/lib/trigger-edit-parser";
+import { pluralRu } from "@/lib/plural-ru";
 import {
   COMPLEX_THINKING_FINAL_REPLY_SIGNAL,
   COMPLEX_THINKING_FINAL_REPLY_STATS,
@@ -36,14 +37,13 @@ export function useChatSubmit(): { submit: (payload: ChatComposerSubmitPayload) 
   const appDispatch = useAppDispatch();
   const timersRef = useRef<number[]>([]);
 
-  useEffect(() => {
-    const timers = timersRef;
-    return () => {
-      timers.current.forEach((id) => window.clearTimeout(id));
-      timers.current = [];
-    };
-  }, []);
-
+  // NB: intentionally NO unmount cleanup of these timers. The "сложный запрос"
+  // flow calls chat.openSidebar(), which unmounts the collapsed bottom-bar
+  // (page.tsx returns null for ChatPanel in sidebar mode). Clearing timers on
+  // unmount would kill the in-flight thinking sequence, leaving the pending
+  // bubble spinning forever (and only "working" on the 2nd try, when the
+  // drawer is already open). The chat state lives in the persistent
+  // ChatProvider, so scheduled callbacks remain valid after this hook unmounts.
   function schedule(fn: () => void, ms: number) {
     const id = window.setTimeout(() => {
       timersRef.current = timersRef.current.filter((t) => t !== id);
@@ -74,37 +74,93 @@ export function useChatSubmit(): { submit: (payload: ChatComposerSubmitPayload) 
   }
 
   function runStatsQuery(id: StatsQueryId, userText: string) {
+    // Shared pattern: echo the user line, apply a state change, then resolve a
+    // pending assistant reply after a short beat.
+    function respond(reply: string, apply?: () => void) {
+      chat.append({ role: "user", text: userText });
+      apply?.();
+      const replyId = chat.append({ role: "assistant", text: "", pending: true });
+      schedule(() => chat.updatePending(replyId, reply), 400);
+    }
+
     switch (id) {
-      case "group-by-campaigns": {
-        chat.append({ role: "user", text: userText });
-        appDispatch({ type: "stats_set_rows", rows: "campaigns" });
-        const replyId = chat.append({ role: "assistant", text: "", pending: true });
-        schedule(() => {
-          chat.updatePending(replyId, "Перегруппировал по кампаниям.");
-        }, 400);
+      case "group-by-campaigns":
+        respond("Перегруппировал по кампаниям.", () =>
+          appDispatch({ type: "stats_set_rows", rows: "campaigns" })
+        );
         return;
-      }
-      case "top-campaigns-income-june": {
-        chat.append({ role: "user", text: userText });
-        appDispatch({
-          type: "stats_apply_patch",
-          patch: {
-            rows: "campaigns",
-            sort: { column: "income", direction: "desc" },
-            period: {
-              preset: "custom",
-              from: `${STATS_DEMO_YEAR}-06-01`,
-              to: `${STATS_DEMO_YEAR}-06-30`,
+      case "top-campaigns-income-june":
+        respond("Топ-10 кампаний по доходу за июнь.", () =>
+          appDispatch({
+            type: "stats_apply_patch",
+            patch: {
+              rows: "campaigns",
+              sort: { column: "income", direction: "desc" },
+              period: {
+                preset: "custom",
+                from: `${STATS_DEMO_YEAR}-06-01`,
+                to: `${STATS_DEMO_YEAR}-06-30`,
+              },
+              rowCount: 10,
             },
-            rowCount: 10,
-          },
-        });
-        const replyId = chat.append({ role: "assistant", text: "", pending: true });
-        schedule(() => {
-          chat.updatePending(replyId, "Топ-10 кампаний по доходу за июнь.");
-        }, 400);
+          })
+        );
         return;
-      }
+      case "top-campaigns-income":
+        respond("Топ-10 кампаний по доходу.", () =>
+          appDispatch({
+            type: "stats_apply_patch",
+            patch: {
+              rows: "campaigns",
+              sort: { column: "income", direction: "desc" },
+              rowCount: 10,
+            },
+          })
+        );
+        return;
+      case "top-by-conversion":
+        respond("Топ по конверсии (AR) — сверху.", () =>
+          appDispatch({
+            type: "stats_apply_patch",
+            patch: { sort: { column: "ar", direction: "desc" }, rowCount: 10 },
+          })
+        );
+        return;
+      case "best-day-income":
+        respond("Лучшие дни по доходу — сверху.", () =>
+          appDispatch({
+            type: "stats_apply_patch",
+            patch: {
+              rows: "days",
+              sort: { column: "income", direction: "desc" },
+              rowCount: 10,
+            },
+          })
+        );
+        return;
+      case "breakdown-by-channels":
+        respond("Разбил по каналам.", () =>
+          appDispatch({ type: "stats_set_rows", rows: "channels" })
+        );
+        return;
+      case "breakdown-by-creatives":
+        respond("Разбил по креативам.", () =>
+          appDispatch({ type: "stats_set_rows", rows: "creatives" })
+        );
+        return;
+      case "trend-by-period":
+        respond("Показал тренд по дням за период.", () =>
+          appDispatch({
+            type: "stats_apply_patch",
+            patch: { rows: "days", sort: null },
+          })
+        );
+        return;
+      case "compare-prev-period":
+        respond(
+          "Сравнил с предыдущим периодом: доход +14%, расход +6%, ROI вырос на 7 п.п."
+        );
+        return;
       case "compare-channels": {
         chat.append({ role: "user", text: userText });
         playComplexThinking({
@@ -129,6 +185,29 @@ export function useChatSubmit(): { submit: (payload: ChatComposerSubmitPayload) 
         runStatsQuery(match.id, text);
         return;
       }
+    }
+
+    // «Проверить доступность доменов» — исключаем случайные домены и сообщаем
+    // сколько недоступно. Если в баре активен trigger-тег — проверяем именно
+    // этот триггер; иначе все выбранные.
+    if (/домен/.test(normalized) && /доступн/.test(normalized)) {
+      const triggerSeg = segments.find((s) => s.chip.kind === "trigger");
+      const triggerId =
+        triggerSeg && typeof triggerSeg.chip.payload === "string"
+          ? triggerSeg.chip.payload
+          : undefined;
+      chat.append({ role: "user", text, triggerLabel: triggerSeg?.chip.label });
+      const id = chat.append({ role: "assistant", text: "", pending: true });
+      const n = triggerEdit.checkDomainAvailability(triggerId);
+      schedule(() => {
+        chat.updatePending(
+          id,
+          n > 0
+            ? `Проверил домены: ${n} ${pluralRu(n, ["домен", "домена", "доменов"])} сейчас недоступны — исключил их.`
+            : "Проверил домены — все доступны, ничего исключать не нужно."
+        );
+      }, 600);
+      return;
     }
 
     if (normalized === LIGHT_QUERY) {

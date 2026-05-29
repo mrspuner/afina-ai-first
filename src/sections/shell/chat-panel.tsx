@@ -52,7 +52,10 @@ export function ChatPanel({ placeholder }: { placeholder: string }) {
         composerRef.current?.insertSuggestion(item.action.prompt);
         return;
       case "submit":
-        submit({ text: item.action.phrase, segments: [] });
+        // Антипаттерн — сразу выполнять действие по клику. Только вставляем
+        // фразу; по Enter ChatComposer отправит её в submit, где
+        // useChatSubmit распознает (stats-matcher, проверка доменов и т.п.).
+        composerRef.current?.insertSuggestion(item.action.phrase);
         return;
       case "dispatch":
         dispatch(item.action.action);

@@ -13,7 +13,14 @@ export const STATS_DEMO_YEAR = 2026;
 export type StatsQueryId =
   | "group-by-campaigns"
   | "top-campaigns-income-june"
-  | "compare-channels";
+  | "top-campaigns-income"
+  | "best-day-income"
+  | "compare-channels"
+  | "compare-prev-period"
+  | "breakdown-by-channels"
+  | "breakdown-by-creatives"
+  | "trend-by-period"
+  | "top-by-conversion";
 
 export interface StatsQueryMatch {
   id: StatsQueryId;
@@ -25,6 +32,7 @@ interface StatsQueryDef {
 }
 
 const QUERIES: StatsQueryDef[] = [
+  // Most specific first — composite queries before their generic prefixes.
   {
     id: "top-campaigns-income-june",
     groups: [
@@ -32,6 +40,29 @@ const QUERIES: StatsQueryDef[] = [
       ["кампани", "campaign"],
       ["доход", "income", "выручк"],
       ["июн", "june"],
+    ],
+  },
+  {
+    id: "top-campaigns-income",
+    groups: [
+      ["топ", "top"],
+      ["кампани", "campaign"],
+      ["доход", "income", "выручк"],
+    ],
+  },
+  {
+    id: "top-by-conversion",
+    groups: [
+      ["топ", "top"],
+      ["конверси", "конверсия", "ar", "аппрув"],
+    ],
+  },
+  {
+    id: "best-day-income",
+    groups: [
+      ["лучш", "найди лучш"],
+      ["день", "дням", "дню", "дней", "дня"],
+      ["доход", "income", "выручк"],
     ],
   },
   {
@@ -43,9 +74,34 @@ const QUERIES: StatsQueryDef[] = [
     ],
   },
   {
+    id: "compare-prev-period",
+    groups: [
+      ["сравни", "сравнить", "сравнение"],
+      ["вчера", "прошл", "предыдущ", "месяц", "квартал", "год", "период"],
+    ],
+  },
+  {
+    id: "breakdown-by-channels",
+    groups: [
+      ["разбей", "разбить", "разбивк", "по каналам"],
+      ["канал"],
+    ],
+  },
+  {
+    id: "breakdown-by-creatives",
+    groups: [
+      ["разбей", "разбить", "разбивк", "по креатив"],
+      ["креатив"],
+    ],
+  },
+  {
+    id: "trend-by-period",
+    groups: [["тренд", "динамик"]],
+  },
+  {
     id: "group-by-campaigns",
     groups: [
-      ["покажи", "показать", "сгруппируй", "группируй", "по разрезу"],
+      ["покажи", "показать", "сгруппируй", "группируй", "разбей", "разбить", "разбивк", "по разрезу"],
       ["кампани"],
     ],
   },

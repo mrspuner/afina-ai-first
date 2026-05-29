@@ -11,6 +11,21 @@ function ask(id: string, label: string, prompt: string): SuggestionItem {
   return { id, label, action: { kind: "ask", prompt } };
 }
 
+// Action chip: inserts its phrase into the bar, runs on confirm (see
+// shell-bottom-bar pending-action handling). Shown ONLY when a specific
+// trigger tag is active (trigger-context scope) — it checks/rebuilds the
+// domains of that one trigger, so it makes no sense without a selected trigger.
+const CHECK_DOMAINS: SuggestionItem = {
+  id: "wiz-2-check-domains",
+  label: "Проверить доступность доменов",
+  action: { kind: "submit", phrase: "проверить доступность доменов" },
+};
+
+/** Подсказки при активном trigger-теге — только проверка доменов. */
+export function resolveTriggerContext(): SuggestionItem[] {
+  return [CHECK_DOMAINS];
+}
+
 // ─── Step 1 — выбор сценария ────────────────────────────────────────────────
 // Раньше дублировали 6 карточек сценариев из основного экрана. Сейчас два
 // вопроса по сути решения: «в чём разница» и «что выбрать».
@@ -119,8 +134,11 @@ export function resolveWizardStep(s: WizardSub): SuggestionItem[] {
   switch (s.step) {
     case 1: return STEP_1;
     case 2: return step2({ hasInterests: s.hasInterests, hasDomains: s.hasDomains });
-    case 3: return STEP_3;
-    case 4: return STEP_4;
+    // Steps 3 (сегменты) and 4 (база) had their suggestion sets swapped
+    // relative to the actual screens — step 4 (база) now gets the file-format
+    // questions, step 3 the volume ones.
+    case 3: return STEP_4;
+    case 4: return STEP_3;
     case 5: return STEP_5;
     case 6: return step6({ nameSet: s.nameSet });
     case 7: return STEP_7;

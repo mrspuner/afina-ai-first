@@ -125,67 +125,15 @@ function resolveCampaigns(s: CampaignsSub): SuggestionItem[] {
 
 // ─── Статистика ─────────────────────────────────────────────────────────────
 
-function resolveStatistics(s: StatisticsSub): SuggestionItem[] {
-  const items: SuggestionItem[] = [];
-
-  // 1) Сравнение с предыдущим периодом — зависит от current preset.
-  if (s.period === "today") {
-    items.push(sub("sec-stats-vs-yesterday", "Сравни со вчера", "сравни с вчера"));
-  } else if (s.period === "this-month" || s.period === "last-month") {
-    items.push(
-      sub(
-        "sec-stats-vs-prev-month",
-        "Сравни с прошлым месяцем",
-        "сравни с прошлым месяцем"
-      )
-    );
-  } else if (s.period === "this-quarter" || s.period === "last-quarter") {
-    items.push(
-      sub(
-        "sec-stats-vs-prev-quarter",
-        "Сравни с прошлым кварталом",
-        "сравни с прошлым кварталом"
-      )
-    );
-  } else if (s.period === "this-year" || s.period === "last-year") {
-    items.push(
-      sub("sec-stats-vs-prev-year", "Сравни с прошлым годом", "сравни с прошлым годом")
-    );
-  } else {
-    items.push(sub("sec-stats-vs-prev", "Сравни с предыдущим периодом", "сравни с предыдущим периодом"));
-  }
-
-  // 2) Разворот по другой оси — зависит от текущего rowKind.
-  switch (s.rowKind) {
-    case "campaigns":
-      items.push(sub("sec-stats-by-channels", "Разбей по каналам", "разбей по каналам"));
-      items.push(sub("sec-stats-top-campaigns", "Топ-10 по доходу", "топ-10 кампаний по доходу"));
-      break;
-    case "channels":
-      items.push(
-        sub("sec-stats-by-campaigns", "Разбей по кампаниям", "разбей по кампаниям")
-      );
-      items.push(sub("sec-stats-by-creatives", "Разбей по креативам", "разбей по креативам"));
-      break;
-    case "triggers":
-    case "landings":
-    case "creatives":
-      items.push(sub("sec-stats-by-campaigns2", "Разбей по кампаниям", "разбей по кампаниям"));
-      items.push(sub("sec-stats-top-conversion", "Топ по конверсии", "топ-10 по конверсии"));
-      break;
-    case "days":
-    case "weekdays":
-    case "weeks":
-    case "months":
-      items.push(sub("sec-stats-best-day", "Лучший день", "найди лучший день по доходу"));
-      items.push(sub("sec-stats-trend", "Покажи тренд", "покажи тренд за период"));
-      break;
-    default:
-      items.push(sub("sec-stats-by-campaigns3", "Разбей по кампаниям", "разбей по кампаниям"));
-      items.push(sub("sec-stats-channels-cmp", "Сравни каналы", "сравни эффективность каналов"));
-  }
-
-  return items.slice(0, 3);
+// Ровно три рабочих запроса статистики (см. runStatsQuery в use-chat-submit):
+// разрез по кампаниям, топ-10 кампаний по доходу, и «сложный» запрос про
+// сравнение эффективности каналов. Выводим их как готовые подсказки.
+function resolveStatistics(_s: StatisticsSub): SuggestionItem[] {
+  return [
+    sub("sec-stats-by-campaigns", "Разрез по кампаниям", "покажи по кампаниям"),
+    sub("sec-stats-top-campaigns", "Топ-10 кампаний по доходу", "топ-10 кампаний по доходу за июнь"),
+    sub("sec-stats-compare-channels", "Сравнить эффективность каналов", "сравни эффективность каналов"),
+  ];
 }
 
 // ─── Сигналы ────────────────────────────────────────────────────────────────

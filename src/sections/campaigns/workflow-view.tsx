@@ -109,7 +109,70 @@ function deriveParamsPatch(
     };
   }
 
+  // Nothing matched the structured parsers — but a prompt-bar edit should
+  // never be a silent no-op. Apply a plausible change anyway: text fields take
+  // the user's words, enum/numeric fields get a near-random sensible value.
+  const fb = fallbackParamsPatch(currentParams, text);
+  if (fb) {
+    const dynamic = computeDynamicSublabel(currentParams.kind, fb);
+    return { paramsPatch: fb, ...(dynamic ? { sublabel: dynamic } : {}) };
+  }
+
   return {};
+}
+
+const FALLBACK_SMS = "Спецпредложение действует только сегодня — загляните в приложение";
+const FALLBACK_EMAIL = "Подготовили для вас персональную подборку — откройте, чтобы узнать детали.";
+const FALLBACK_PUSH = "Загляните — для вас есть кое-что интересное";
+const FALLBACK_GOALS = ["Конверсия в заявку", "Повторная покупка", "Активация клиента"];
+const FALLBACK_OFFERS = ["Кэшбэк 5%", "Премиум на месяц", "Бесплатная доставка"];
+
+function randPick<T>(arr: readonly T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+/**
+ * A best-effort parameter change for prompts that didn't match any structured
+ * action. Keeps the prototype's "магия под капотом" feel — the AI always
+ * "did something". Returns null only for node kinds that have no editable
+ * params (merge, signal).
+ */
+function fallbackParamsPatch(
+  params: NodeParams,
+  rawText: string
+): Partial<NodeParams> | null {
+  const text = rawText.trim().replace(/^[:\s]+/, "");
+  switch (params.kind) {
+    case "sms":
+      return { text: text || FALLBACK_SMS };
+    case "email":
+      return { body: text || FALLBACK_EMAIL };
+    case "push":
+      return { body: text || FALLBACK_PUSH };
+    case "ivr":
+      return { scenario: text || "Приветствие + предложение" };
+    case "success":
+      return { goal: text || randPick(FALLBACK_GOALS) };
+    case "end":
+      return { reason: text || "Цель не достигнута" };
+    case "landing":
+      return { offerTitle: text || randPick(FALLBACK_OFFERS) };
+    case "storefront": {
+      const offers = text
+        ? text.split(/[,;]/).map((o) => o.trim()).filter(Boolean)
+        : [randPick(FALLBACK_OFFERS)];
+      return { offers };
+    }
+    case "wait":
+      return { mode: "duration", durationHours: randPick([1, 3, 6, 12, 24, 48]) };
+    case "condition":
+      return { trigger: randPick(["opened", "not_opened", "clicked", "not_clicked"] as const) };
+    case "split":
+      return { branches: 2 + Math.floor(Math.random() * 4) };
+    case "merge":
+    case "signal":
+      return null;
+  }
 }
 
 function patchNode(
@@ -314,10 +377,18 @@ export function WorkflowView({
         let nodes = prev.nodes;
         const changedIds = new Set<string>();
         for (const p of plans) {
+          // Accumulate the changed param keys so a yellow dot can mark each
+          // edited field in the expanded card (not the node as a whole).
+          const existingDirty =
+            nodes.find((n) => n.id === p.nodeId)?.data.dirtyParams ?? [];
+          const dirtyParams = p.paramsPatch
+            ? Array.from(new Set([...existingDirty, ...Object.keys(p.paramsPatch)]))
+            : existingDirty;
           nodes = patchNode(nodes, p.nodeId, {
             needsAttention: false,
             attentionReason: undefined,
             ...(p.sublabel ? { sublabel: p.sublabel } : {}),
+            ...(p.paramsPatch ? { dirtyParams } : {}),
           });
           if (p.paramsPatch) {
             nodes = patchNodeParams(nodes, p.nodeId, p.paramsPatch);

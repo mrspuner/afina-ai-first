@@ -1,22 +1,26 @@
 import { describe, it, expect } from "vitest";
-import { SCENARIOS, SCENARIO_CATEGORIES, getScenario, baseScenarios, curatedScenarios, scenarioCount } from "./scenarios";
+import { SCENARIOS, SCENARIO_CATEGORIES, getScenario, baseScenarios, curatedScenarios, scenarioCount, curatedScenarioCount } from "./scenarios";
 
 describe("scenarios library", () => {
-  it("has 24 scenarios", () => {
-    expect(SCENARIOS).toHaveLength(24);
-    expect(scenarioCount).toBe(24);
+  it("has 36 scenarios", () => {
+    expect(SCENARIOS).toHaveLength(36);
+    expect(scenarioCount).toBe(36);
   });
   it("has 6 base scenarios", () => {
     expect(baseScenarios()).toHaveLength(6);
     expect(baseScenarios().every((s) => s.isBase)).toBe(true);
   });
-  it("has 4 curated scenarios, none of them base", () => {
-    expect(curatedScenarios()).toHaveLength(4);
+  it("has 10 curated scenarios, none of them base", () => {
+    expect(curatedScenarios()).toHaveLength(10);
     expect(curatedScenarios().every((s) => s.isCurated && !s.isBase)).toBe(true);
+  });
+  it("curatedScenarioCount equals the curated count (welcome hero)", () => {
+    expect(curatedScenarioCount).toBe(curatedScenarios().length);
+    expect(curatedScenarioCount).toBe(10);
   });
   it("every scenario has a unique id", () => {
     const ids = new Set(SCENARIOS.map((s) => s.id));
-    expect(ids.size).toBe(24);
+    expect(ids.size).toBe(SCENARIOS.length);
   });
   it("every scenario.signalType is a valid SignalType", () => {
     const valid = ["Регистрация", "Первая сделка", "Апсейл", "Реактивация", "Возврат", "Удержание"];

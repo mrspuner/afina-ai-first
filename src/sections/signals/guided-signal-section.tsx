@@ -7,6 +7,7 @@ import type { Signal } from "@/state/app-state";
 import type { SignalStatus } from "@/types/signal-status";
 import type { StepData } from "@/types/campaign";
 import { SCENARIO_TO_TYPE } from "@/state/scenario-map";
+import { SCENARIO_NAMES } from "@/data/scenarios";
 import { SurveySection } from "@/sections/survey/survey-section";
 import { CampaignWorkspace } from "./campaign-workspace";
 import { TopUpModal, computeShortfall } from "./top-up-modal";
@@ -155,11 +156,16 @@ export function GuidedSignalSection() {
       }
       const id = `sig_${nanoid(8)}`;
       const type = SCENARIO_TO_TYPE[params.scenarioId] ?? "Регистрация";
+      // Display name follows the chosen scenario ("Брошенная корзина", …), not
+      // the coarse signal type. Falls back to `type` when no scenario was set
+      // (free-text flow) since `name` is then left undefined.
+      const scenarioName = SCENARIO_NAMES[params.scenarioId];
       const enoughBalance = computeShortfall(balance, params.cost) <= 0;
 
       const signal: Signal = {
         id,
         type,
+        name: scenarioName,
         count: params.count,
         segments: { max: 1000, high: 1500, mid: 1200, low: 612 },
         createdAt: now,
@@ -173,7 +179,7 @@ export function GuidedSignalSection() {
       // persists. Track the id so step-7/step-8 can read live status.
       setPendingSignalId(id);
       setPendingCost(params.cost);
-      setPendingLabel(`${type} · ${params.count.toLocaleString("ru-RU")}`);
+      setPendingLabel(`${scenarioName ?? type} · ${params.count.toLocaleString("ru-RU")}`);
 
       if (enoughBalance) {
         // Schedule processing → ready transition.
@@ -215,6 +221,19 @@ export function GuidedSignalSection() {
     : activeResume
     ? signals.find((s) => s.id === activeResume.id) ?? null
     : null;
+
+  // Once a freshly-launched signal finishes processing, hand off to the real
+  // signal card instead of the wizard's step-8 result — the final state of a
+  // found signal IS its card (same total, settings table, actions, back
+  // button). Keyed on `pendingSignalId` so resumed signals are untouched.
+  useEffect(() => {
+    if (!pendingSignalId) return;
+    const sig = signals.find((s) => s.id === pendingSignalId);
+    if (sig && (sig.status ?? "ready") === "ready") {
+      dispatch({ type: "signal_opened", id: pendingSignalId });
+      setPendingSignalId(null);
+    }
+  }, [pendingSignalId, signals, dispatch]);
 
   // Survey gate must be after all hooks — React rule.
   const showSurvey =
