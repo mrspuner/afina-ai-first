@@ -12,6 +12,7 @@ import type { NodeTagPayload } from "@/state/prompt-chips-context";
 import { useAppDispatch } from "@/state/app-state-context";
 import { cn } from "@/lib/utils";
 import { getNodeColor } from "./node-visuals";
+import { useWorkflowReadOnly } from "./workflow-readonly-context";
 
 type ParamRow = { label: string; value: string };
 
@@ -133,6 +134,9 @@ export function NodeCardBody({ id, data }: NodeCardBodyProps) {
   const { textInput } = usePromptInputController();
   const { pushChip } = usePromptChips();
   const dispatch = useAppDispatch();
+  // Launched/paused/completed campaigns: the card opens for inspection only —
+  // every field stays read-only regardless of its manual/ai editability.
+  const readOnly = useWorkflowReadOnly();
   const [editing, setEditing] = useState<{ label: string; value: string } | null>(null);
 
   function commitEdit() {
@@ -253,7 +257,8 @@ export function NodeCardBody({ id, data }: NodeCardBodyProps) {
             // Whole-row affordance: clicking anywhere on a manual row opens its
             // inline editor; on an ai row sends the field tag to the prompt bar.
             // The trailing icon is now just a visual marker, not the only target.
-            const interactive = editability === "manual" || editability === "ai";
+            const interactive =
+              !readOnly && (editability === "manual" || editability === "ai");
             const icon =
               editability === "manual" ? (
                 <Pencil className="h-3 w-3" />

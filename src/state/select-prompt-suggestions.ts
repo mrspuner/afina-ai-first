@@ -139,6 +139,11 @@ export function selectPromptSuggestions(
   if (ctx.activeTag) {
     const payload = ctx.activeTag.payload;
     if (isNodeTagPayload(payload)) {
+      // Read-only (launched) workflow: узел раскрывается только для просмотра —
+      // подсказки-правки под баром не показываем.
+      if (state.view.kind === "workflow" && state.view.launched) {
+        return { kind: "hidden" };
+      }
       return resolved({
         kind: "node-context",
         nodeType: payload.nodeType as WorkflowNodeType,

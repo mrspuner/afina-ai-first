@@ -523,6 +523,7 @@ export function WorkflowView({
           nodes={shiftNeighborsAround(graph.nodes, selectedNodeId)}
           edges={graph.edges}
           compact={launched}
+          readOnly={launched}
           onNodeClick={onNodeClick}
           onPaneClick={onPaneClick}
         />

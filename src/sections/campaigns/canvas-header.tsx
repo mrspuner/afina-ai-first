@@ -20,7 +20,7 @@ export interface CanvasHeaderToast {
   text: string;
 }
 
-type ConfirmKind = "pause" | "duplicate";
+type ConfirmKind = "pause";
 
 interface CanvasHeaderProps {
   campaign: Campaign;
@@ -29,8 +29,6 @@ interface CanvasHeaderProps {
   onLaunch: () => void;
   onPause: () => void;
   onResume: () => void;
-  onDuplicate: () => void;
-  onGoToStats: () => void;
   toast?: CanvasHeaderToast | null;
   onDismissToast?: () => void;
   /**
@@ -40,8 +38,9 @@ interface CanvasHeaderProps {
    * - "read-only" — used when the workflow is opened in launched/preview
    *   mode. Adds a large «Back» arrow to the left of the title and replaces
    *   the signal-line subtitle with a static «Просмотр workflow» label.
-   *   Pencil-edit of the campaign name and the right-side action buttons
-   *   are preserved — renaming a launched campaign is allowed.
+   *   Pencil-edit of the campaign name is preserved — renaming a launched
+   *   campaign is allowed. The only status action surfaced here is start/stop
+   *   (запуск/остановка); дублирование и статистика живут в карточке кампании.
    */
   mode?: "edit" | "read-only";
   /**
@@ -101,8 +100,6 @@ export function CanvasHeader({
   onLaunch,
   onPause,
   onResume,
-  onDuplicate,
-  onGoToStats,
   toast,
   onDismissToast,
   mode = "edit",
@@ -221,38 +218,16 @@ export function CanvasHeader({
             <Button onClick={onLaunch}>Запустить</Button>
           )}
           {campaign.status === "active" && (
-            <>
-              <Button variant="outline" onClick={onGoToStats}>
-                Посмотреть статистику
-              </Button>
-              <Button
-                variant="outline"
-                className="text-amber-600 border-amber-500/40 hover:bg-amber-500/10"
-                onClick={() => setConfirm("pause")}
-              >
-                Приостановить
-              </Button>
-              <Button onClick={() => setConfirm("duplicate")}>Дублировать</Button>
-            </>
+            <Button
+              variant="outline"
+              className="text-amber-600 border-amber-500/40 hover:bg-amber-500/10"
+              onClick={() => setConfirm("pause")}
+            >
+              Приостановить
+            </Button>
           )}
           {campaign.status === "paused" && (
-            <>
-              <Button variant="outline" onClick={onGoToStats}>
-                Посмотреть статистику
-              </Button>
-              <Button variant="outline" onClick={() => setConfirm("duplicate")}>
-                Дублировать
-              </Button>
-              <Button onClick={onResume}>Возобновить</Button>
-            </>
-          )}
-          {campaign.status === "completed" && (
-            <>
-              <Button variant="outline" onClick={onGoToStats}>
-                Посмотреть статистику
-              </Button>
-              <Button onClick={() => setConfirm("duplicate")}>Дублировать</Button>
-            </>
+            <Button onClick={onResume}>Возобновить</Button>
           )}
         </div>
       </div>
@@ -307,30 +282,6 @@ export function CanvasHeader({
                   }}
                 >
                   Приостановить
-                </Button>
-              </DialogFooter>
-            </>
-          )}
-          {confirm === "duplicate" && (
-            <>
-              <DialogHeader>
-                <DialogTitle>Дублировать кампанию?</DialogTitle>
-                <DialogDescription>
-                  Будет создана черновая копия «Копия — {campaign.name}» и
-                  открыта в Canvas.
-                </DialogDescription>
-              </DialogHeader>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setConfirm(null)}>
-                  Отмена
-                </Button>
-                <Button
-                  onClick={() => {
-                    setConfirm(null);
-                    onDuplicate();
-                  }}
-                >
-                  Дублировать
                 </Button>
               </DialogFooter>
             </>

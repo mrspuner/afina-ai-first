@@ -29,6 +29,13 @@ import type { ChatComposerSubmitPayload } from "./chat-composer";
 const LIGHT_QUERY = "лёгкий запрос";
 const HEAVY_QUERY = "сложный запрос";
 
+// Ответ при попытке отредактировать ноду в уже запущенном (read-only)
+// сценарии. Правок на лету нет — пользователя ведём к дублированию.
+const READ_ONLY_WORKFLOW_REPLY =
+  "Этот сценарий уже запущен, поэтому его нельзя редактировать. " +
+  "Чтобы внести изменения, продублируйте кампанию — копия откроется черновиком, " +
+  "и ноды снова можно будет править.";
+
 /** Общий обработчик сабмита чата — используется и collapsed-баром, и drawer. */
 export function useChatSubmit(): { submit: (payload: ChatComposerSubmitPayload) => void } {
   const chat = useChat();
@@ -175,6 +182,26 @@ export function useChatSubmit(): { submit: (payload: ChatComposerSubmitPayload) 
   function submit(payload: ChatComposerSubmitPayload) {
     const { text, segments } = payload;
     const normalized = text.trim().toLowerCase();
+
+    // Read-only (запущенный) сценарий: правка ноды невозможна. Если пользователь
+    // что-то напечатал после тега узла — эхо его запроса в историю и ответ,
+    // который ведёт к дублированию, вместо no-op правки. Нетегированные вопросы
+    // продолжают получать обычный ответ ниже.
+    if (appState.view.kind === "workflow" && appState.view.launched) {
+      const nodeSeg = segments.find(
+        (s) => s.chip.kind === "node" && s.text.trim().length > 0
+      );
+      if (nodeSeg) {
+        chat.append({
+          role: "user",
+          text: nodeSeg.text,
+          triggerLabel: nodeSeg.chip.label,
+        });
+        const id = chat.append({ role: "assistant", text: "", pending: true });
+        schedule(() => chat.updatePending(id, READ_ONLY_WORKFLOW_REPLY), 400);
+        return;
+      }
+    }
 
     // Statistics-only hard-coded queries (looser matching). Скоупинг по
     // секции — фразы не должны срабатывать вне Статистики, даже если их

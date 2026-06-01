@@ -172,16 +172,6 @@ export function WorkflowSection() {
     });
   }
 
-  function handleDuplicate() {
-    if (!currentCampaign) return;
-    dispatch({ type: "campaign_duplicated", id: currentCampaign.id });
-  }
-
-  function handleGoToStats() {
-    if (!currentCampaign) return;
-    dispatch({ type: "goto_stats", campaignId: currentCampaign.id });
-  }
-
   if (!currentCampaign) {
     return (
       <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
@@ -199,8 +189,6 @@ export function WorkflowSection() {
         onLaunch={handleLaunch}
         onPause={handlePause}
         onResume={handleResume}
-        onDuplicate={handleDuplicate}
-        onGoToStats={handleGoToStats}
         toast={toast}
         onDismissToast={dismissToast}
         mode={view.launched ? "read-only" : "edit"}
@@ -227,9 +215,11 @@ export function WorkflowSection() {
           signalType={currentSignal?.type}
           signal={currentSignal ?? undefined}
           onGraphChange={handleGraphChange}
-          // Read-only for launched campaigns — kill node interactions.
-          onNodeClick={view.launched ? undefined : handleNodeClick}
-          onPaneClick={view.launched ? undefined : handlePaneClick}
+          // Launched campaigns are read-only: nodes still open/expand so the
+          // user can inspect the сценарий, but their fields can't be edited
+          // (enforced down in NodeCardBody via the read-only context).
+          onNodeClick={handleNodeClick}
+          onPaneClick={handlePaneClick}
         />
       </div>
 

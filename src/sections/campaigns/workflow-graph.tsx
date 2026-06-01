@@ -14,6 +14,7 @@ import {
   WorkflowNodeComponent,
   WORKFLOW_NODE_STATE_CSS,
 } from "@/sections/campaigns/workflow-node";
+import { WorkflowReadOnlyProvider } from "@/sections/campaigns/workflow-readonly-context";
 import type { WorkflowNode, WorkflowEdge } from "@/types/workflow";
 
 // Defined outside component — React Flow requires stable nodeTypes reference
@@ -23,6 +24,8 @@ interface WorkflowGraphProps {
   nodes: WorkflowNode[];
   edges: WorkflowEdge[];
   compact?: boolean;
+  /** Launched campaigns: nodes expand for inspection but fields can't be edited. */
+  readOnly?: boolean;
   onNodeClick?: (id: string, label: string, nodeType?: string) => void;
   onPaneClick?: () => void;
 }
@@ -121,18 +124,21 @@ export function WorkflowGraph({
   nodes,
   edges,
   compact,
+  readOnly = false,
   onNodeClick,
   onPaneClick,
 }: WorkflowGraphProps) {
   return (
-    <ReactFlowProvider>
-      <GraphInner
-        nodes={nodes}
-        edges={edges}
-        compact={compact}
-        onNodeClick={onNodeClick}
-        onPaneClick={onPaneClick}
-      />
-    </ReactFlowProvider>
+    <WorkflowReadOnlyProvider value={readOnly}>
+      <ReactFlowProvider>
+        <GraphInner
+          nodes={nodes}
+          edges={edges}
+          compact={compact}
+          onNodeClick={onNodeClick}
+          onPaneClick={onPaneClick}
+        />
+      </ReactFlowProvider>
+    </WorkflowReadOnlyProvider>
   );
 }
