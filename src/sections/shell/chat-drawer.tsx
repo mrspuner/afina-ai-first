@@ -1,21 +1,17 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { useChat } from "@/state/chat-context";
 import { ChatPanelHeader } from "./chat-panel-header";
 import { ChatHistoryList } from "./chat-history-list";
-import { ChatComposer, type ChatComposerHandle } from "./chat-composer";
-import { useChatSubmit } from "./use-chat-submit";
+import {
+  PromptComposer,
+  DRAWER_INPUT_CLASS,
+  type PromptComposerHandle,
+} from "./prompt-composer";
 import { DraftQueueList } from "./draft-queue-list";
-import { SuggestionBar } from "./suggestion-bar";
-import type { PromptChip } from "@/state/prompt-chips-context";
-import { useAppDispatch, useAppState } from "@/state/app-state-context";
-import { useDraftQueue } from "@/state/draft-queue-context";
-import { useWelcomeChat } from "@/sections/welcome/welcome-chat-context";
-import { selectPromptSuggestions } from "@/state/select-prompt-suggestions";
-import type { SuggestionItem } from "@/state/suggestion-registry";
 
 const SIDEBAR_WIDTH_PX = 420;
 
@@ -33,62 +29,8 @@ function EmptyHistory() {
 /** Глобальный правый AI-drawer. Открывается кнопкой PanelRightOpen в PromptBar. */
 export function ChatDrawer({ placeholder }: { placeholder: string }) {
   const chat = useChat();
-  const { submit } = useChatSubmit();
-  const state = useAppState();
-  const dispatch = useAppDispatch();
-  const { drafts } = useDraftQueue();
-  const welcomeChat = useWelcomeChat();
-  const composerRef = useRef<ChatComposerHandle>(null);
+  const composerRef = useRef<PromptComposerHandle>(null);
   const isSidebar = chat.mode === "sidebar";
-
-  const [activeInfo, setActiveInfo] = useState<{
-    tag: PromptChip | null;
-    hasTypedText: boolean;
-  }>({ tag: null, hasTypedText: false });
-
-  const handleActiveTagChange = useCallback(
-    (info: { tag: PromptChip | null; hasTypedText: boolean }) => {
-      setActiveInfo((prev) =>
-        prev.tag === info.tag && prev.hasTypedText === info.hasTypedText
-          ? prev
-          : info
-      );
-    },
-    []
-  );
-
-  // Те же подсказки, что и под свёрнутым баром — теперь дублируются в drawer.
-  const resolution = selectPromptSuggestions(state, {
-    activeTag: activeInfo.tag,
-    hasTypedText: activeInfo.hasTypedText,
-    queueLength: drafts.length,
-    welcomeChips: welcomeChat?.chips ?? [],
-  });
-
-  function handlePick(item: SuggestionItem) {
-    switch (item.action.kind) {
-      case "ask":
-        composerRef.current?.insertSuggestion(item.action.prompt);
-        return;
-      case "submit":
-        // Только вставляем фразу — действие выполнится по Enter через submit
-        // (не сразу по клику; см. ChatPanel.handlePick).
-        composerRef.current?.insertSuggestion(item.action.phrase);
-        return;
-      case "dispatch":
-        dispatch(item.action.action);
-        return;
-      case "command":
-        if (item.action.command === "apply-all") {
-          composerRef.current?.insertApplyAllCommand();
-        }
-        return;
-      case "chat-submit":
-        // Welcome-волны теперь живут в общем чате/drawer — пишем ответ сюда.
-        welcomeChat?.submitChip(item.action.chip);
-        return;
-    }
-  }
 
   useLayoutEffect(() => {
     const root = document.documentElement;
@@ -127,13 +69,11 @@ export function ChatDrawer({ placeholder }: { placeholder: string }) {
           ) : (
             <ChatHistoryList messages={chat.messages} />
           )}
-          <ChatComposer
+          <PromptComposer
             ref={composerRef}
             placeholder={placeholder}
-            onSubmit={submit}
-            onActiveTagChange={handleActiveTagChange}
+            inputClassName={DRAWER_INPUT_CLASS}
           />
-          <SuggestionBar resolution={resolution} onPick={handlePick} />
         </motion.aside>
       )}
     </AnimatePresence>
