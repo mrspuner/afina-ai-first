@@ -154,11 +154,12 @@ export function StatisticsView({ campaignId }: { campaignId?: string } = {}) {
     [applied, activeTemplate.filters],
   );
 
-  // Строки — group-by по кубу фактов реальных кампаний/сигналов. При просмотре
-  // статистики конкретной кампании (campaignId) факты фильтруются по ней.
+  // Строки — group-by по кубу фактов реальных кампаний/сигналов. Фильтрация (в
+  // т.ч. скоуп на одну кампанию из карточки) идёт через живые условия поиска
+  // (applied.conditions), которые применяет generateRows.
   const rows = useMemo(
-    () => generateRows(applied, { campaigns, signals }, { campaignId }),
-    [applied, campaigns, signals, campaignId],
+    () => generateRows(applied, { campaigns, signals }),
+    [applied, campaigns, signals],
   );
   const resolvedRange = useMemo(
     () => resolvePeriod(applied.period),

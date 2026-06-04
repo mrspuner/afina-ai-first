@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { aggregate, buildFacts, groupFacts, type StatsContext } from "./fact-cube";
+import {
+  aggregate,
+  buildFacts,
+  filterFactsByConditions,
+  groupFacts,
+  type StatsContext,
+} from "./fact-cube";
 import type { DateRange } from "./period-utils";
 
 // Fixed "now" so campaign windows and the period are deterministic.
@@ -72,7 +78,10 @@ describe("buildFacts — околореальные дни", () => {
 
   it("активные дни = длине пересечения окна кампании и периода", () => {
     // cmp_b: 05 Apr → 20 Apr completed = 16 дней, целиком внутри периода.
-    const facts = buildFacts(CTX, PERIOD, { now: NOW, campaignId: "cmp_b" });
+    const facts = filterFactsByConditions(
+      buildFacts(CTX, PERIOD, { now: NOW }),
+      { include: { campaigns: ["cmp-cmp_b"] }, exclude: {} },
+    );
     const days = new Set(facts.map((f) => f.date.toISOString().slice(0, 10)));
     expect(days.size).toBe(16);
   });
@@ -161,6 +170,42 @@ describe("cube invariants", () => {
   it("детерминизм: повторный вызов даёт те же числа", () => {
     const again = buildFacts(CTX, PERIOD, { now: NOW });
     expect(aggregate(again)).toEqual(aggregate(facts));
+  });
+
+  it("условие include по кампании оставляет только её факты", () => {
+    const only = filterFactsByConditions(facts, {
+      include: { campaigns: ["cmp-cmp_a"] },
+      exclude: {},
+    });
+    expect(only.length).toBeGreaterThan(0);
+    expect(only.every((f) => f.dims.campaigns.key === "cmp-cmp_a")).toBe(true);
+  });
+
+  it("условие exclude убирает факты кампании", () => {
+    const without = filterFactsByConditions(facts, {
+      include: {},
+      exclude: { campaigns: ["cmp-cmp_a"] },
+    });
+    expect(without.every((f) => f.dims.campaigns.key !== "cmp-cmp_a")).toBe(true);
+    expect(without.length).toBe(
+      facts.filter((f) => f.dims.campaigns.key !== "cmp-cmp_a").length,
+    );
+  });
+
+  it("пустые условия не меняют набор фактов", () => {
+    expect(filterFactsByConditions(facts, { include: {}, exclude: {} })).toBe(
+      facts,
+    );
+  });
+
+  it("include по pool-измерению фильтрует по ключу канала", () => {
+    const ch = facts[0].dims.channels.key;
+    const only = filterFactsByConditions(facts, {
+      include: { channels: [ch] },
+      exclude: {},
+    });
+    expect(only.length).toBeGreaterThan(0);
+    expect(only.every((f) => f.dims.channels.key === ch)).toBe(true);
   });
 
   it("каждый факт несёт значение по каждому измерению", () => {

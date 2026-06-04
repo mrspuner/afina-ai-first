@@ -23,7 +23,7 @@ import {
   seededInt,
   type FunnelNumbers,
 } from "@/state/metrics";
-import type { RowKind } from "./statistics-state";
+import type { RowKind, SearchConditions } from "./statistics-state";
 import {
   eachDay,
   formatDateRangeRu,
@@ -83,7 +83,7 @@ export type StatsContext = {
 // their values come from the campaign itself.
 // ---------------------------------------------------------------------------
 
-const POOLS: Record<Exclude<EntityDim, "campaigns" | "scenarios">, string[]> = {
+export const POOLS: Record<Exclude<EntityDim, "campaigns" | "scenarios">, string[]> = {
   offers: [
     "Кредит наличными",
     "Депозит «Гибкий»",
@@ -339,12 +339,7 @@ function buildCampaignFacts(
 // the column/currency/sort/rows choices that change on every settings tweak.
 let factCache: { key: string; facts: Fact[] } | null = null;
 
-function cacheKey(
-  ctx: StatsContext,
-  period: DateRange,
-  campaignId: string | undefined,
-  now: Date,
-): string {
+function cacheKey(ctx: StatsContext, period: DateRange, now: Date): string {
   const c = (ctx.campaigns ?? [])
     .map(
       (x) =>
@@ -352,16 +347,21 @@ function cacheKey(
     )
     .join("|");
   const s = (ctx.signals ?? []).map((x) => `${x.id}:${x.count}`).join("|");
-  return `${period.from.getTime()}-${period.to.getTime()}|${campaignId ?? ""}|${now.getTime()}|${c}|${s}`;
+  return `${period.from.getTime()}-${period.to.getTime()}|${now.getTime()}|${c}|${s}`;
 }
 
+/**
+ * All delivery facts for the launched campaigns active during `period`. Cached
+ * by entities+period+now; per-entity filtering (search conditions, campaign
+ * scoping) is applied downstream via {@link filterFactsByConditions}, not here.
+ */
 export function buildFacts(
   ctx: StatsContext,
   period: DateRange,
-  opts: { campaignId?: string; now?: Date } = {},
+  opts: { now?: Date } = {},
 ): Fact[] {
   const now = opts.now ?? new Date();
-  const key = cacheKey(ctx, period, opts.campaignId, now);
+  const key = cacheKey(ctx, period, now);
   if (factCache && factCache.key === key) return factCache.facts;
 
   const countById = new Map(
@@ -369,7 +369,6 @@ export function buildFacts(
   );
   const facts: Fact[] = [];
   for (const c of ctx.campaigns ?? []) {
-    if (opts.campaignId && c.id !== opts.campaignId) continue;
     const window = campaignWindow(c, now);
     if (!window) continue;
     const span = intersect(window, period);
@@ -379,6 +378,42 @@ export function buildFacts(
   }
   factCache = { key, facts };
   return facts;
+}
+
+/** Dimension options for a label pool, keyed exactly like fact dim values. */
+export function poolOptions(
+  kind: keyof typeof POOLS,
+): { value: string; label: string }[] {
+  return POOLS[kind].map((label, i) => ({ value: `${kind}-${i}`, label }));
+}
+
+/**
+ * Applies live search conditions to the fact set. Within an entity the values
+ * are OR'd; across entities they are AND'd; excludes drop any matching fact.
+ * Entity keys are dimension names (campaigns/offers/channels/…), so each fact's
+ * value for that dimension is read via {@link dimValueOf} and matched by key —
+ * the same `cmp-<id>` / `<kind>-<i>` / `scn-<id>` namespace the options use.
+ */
+export function filterFactsByConditions(
+  facts: Fact[],
+  conditions: SearchConditions,
+): Fact[] {
+  const include = Object.entries(conditions.include).filter(
+    ([, v]) => v && v.length > 0,
+  );
+  const exclude = Object.entries(conditions.exclude).filter(
+    ([, v]) => v && v.length > 0,
+  );
+  if (include.length === 0 && exclude.length === 0) return facts;
+  return facts.filter((f) => {
+    for (const [entity, values] of include) {
+      if (!values.includes(dimValueOf(f, entity as RowKind).key)) return false;
+    }
+    for (const [entity, values] of exclude) {
+      if (values.includes(dimValueOf(f, entity as RowKind).key)) return false;
+    }
+    return true;
+  });
 }
 
 // ---------------------------------------------------------------------------

@@ -8,6 +8,7 @@ import { formatFunnel, type FunnelDisplay } from "@/state/metrics";
 import {
   aggregate,
   buildFacts,
+  filterFactsByConditions,
   groupFacts,
   type StatsContext,
 } from "./fact-cube";
@@ -68,11 +69,16 @@ export function sortRows(
 export function generateRows(
   filters: StatisticsFilters,
   ctx?: StatsContext,
-  opts: { campaignId?: string; now?: Date } = {},
+  opts: { now?: Date } = {},
 ): GeneratedRow[] {
   if (!ctx) return [];
   const period = resolvePeriod(filters.period, opts.now);
-  const facts = buildFacts(ctx, period, opts);
+  // Условия поиска — единый живой фильтр куба (включения/исключения по
+  // сущностям). Применяются к полному набору фактов до группировки.
+  const facts = filterFactsByConditions(
+    buildFacts(ctx, period, opts),
+    filters.conditions,
+  );
 
   // subRows === rows — вырожденная пара (разбивка измерения само на себя);
   // трактуем как отсутствие подстрок.

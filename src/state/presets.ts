@@ -176,17 +176,23 @@ export function generateCampaigns(opts: GenerateCampaignsOpts): Campaign[] {
       campaign.launchedAt = rndPastDate(rng, 30, opts.now);
     }
     if (status === "paused") {
-      // Launched some time ago (5-30 days), paused more recently (1-15 days).
-      campaign.launchedAt = new Date(
-        opts.now - (5 + Math.floor(rng() * 26)) * DAY_MS
-      ).toISOString();
+      // Launched 5–30 days ago, paused some time AFTER launch (never before).
+      const launchedMs = opts.now - (5 + Math.floor(rng() * 26)) * DAY_MS;
+      campaign.launchedAt = new Date(launchedMs).toISOString();
       campaign.pausedAt = new Date(
-        opts.now - (1 + Math.floor(rng() * 15)) * DAY_MS
+        launchedMs + Math.floor(rng() * (opts.now - launchedMs))
       ).toISOString();
     }
     if (status === "completed") {
-      campaign.launchedAt = rndPastDate(rng, opts.dateSpanDays, opts.now);
-      campaign.completedAt = rndPastDate(rng, 30, opts.now);
+      // Launched within the span, completed between launch and now — so the
+      // lifetime window [launchedAt, completedAt] is always valid (otherwise
+      // the stats cube drops the campaign entirely).
+      const launchedMs =
+        opts.now - Math.floor(rng() * opts.dateSpanDays * DAY_MS);
+      campaign.launchedAt = new Date(launchedMs).toISOString();
+      campaign.completedAt = new Date(
+        launchedMs + Math.floor(rng() * (opts.now - launchedMs))
+      ).toISOString();
     }
     out.push(campaign);
   });

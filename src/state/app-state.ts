@@ -564,10 +564,25 @@ export function appReducer(state: AppState, action: Action): AppState {
       const keepWorkflow =
         workflowCampaignId !== null &&
         action.preset.campaigns.some((c) => c.id === workflowCampaignId);
+      // Preset campaign dates span the last 30–90 days. Reset the stats period
+      // to cover them (last 90 days) and clear any stale conditions, so the
+      // preset's campaigns are immediately visible in the report.
+      const now = new Date();
+      const from = new Date(now);
+      from.setDate(from.getDate() - 89);
+      const stats: StatisticsFilters = {
+        ...DEFAULT_FILTERS,
+        period: {
+          preset: "custom",
+          from: from.toISOString().slice(0, 10),
+          to: now.toISOString().slice(0, 10),
+        },
+      };
       return {
         ...state,
         signals: action.preset.signals,
         campaigns: action.preset.campaigns,
+        stats,
         view:
           state.view.kind === "workflow" && !keepWorkflow
             ? { kind: "section", name: "Кампании" }
@@ -633,6 +648,18 @@ export function appReducer(state: AppState, action: Action): AppState {
         view: { kind: "section", name: "Статистика", campaignId: action.campaignId },
         workflowCommand: null,
         selectedWorkflowNode: null,
+        // Открытие статистики из карточки кампании выставляет ЖИВОЕ условие
+        // поиска — оно и фильтрует куб, и видно в «Условиях поиска». Ключ
+        // совпадает с ключом измерения campaigns в кубе (`cmp-<id>`).
+        stats: action.campaignId
+          ? {
+              ...state.stats,
+              conditions: {
+                include: { campaigns: [`cmp-${action.campaignId}`] },
+                exclude: {},
+              },
+            }
+          : state.stats,
         activeSection: "Статистика",
         campaignFilter: [],
         campaignSort: "default",
