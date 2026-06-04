@@ -2,7 +2,7 @@ import { nanoid } from "nanoid";
 import type { StructuralOp } from "./structural-commands";
 import type { CampaignSort } from "./parse-campaign-filter";
 import type { Survey, SurveyStatus } from "@/types/survey";
-import { EMPTY_SURVEY } from "@/types/survey";
+import { EMPTY_SURVEY, DEMO_SURVEY } from "@/types/survey";
 import type { SignalStatus } from "@/types/signal-status";
 import type { StepData } from "@/types/campaign";
 import type { NodeParams } from "@/types/workflow";
@@ -578,11 +578,34 @@ export function appReducer(state: AppState, action: Action): AppState {
           to: now.toISOString().slice(0, 10),
         },
       };
+      // Непустой пресет автоматически заполняет анкету (демо-данные) и
+      // подтягивает сайт в настройки — чтобы тестировать без прохождения формы;
+      // empty — сбрасывает анкету обратно.
+      const isEmptyPreset = action.preset.key === "empty";
+      const survey = isEmptyPreset ? EMPTY_SURVEY : DEMO_SURVEY;
+      const surveyStatus: SurveyStatus = isEmptyPreset
+        ? "not_started"
+        : "completed";
+      const clientDirection = isEmptyPreset
+        ? DEFAULT_DIRECTION_ID
+        : businessDirectionFromSurvey(DEMO_SURVEY.directionId);
+      const accountSettings = isEmptyPreset
+        ? state.accountSettings
+        : {
+            ...state.accountSettings,
+            companyWebsite: DEMO_SURVEY.companyWebsite,
+            companyName: DEMO_SURVEY.companyName,
+            directionId: DEMO_SURVEY.directionId,
+          };
       return {
         ...state,
         signals: action.preset.signals,
         campaigns: action.preset.campaigns,
         stats,
+        survey,
+        surveyStatus,
+        clientDirection,
+        accountSettings,
         view:
           state.view.kind === "workflow" && !keepWorkflow
             ? { kind: "section", name: "Кампании" }
@@ -755,6 +778,17 @@ export function appReducer(state: AppState, action: Action): AppState {
         // Анкета — единственный источник «направления клиента» для пользователя.
         // Дев-панель просто отражает это значение и позволяет тестово переопределить.
         clientDirection: businessDirectionFromSurvey(action.survey.directionId),
+        // Сайт (и название/направление), введённые в анкете, подтягиваются в
+        // «Настройки» — это первичный источник данных аккаунта.
+        accountSettings: {
+          ...state.accountSettings,
+          companyWebsite:
+            action.survey.companyWebsite || state.accountSettings.companyWebsite,
+          companyName:
+            action.survey.companyName || state.accountSettings.companyName,
+          directionId:
+            action.survey.directionId ?? state.accountSettings.directionId,
+        },
       };
 
     case "open_survey":
