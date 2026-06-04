@@ -608,10 +608,12 @@ export function appReducer(state: AppState, action: Action): AppState {
       return { ...state, selectedWorkflowNode: null };
 
     case "workflow_node_command_submit":
+      // Keep the edited node selected/open so the user can keep tweaking it —
+      // только применяем команду. (Снятие выделения происходит по клику на
+      // полотно/крестик или при структурных операциях, меняющих граф.)
       return {
         ...state,
         workflowNodeCommand: { commands: action.commands },
-        selectedWorkflowNode: null,
       };
 
     case "workflow_node_command_handled":

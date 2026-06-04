@@ -356,7 +356,7 @@ describe("appReducer — workflow node selection + AI cycle", () => {
     expect(next.selectedWorkflowNode).toBeNull();
   });
 
-  it("workflow_node_command_submit captures the batch and deselects", () => {
+  it("workflow_node_command_submit captures the batch and keeps the node selected", () => {
     const state: AppState = {
       ...initialState,
       selectedWorkflowNode: { id: "email", label: "Email" },
@@ -368,7 +368,9 @@ describe("appReducer — workflow node selection + AI cycle", () => {
     expect(next.workflowNodeCommand).toEqual({
       commands: [{ nodeLabel: "Email", text: "Задержка 2 часа" }],
     });
-    expect(next.selectedWorkflowNode).toBeNull();
+    // Узел, в котором правят, остаётся открытым — пользователь может править
+    // дальше (см. фикс «не закрывать узел после изменения»).
+    expect(next.selectedWorkflowNode).toEqual({ id: "email", label: "Email" });
   });
 
   it("workflow_node_command_submit accepts multi-node batch", () => {
