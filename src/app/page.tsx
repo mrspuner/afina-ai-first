@@ -15,6 +15,7 @@ import { useChat } from "@/state/chat-context";
 import { AppSidebar } from "@/sections/shell/app-sidebar";
 import { LaunchFlyout } from "@/sections/shell/launch-flyout";
 import { ShellBottomBar } from "@/sections/shell/shell-bottom-bar";
+import { PromptInputScopeReset } from "@/sections/shell/prompt-composer";
 import { WelcomeSection } from "@/sections/welcome/welcome-section";
 import { SurveySection } from "@/sections/survey/survey-section";
 import { WelcomeChatProvider } from "@/sections/welcome/welcome-chat-context";
@@ -114,6 +115,7 @@ export default function Home() {
         <DraftQueueProvider>
         <TriggerEditRegistryProvider>
         <div className="flex h-screen overflow-hidden bg-background">
+          <PromptInputScopeReset />
           <AnimatePresence initial={false}>
             {!isFullscreen && (
               <motion.div

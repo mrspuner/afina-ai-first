@@ -38,6 +38,7 @@ import { parseCampaignQuery } from "@/state/parse-campaign-filter";
 import { decideEnterAction, APPLY_ALL_COMMAND } from "@/state/prompt-bar-enter";
 import { selectPromptSuggestions } from "@/state/select-prompt-suggestions";
 import type { SuggestionAction, SuggestionItem } from "@/state/suggestion-registry";
+import { useScopeReset } from "@/state/use-scope-reset";
 import { cn } from "@/lib/utils";
 import { SuggestionBar } from "./suggestion-bar";
 import { useChatSubmit } from "./use-chat-submit";
@@ -127,6 +128,11 @@ export const PromptComposer = forwardRef<PromptComposerHandle, PromptComposerPro
     function resetEditor() {
       editorRef.current?.clear();
       chipsApi.clearChips();
+      // clear() wipes the editor DOM but NOT the shared controller value — if
+      // we skip this, the hydrate-once effect re-inserts the stale text when
+      // the editor remounts (drawer toggle / navigation), so the bar "won't
+      // clear".
+      textInput.clear();
       prevActiveRef.current = null;
       setFromQueueChipId(null);
     }
@@ -156,6 +162,7 @@ export const PromptComposer = forwardRef<PromptComposerHandle, PromptComposerPro
       removeDraft(draft.id);
       editorRef.current?.clear();
       chipsApi.clearChips();
+      textInput.clear();
       chipsApi.pushChip({
         id: draft.chip.id,
         kind: draft.chip.kind,
@@ -319,9 +326,11 @@ export const PromptComposer = forwardRef<PromptComposerHandle, PromptComposerPro
 
     function handlePickSuggestion(item: SuggestionItem) {
       function insert(text: string, action: SuggestionAction | null) {
+        // Focus first so the caret is inside the editor and the insert lands at
+        // the cursor (not via the dead textarea path).
+        editorRef.current?.focus();
         textInput.insertAtCursor(text, { separator: "smart", preserveTags: true });
         pendingActionRef.current = action ? { action, text } : null;
-        editorRef.current?.focus();
       }
       switch (item.action.kind) {
         case "ask":
@@ -380,6 +389,19 @@ export const PromptComposer = forwardRef<PromptComposerHandle, PromptComposerPro
     );
   }
 );
+
+/**
+ * Сбрасывает текст промпт-бара при смене раздела (тем же ключом, что чистит
+ * чипы/чат/черновики). Монтируется один раз под PromptInputProvider, поэтому
+ * чистит независимо от того, какая поверхность сейчас на экране — иначе
+ * напечатанный текст «протекал» между разделами (значение живёт в общем
+ * контроллере и не сбрасывалось вместе с чипами).
+ */
+export function PromptInputScopeReset() {
+  const { textInput } = usePromptInputController();
+  useScopeReset(textInput.clear);
+  return null;
+}
 
 /**
  * Mirrors the selected workflow node into a chip, coloured by node kind. Chips
