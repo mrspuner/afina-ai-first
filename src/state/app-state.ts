@@ -1008,6 +1008,23 @@ export const isOnStatisticsSection = (s: AppState): boolean =>
   s.view.kind === "section" && s.view.name === "Статистика";
 
 /**
+ * Канонический ключ «разговорного контекста» текущего экрана — единственное
+ * определение того, что считать сменой раздела для эфемерного ввода (чат,
+ * чипы, очередь черновиков). Все драйверы подписаны на него через
+ * `useScopeReset`, поэтому очищаются синхронно и предсказуемо.
+ *
+ * Секции различаем по имени (переход Сигналы→Статистика — смена scope), прочие
+ * экраны — по kind. `awaiting-campaign` сворачиваем в `guided-signal`: это
+ * продолжение того же signal-флоу (как и в page.tsx viewKey), а не новый scope,
+ * иначе ввод стирался бы в середине создания сигнала.
+ */
+export function navigationScopeKey(view: View): string {
+  if (view.kind === "section") return `section:${view.name}`;
+  const kind = view.kind === "awaiting-campaign" ? "guided-signal" : view.kind;
+  return `view:${kind}`;
+}
+
+/**
  * Какой пункт левого меню подсвечен. Выводится из текущего view, чтобы пункт
  * не гас при заполнении визарда / работе с кампанией (там activeSection
  * занулён):

@@ -8,6 +8,7 @@ import type {
 } from "./app-state";
 import type { StepData } from "@/types/campaign";
 import { SCENARIOS } from "@/data/scenarios";
+import { makeRng, splitSegments } from "./metrics";
 
 const SIGNAL_TYPES: SignalType[] = [
   "Регистрация",
@@ -31,16 +32,8 @@ const PRETTY_NAMES = [
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-function mulberry32(seed: number) {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
+// PRNG (makeRng) и splitSegments берутся из единого движка чисел
+// (src/state/metrics.ts) — никаких локальных генераторов.
 
 function rndInt(rng: () => number, min: number, max: number): number {
   return Math.floor(rng() * (max - min + 1)) + min;
@@ -53,16 +46,6 @@ function rndPick<T>(rng: () => number, arr: readonly T[]): T {
 function rndPastDate(rng: () => number, spanDays: number, now: number): string {
   const offset = Math.floor(rng() * spanDays * DAY_MS);
   return new Date(now - offset).toISOString();
-}
-
-function splitSegments(count: number, rng: () => number): Signal["segments"] {
-  const weights = [rng(), rng(), rng(), rng()];
-  const total = weights.reduce((a, b) => a + b, 0) || 1;
-  const max = Math.floor((count * weights[0]) / total);
-  const high = Math.floor((count * weights[1]) / total);
-  const mid = Math.floor((count * weights[2]) / total);
-  const low = count - max - high - mid;
-  return { max, high, mid, low };
 }
 
 // Plausible filler for the "Настройки сигнала" table on preset (demo) signals.
@@ -133,7 +116,7 @@ type GenerateSignalsOpts = {
 };
 
 export function generateSignals(opts: GenerateSignalsOpts): Signal[] {
-  const rng = mulberry32(opts.seed);
+  const rng = makeRng(opts.seed);
   const out: Signal[] = [];
   for (let i = 0; i < opts.count; i++) {
     const type = SIGNAL_TYPES[i % SIGNAL_TYPES.length];
@@ -162,7 +145,7 @@ type GenerateCampaignsOpts = {
 };
 
 export function generateCampaigns(opts: GenerateCampaignsOpts): Campaign[] {
-  const rng = mulberry32(opts.seed);
+  const rng = makeRng(opts.seed);
   const statuses: CampaignStatus[] = [];
   (Object.keys(opts.distribution) as CampaignStatus[]).forEach((status) => {
     for (let i = 0; i < opts.distribution[status]; i++) statuses.push(status);

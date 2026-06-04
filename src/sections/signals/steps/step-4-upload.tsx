@@ -6,16 +6,18 @@ import { DropZone } from "@/components/ui/drop-zone";
 import { HashingLoader } from "@/components/ui/hashing-loader";
 import { StepContent } from "@/sections/signals/steps/step-content";
 import { StepProps } from "@/types/campaign";
+import { rngFor, seededInt } from "@/state/metrics";
 
 export function Step4Upload({ data, onNext }: StepProps) {
   const [file, setFile] = useState<File | null>(data.file);
   const [isHashing, setIsHashing] = useState(false);
 
   /** Simulate parsing the file by attaching a plausible row count. The real
-   *  product would parse server-side; for the prototype a stable random in
-   *  the 1k-100k range is enough to drive downstream UI (budget recommend). */
-  function simulateRowCount(): number {
-    return 1000 + Math.floor(Math.random() * 99_000);
+   *  product would parse server-side; for the prototype a count derived
+   *  deterministically from the file (name + size) drives downstream UI
+   *  (budget recommend) and stays stable for the same file. */
+  function simulateRowCount(f: File): number {
+    return seededInt(rngFor("rowcount", f.name, f.size), 1000, 100_000);
   }
 
   function handleNext() {
@@ -35,7 +37,9 @@ export function Step4Upload({ data, onNext }: StepProps) {
     const rowCount =
       data.file === file && typeof data.fileRowCount === "number"
         ? data.fileRowCount
-        : simulateRowCount();
+        : file
+          ? simulateRowCount(file)
+          : 0;
     onNext({ file, fileRowCount: rowCount });
   }
 

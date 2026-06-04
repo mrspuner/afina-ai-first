@@ -16,6 +16,12 @@ import type {
   SortState,
   StatisticsFilters,
 } from "./statistics-state";
+import {
+  deriveCampaignFunnel,
+  deriveFunnel,
+  hashSeed,
+  makeRng,
+} from "@/state/metrics";
 
 export type RowData = {
   expenses: string;
@@ -36,18 +42,6 @@ export type GeneratedRow = {
   caption?: string;
   data: RowData;
   subRows: { key: string; label: string; data: RowData }[];
-};
-
-const CURRENCY_SYMBOL: Record<Currency, string> = {
-  usd: "$",
-  eur: "€",
-  rub: "₽",
-};
-
-const CURRENCY_RATE: Record<Currency, number> = {
-  usd: 1,
-  eur: 0.92,
-  rub: 93,
 };
 
 const WEEKDAY_NAMES = [
@@ -172,56 +166,14 @@ const STATIC_LABELS: Record<
   ],
 };
 
-function seededRand(seed: number): () => number {
-  let s = seed || 1;
-  return () => {
-    s = (s * 1103515245 + 12345) & 0x7fffffff;
-    return s / 0x7fffffff;
-  };
-}
-
-function hashString(s: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = (h * 16777619) >>> 0;
-  }
-  return h >>> 0;
-}
-
-function formatMoney(value: number, currency: Currency): string {
-  const fmt = new Intl.NumberFormat("ru-RU", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
-  return `${fmt} ${CURRENCY_SYMBOL[currency]}`;
-}
-
-function generateRowData(seed: number, currency: Currency): RowData {
-  const rand = seededRand(seed);
-  const sends = 2500 + Math.floor(rand() * 35000);
-  const clicks = Math.floor(sends * (0.35 + rand() * 0.35));
-  const actions = Math.floor(sends * (0.04 + rand() * 0.08));
-  const holds = Math.floor(actions * (0.2 + rand() * 0.25));
-  const approves = Math.floor(actions * (0.45 + rand() * 0.25));
-  const rejects = Math.max(0, actions - holds - approves);
-  const expensesUsd = 300 + rand() * 5000;
-  const incomeUsd = expensesUsd * (4 + rand() * 18);
-  const rate = CURRENCY_RATE[currency];
-  const ar = (approves / Math.max(sends, 1)) * 100;
-  const rr = (rejects / Math.max(sends, 1)) * 100;
-  return {
-    expenses: formatMoney(expensesUsd * rate, currency),
-    income: formatMoney(incomeUsd * rate, currency),
-    sends,
-    clicks,
-    actions,
-    holds,
-    approves,
-    rejects,
-    ar: `${ar.toFixed(2)}%`,
-    rr: `${rr.toFixed(2)}%`,
-  };
+// Funnel-математика, форматирование денег и PRNG живут в едином движке чисел
+// (src/state/metrics.ts). Здесь — только сборка строк отчёта.
+function generateRowData(
+  seed: number,
+  currency: Currency,
+  baseSends?: number,
+): RowData {
+  return deriveFunnel(makeRng(seed), currency, baseSends);
 }
 
 type LabeledKey = { key: string; label: string; caption?: string };
@@ -298,17 +250,70 @@ export function sortRows(
   });
 }
 
-export function generateRows(filters: StatisticsFilters): GeneratedRow[] {
+/**
+ * Сущности, из которых выводится статистика. Передаётся из StatisticsView
+ * (реальные кампании и сигналы из глобального стейта). Опционально — без него
+ * отчёт строится по абстрактным меткам как раньше.
+ */
+export type StatsContext = {
+  campaigns?: readonly {
+    id: string;
+    name: string;
+    signalId: string;
+    status: string;
+  }[];
+  signals?: readonly { id: string; count: number }[];
+};
+
+function isLaunched(status: string): boolean {
+  return status === "active" || status === "paused" || status === "completed";
+}
+
+export function generateRows(
+  filters: StatisticsFilters,
+  ctx?: StatsContext,
+): GeneratedRow[] {
   const period = resolvePeriod(filters.period);
-  const topLabels = labelsForKind(filters.rows, period);
 
   const subLabels =
     filters.subRows !== "none"
       ? labelsForKind(filters.subRows, period).slice(0, 6)
       : [];
 
+  // Строки «Кампании» — это реальные запущенные кампании, а их цифры выводятся
+  // из count связанного сигнала (sends ≤ числу найденных сигналов). Так
+  // статистика перестаёт быть оторванной от сущностей: цифры сходятся сквозь
+  // карточку сигнала → кампанию → отчёт.
+  if (filters.rows === "campaigns" && ctx?.campaigns?.length) {
+    const countById = new Map(
+      (ctx.signals ?? []).map((s) => [s.id, s.count] as const),
+    );
+    const rows: GeneratedRow[] = ctx.campaigns
+      .filter((c) => isLaunched(c.status))
+      .map((c) => ({
+        key: `cmp-${c.id}`,
+        label: c.name,
+        data: deriveCampaignFunnel(
+          c.id,
+          countById.get(c.signalId),
+          filters.currency,
+        ),
+        subRows: subLabels.map((sub, j) => ({
+          key: `cmp-${c.id}__${sub.key}`,
+          label: sub.label,
+          data: generateRowData(
+            hashSeed("cmp", c.id, sub.key, j),
+            filters.currency,
+          ),
+        })),
+      }));
+    return sortRows(rows.slice(0, Math.max(1, filters.rowCount)), filters.sort);
+  }
+
+  const topLabels = labelsForKind(filters.rows, period);
+
   const rows: GeneratedRow[] = topLabels.map((top, i) => {
-    const seed = hashString(`${filters.rows}:${top.key}:${i}`);
+    const seed = hashSeed(filters.rows, top.key, i);
     const data = generateRowData(seed, filters.currency);
     const subRows =
       subLabels.length > 0
@@ -316,7 +321,7 @@ export function generateRows(filters: StatisticsFilters): GeneratedRow[] {
             key: `${top.key}__${sub.key}`,
             label: sub.label,
             data: generateRowData(
-              hashString(`${top.key}:${sub.key}:${j}`),
+              hashSeed(top.key, sub.key, j),
               filters.currency,
             ),
           }))

@@ -10,6 +10,7 @@ import {
 } from "react";
 import { nanoid } from "nanoid";
 import type { PromptChip } from "./prompt-chips-context";
+import { useScopeReset } from "./use-scope-reset";
 
 /**
  * Один непринятый черновик: тег (PromptChip) + написанный к нему текст.
@@ -105,6 +106,11 @@ export function DraftQueueProvider({ children }: { children: ReactNode }) {
   );
 
   const clearQueue = useCallback(() => dispatch({ type: "clear" }), []);
+
+  // Очередь черновиков — часть нижнего драйвера: при смене раздела сбрасывается
+  // вместе с чатом и чипами, чтобы запаркованные правки не протекали между
+  // разделами. Внутри одного workflow scope не меняется → черновики живут.
+  useScopeReset(clearQueue);
 
   const api = useMemo<DraftQueueApi>(
     () => ({ drafts: state.drafts, parkDraft, removeDraft, takeDraft, clearQueue }),

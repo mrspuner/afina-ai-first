@@ -29,7 +29,6 @@ import { useAppState, useAppDispatch } from "@/state/app-state-context";
 import {
   isOnWelcome,
   isWorkflowView,
-  type View,
 } from "@/state/app-state";
 import { parseStructuralCommands } from "@/state/structural-commands";
 import { parseCampaignQuery } from "@/state/parse-campaign-filter";
@@ -77,8 +76,8 @@ function SelectedNodeChipEffect({
 
   // Each canvas selection adds a new chip to the prompt-bar. Existing chips
   // for previously-selected nodes stay — multiple node chips can coexist so a
-  // single command applies to all of them. Chips clear via ClearChipsOnView-
-  // ChangeEffect when the user navigates away, or via Backspace.
+  // single command applies to all of them. Chips clear via useScopeReset in
+  // PromptChipsProvider when the user navigates away, or via Backspace.
   // Re-clicking the same node is a no-op because pushChip dedups by id.
   useEffect(() => {
     if (!selected) return;
@@ -97,28 +96,6 @@ function SelectedNodeChipEffect({
     });
   }, [selected, pushChip]);
 
-  return null;
-}
-
-/**
- * Generic chip cleanup: clears all chips when the top-level view kind changes.
- * Replaces the previous ClearOnLeaveWorkflowEffect (which scrubbed @-text out
- * of the textarea on workflow exit) — chips are now the structured carrier of
- * cross-view context, so per-view text scrubbing is no longer needed.
- */
-function ClearChipsOnViewChangeEffect({
-  viewKind,
-}: {
-  viewKind: View["kind"];
-}) {
-  const { clearChips } = usePromptChips();
-  const prevKind = useRef<View["kind"] | null>(null);
-  useEffect(() => {
-    if (prevKind.current && prevKind.current !== viewKind) {
-      clearChips();
-    }
-    prevKind.current = viewKind;
-  }, [viewKind, clearChips]);
   return null;
 }
 
@@ -417,7 +394,6 @@ export function ShellBottomBar() {
   return (
     <>
       <SelectedNodeChipEffect selected={selectedWorkflowNode} />
-      <ClearChipsOnViewChangeEffect viewKind={view.kind} />
       <PromptBar
         onOpenDrawer={chat.openSidebar}
         slot={

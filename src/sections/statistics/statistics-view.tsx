@@ -107,7 +107,7 @@ function buildCsv(
 
 export function StatisticsView({ campaignId }: { campaignId?: string } = {}) {
   const filterByCampaign = Boolean(campaignId);
-  const { campaigns } = useAppState();
+  const { campaigns, signals } = useAppState();
 
   // Stats only become meaningful once a campaign has actually been
   // launched — having signals or draft campaigns isn't enough to
@@ -154,7 +154,12 @@ export function StatisticsView({ campaignId }: { campaignId?: string } = {}) {
     [applied, activeTemplate.filters],
   );
 
-  const rows = useMemo(() => generateRows(applied), [applied]);
+  // Передаём реальные сущности, чтобы строки «Кампании» выводились из count
+  // их сигналов (единый источник цифр), а не из несвязанной мок-генерации.
+  const rows = useMemo(
+    () => generateRows(applied, { campaigns, signals }),
+    [applied, campaigns, signals],
+  );
   const resolvedRange = useMemo(
     () => resolvePeriod(applied.period),
     [applied.period],
