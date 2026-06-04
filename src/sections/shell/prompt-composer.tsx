@@ -366,7 +366,9 @@ export const PromptComposer = forwardRef<PromptComposerHandle, PromptComposerPro
 
     return (
       <>
-        <SelectedNodeChipEffect selected={selectedWorkflowNode} />
+        <SelectedNodeChipEffect
+          selected={view.kind === "workflow" ? selectedWorkflowNode : null}
+        />
         <PromptInput onSubmit={handlePromptSubmit} className={inputClassName}>
           <ChipEditableInput
             ref={editorRef}
