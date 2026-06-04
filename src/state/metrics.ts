@@ -134,7 +134,36 @@ export function recommendBudget(rowCount: number): number {
 // Statistics funnel
 // ---------------------------------------------------------------------------
 
-export type Funnel = {
+/**
+ * Numeric funnel — raw metric counts kept as numbers so they can be summed
+ * exactly during aggregation (see {@link addFunnel}). Money is carried in a USD
+ * base; currency conversion + formatting happen once at the end via
+ * {@link formatFunnel}.
+ */
+export type FunnelNumbers = {
+  sends: number;
+  clicks: number;
+  actions: number;
+  holds: number;
+  approves: number;
+  rejects: number;
+  expensesUsd: number;
+  incomeUsd: number;
+};
+
+export const EMPTY_FUNNEL: FunnelNumbers = {
+  sends: 0,
+  clicks: 0,
+  actions: 0,
+  holds: 0,
+  approves: 0,
+  rejects: 0,
+  expensesUsd: 0,
+  incomeUsd: 0,
+};
+
+/** Formatted funnel row for display: money strings + recomputed % rates. */
+export type FunnelDisplay = {
   expenses: string;
   income: string;
   sends: number;
@@ -168,18 +197,14 @@ function formatMoney(value: number, currency: Currency): string {
 }
 
 /**
- * Derives a full marketing funnel from a seeded RNG. When `baseSends` is given
- * (an entity-derived audience size, e.g. a campaign's reachable contacts) the
- * funnel scales off it; otherwise a plausible send volume is drawn from the
- * stream. Downstream ratios (clicks/actions/holds/…) are identical in both
- * paths, so a campaign's stats and an abstract row read the same way.
+ * Derives a numeric marketing funnel from a seeded RNG and a base send volume.
+ * Pure numbers (no currency, no formatting) so atomic facts can be aggregated
+ * losslessly. Downstream ratios (clicks/actions/holds/…) match the previous
+ * implementation, so individual rows read the same as before.
  */
-export function deriveFunnel(
-  rng: () => number,
-  currency: Currency,
-  baseSends?: number,
-): Funnel {
-  const sends = baseSends ?? 2500 + Math.floor(rng() * 35000);
+export function computeFunnel(rng: () => number, baseSends: number): FunnelNumbers {
+  const sends = Math.max(0, Math.floor(baseSends));
+  if (sends === 0) return { ...EMPTY_FUNNEL };
   const clicks = Math.floor(sends * (0.35 + rng() * 0.35));
   const actions = Math.floor(sends * (0.04 + rng() * 0.08));
   const holds = Math.floor(actions * (0.2 + rng() * 0.25));
@@ -187,47 +212,56 @@ export function deriveFunnel(
   const rejects = Math.max(0, actions - holds - approves);
   const expensesUsd = 300 + rng() * 5000;
   const incomeUsd = expensesUsd * (4 + rng() * 18);
-  const rate = CURRENCY_RATE[currency];
-  const ar = (approves / Math.max(sends, 1)) * 100;
-  const rr = (rejects / Math.max(sends, 1)) * 100;
+  return { sends, clicks, actions, holds, approves, rejects, expensesUsd, incomeUsd };
+}
+
+/** Sums two funnels field-by-field. Additive metrics roll up; rates are
+ *  derived later from the aggregate, never summed. */
+export function addFunnel(a: FunnelNumbers, b: FunnelNumbers): FunnelNumbers {
   return {
-    expenses: formatMoney(expensesUsd * rate, currency),
-    income: formatMoney(incomeUsd * rate, currency),
-    sends,
-    clicks,
-    actions,
-    holds,
-    approves,
-    rejects,
+    sends: a.sends + b.sends,
+    clicks: a.clicks + b.clicks,
+    actions: a.actions + b.actions,
+    holds: a.holds + b.holds,
+    approves: a.approves + b.approves,
+    rejects: a.rejects + b.rejects,
+    expensesUsd: a.expensesUsd + b.expensesUsd,
+    incomeUsd: a.incomeUsd + b.incomeUsd,
+  };
+}
+
+/** Converts an aggregated numeric funnel into a formatted display row. AR/RR
+ *  are recomputed from the aggregate (rates never aggregate additively). */
+export function formatFunnel(n: FunnelNumbers, currency: Currency): FunnelDisplay {
+  const rate = CURRENCY_RATE[currency];
+  const ar = (n.approves / Math.max(n.sends, 1)) * 100;
+  const rr = (n.rejects / Math.max(n.sends, 1)) * 100;
+  return {
+    expenses: formatMoney(n.expensesUsd * rate, currency),
+    income: formatMoney(n.incomeUsd * rate, currency),
+    sends: n.sends,
+    clicks: n.clicks,
+    actions: n.actions,
+    holds: n.holds,
+    approves: n.approves,
+    rejects: n.rejects,
     ar: `${ar.toFixed(2)}%`,
     rr: `${rr.toFixed(2)}%`,
   };
 }
 
-/** Funnel for a stable string key (abstract statistics rows: days, channels…). */
-export function funnelForKey(
-  currency: Currency,
-  ...parts: Array<string | number>
-): Funnel {
-  return deriveFunnel(rngFor(...parts), currency);
-}
-
 /**
- * Funnel for a real campaign, anchored to the audience of its source signal.
- * `sends` can never exceed the signal's `count` (you can't message more people
- * than the signal found), so a campaign's statistics are a faithful downstream
- * of the very number shown on the signal card. Deterministic per campaign id.
+ * Deterministic total send volume for a campaign, anchored to its source
+ * signal and capped by `signal.count` — you can't message more people than the
+ * signal found. The statistics cube distributes this total across the
+ * campaign's active days and channels, so every breakdown rolls back up to it.
  */
-export function deriveCampaignFunnel(
+export function campaignBaseSends(
   campaignId: string,
   signalCount: number | undefined,
-  currency: Currency,
-): Funnel {
-  const rng = rngFor("campaign-stats", campaignId);
+): number {
   const reach = signalCount ?? 0;
-  const sends =
-    reach > 0
-      ? Math.max(1, Math.floor(reach * (0.4 + rng() * 0.5)))
-      : undefined;
-  return deriveFunnel(rng, currency, sends);
+  if (reach <= 0) return 0;
+  const rng = rngFor("campaign-sends", campaignId);
+  return Math.max(1, Math.floor(reach * (0.4 + rng() * 0.5)));
 }

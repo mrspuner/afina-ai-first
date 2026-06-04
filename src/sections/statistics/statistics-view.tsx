@@ -154,11 +154,11 @@ export function StatisticsView({ campaignId }: { campaignId?: string } = {}) {
     [applied, activeTemplate.filters],
   );
 
-  // Передаём реальные сущности, чтобы строки «Кампании» выводились из count
-  // их сигналов (единый источник цифр), а не из несвязанной мок-генерации.
+  // Строки — group-by по кубу фактов реальных кампаний/сигналов. При просмотре
+  // статистики конкретной кампании (campaignId) факты фильтруются по ней.
   const rows = useMemo(
-    () => generateRows(applied, { campaigns, signals }),
-    [applied, campaigns, signals],
+    () => generateRows(applied, { campaigns, signals }, { campaignId }),
+    [applied, campaigns, signals, campaignId],
   );
   const resolvedRange = useMemo(
     () => resolvePeriod(applied.period),

@@ -1,7 +1,12 @@
 import { describe, it, expect } from "vitest";
 import {
-  deriveCampaignFunnel,
+  addFunnel,
+  campaignBaseSends,
+  computeFunnel,
+  EMPTY_FUNNEL,
   estimateSignalCount,
+  formatFunnel,
+  makeRng,
   recommendBudget,
   segmentsForSignal,
   signalCountRange,
@@ -54,17 +59,49 @@ describe("recommendBudget", () => {
   });
 });
 
-describe("deriveCampaignFunnel", () => {
-  it("never sends to more people than the source signal found", () => {
+describe("campaignBaseSends", () => {
+  it("never exceeds the source signal count and is deterministic", () => {
     const count = 12000;
-    const funnel = deriveCampaignFunnel("cmp_1", count, "rub");
-    expect(funnel.sends).toBeLessThanOrEqual(count);
-    expect(funnel.sends).toBeGreaterThan(0);
+    const a = campaignBaseSends("cmp_1", count);
+    expect(a).toBeLessThanOrEqual(count);
+    expect(a).toBeGreaterThan(0);
+    expect(campaignBaseSends("cmp_1", count)).toBe(a);
   });
 
-  it("is deterministic per campaign id", () => {
-    expect(deriveCampaignFunnel("cmp_1", 12000, "rub")).toEqual(
-      deriveCampaignFunnel("cmp_1", 12000, "rub"),
-    );
+  it("is 0 without a signal count", () => {
+    expect(campaignBaseSends("cmp_1", 0)).toBe(0);
+    expect(campaignBaseSends("cmp_1", undefined)).toBe(0);
+  });
+});
+
+describe("computeFunnel / addFunnel / formatFunnel", () => {
+  it("computeFunnel is deterministic and bounded by sends", () => {
+    const f = computeFunnel(makeRng(123), 1000);
+    expect(f.sends).toBe(1000);
+    expect(f.clicks).toBeLessThanOrEqual(f.sends);
+    expect(f.actions).toBeLessThanOrEqual(f.sends);
+    expect(f.holds + f.approves + f.rejects).toBe(f.actions);
+    expect(computeFunnel(makeRng(123), 1000)).toEqual(f);
+  });
+
+  it("zero sends yields an empty funnel", () => {
+    expect(computeFunnel(makeRng(1), 0)).toEqual(EMPTY_FUNNEL);
+  });
+
+  it("addFunnel sums additive metrics", () => {
+    const a = computeFunnel(makeRng(1), 1000);
+    const b = computeFunnel(makeRng(2), 2000);
+    const sum = addFunnel(a, b);
+    expect(sum.sends).toBe(a.sends + b.sends);
+    expect(sum.approves).toBe(a.approves + b.approves);
+    expect(sum.expensesUsd).toBeCloseTo(a.expensesUsd + b.expensesUsd);
+  });
+
+  it("formatFunnel recomputes rates from the aggregate", () => {
+    const n = { ...EMPTY_FUNNEL, sends: 200, approves: 20, rejects: 10 };
+    const d = formatFunnel(n, "rub");
+    expect(d.ar).toBe("10.00%");
+    expect(d.rr).toBe("5.00%");
+    expect(d.sends).toBe(200);
   });
 });
