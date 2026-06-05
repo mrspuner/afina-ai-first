@@ -101,7 +101,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   // переходе между разделами она не должна тянуться. Смена шагов wizard'а и
   // изменения внутри одного workflow/campaign-feed scope не меняют. Единое
   // правило очистки разделяется с чипами и очередью черновиков (useScopeReset).
-  const resetChat = useCallback(() => dispatch({ type: "clear" }), []);
+  // Заодно закрываем боковой драйвер: при переходе в другой раздел открытый
+  // AI-drawer не должен оставаться висеть.
+  const resetChat = useCallback(() => {
+    dispatch({ type: "clear" });
+    dispatch({ type: "close_sidebar" });
+  }, []);
   useScopeReset(resetChat);
 
   // Reset the chat when the wizard session id changes (new signal flow started).
