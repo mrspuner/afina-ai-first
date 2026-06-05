@@ -1,108 +1,60 @@
 "use client";
 
 import { MinusIcon, PlusIcon } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useAppState } from "@/state/app-state-context";
+import type { Campaign } from "@/state/app-state";
 
 import {
   ChipMultiselect,
   type ChipOption,
 } from "./fields/chip-multiselect";
+import { poolOptions } from "./fact-cube";
 import type {
   SearchConditions as Conditions,
   StatisticsAction,
 } from "./statistics-state";
 
-const ENTITIES: { key: string; label: string; options: ChipOption[] }[] = [
-  {
-    key: "campaigns",
-    label: "Кампании",
-    options: [
-      { value: "c1", label: "Кампания 1" },
-      { value: "c2", label: "Кампания 2" },
-      { value: "c3", label: "Кампания 3" },
-      { value: "g1", label: "Группа кампаний 1" },
-      { value: "g2", label: "Группа кампаний 2" },
-      { value: "act", label: "Активные" },
-    ],
-  },
-  {
-    key: "offers",
-    label: "Предложения",
-    options: [
-      { value: "o1", label: "Предложение 1" },
-      { value: "o2", label: "Предложение 2" },
-      { value: "o3", label: "Предложение 3" },
-      { value: "o4", label: "Предложение 4" },
-      { value: "og1", label: "Группа предложений 1" },
-      { value: "og2", label: "Группа предложений 2" },
-      { value: "v1", label: "Вертикаль 1" },
-      { value: "v2", label: "Вертикаль 2" },
-    ],
-  },
-  {
-    key: "subscribers",
-    label: "Абоненты",
-    options: [
-      { value: "s1", label: "Сегмент 1" },
-      { value: "s2", label: "Сегмент 2" },
-      { value: "s3", label: "Сегмент 3" },
-    ],
-  },
-  {
-    key: "channels",
-    label: "Каналы",
-    options: [
-      { value: "ch1", label: "Канал 1" },
-      { value: "ch2", label: "Канал 2" },
-      { value: "ch3", label: "Канал 3" },
-    ],
-  },
-  {
-    key: "creatives",
-    label: "Креативы",
-    options: [
-      { value: "cr1", label: "Креатив 1" },
-      { value: "cr2", label: "Креатив 2" },
-      { value: "cr3", label: "Креатив 3" },
-      { value: "crg1", label: "Группа креативов 1" },
-      { value: "crg2", label: "Группа креативов 2" },
-      { value: "cv1", label: "Вертикаль 1" },
-      { value: "cv2", label: "Вертикаль 2" },
-      { value: "banner", label: "Баннер" },
-      { value: "text", label: "Текст" },
-    ],
-  },
-  {
-    key: "triggers",
-    label: "Триггеры",
-    options: [
-      { value: "t1", label: "Триггер 1" },
-      { value: "t2", label: "Триггер 2" },
-      { value: "t3", label: "Триггер 3" },
-      { value: "tg1", label: "Группа триггеров 1" },
-      { value: "tg2", label: "Группа триггеров 2" },
-    ],
-  },
-  {
-    key: "scenarios",
-    label: "Сценарии",
-    options: [
-      { value: "sc1", label: "СМС → Витрина → Лендинг" },
-      { value: "sc2", label: "СМС → Лендинг" },
-    ],
-  },
-  {
-    key: "strategies",
-    label: "Стратегии",
-    options: [
-      { value: "str1", label: "Первичная витрина" },
-      { value: "str2", label: "Каскадное сообщение" },
-    ],
-  },
-];
+type Entity = { key: string; label: string; options: ChipOption[] };
+
+/**
+ * Опции условий поиска строятся из реальных сущностей, а их `value` совпадают
+ * с ключами измерений куба фактов (`cmp-<id>`, `scn-<id>`, `<kind>-<i>`) — это
+ * и делает условия живым фильтром: выбранное значение реально матчит факты.
+ */
+function buildEntities(campaigns: readonly Campaign[]): Entity[] {
+  const launched = campaigns.filter(
+    (c) =>
+      c.status === "active" ||
+      c.status === "paused" ||
+      c.status === "completed",
+  );
+  const campaignOptions: ChipOption[] = launched.map((c) => ({
+    value: `cmp-${c.id}`,
+    label: c.name,
+  }));
+  const scnMap = new Map<string, string>();
+  for (const c of launched) {
+    if (c.scenario) scnMap.set(c.scenario.id, c.scenario.name);
+  }
+  const scenarioOptions: ChipOption[] = [...scnMap].map(([id, name]) => ({
+    value: `scn-${id}`,
+    label: name,
+  }));
+  return [
+    { key: "campaigns", label: "Кампании", options: campaignOptions },
+    { key: "offers", label: "Предложения", options: poolOptions("offers") },
+    { key: "subscribers", label: "Абоненты", options: poolOptions("subscribers") },
+    { key: "channels", label: "Каналы", options: poolOptions("channels") },
+    { key: "creatives", label: "Креативы", options: poolOptions("creatives") },
+    { key: "triggers", label: "Триггеры", options: poolOptions("triggers") },
+    { key: "scenarios", label: "Сценарии", options: scenarioOptions },
+    { key: "strategies", label: "Стратегии", options: poolOptions("strategies") },
+  ];
+}
 
 export function SearchConditionsBlock({
   conditions,
@@ -111,6 +63,8 @@ export function SearchConditionsBlock({
   conditions: Conditions;
   dispatch: (action: StatisticsAction) => void;
 }) {
+  const { campaigns } = useAppState();
+  const entities = useMemo(() => buildEntities(campaigns), [campaigns]);
   const [showExclude, setShowExclude] = useState(() =>
     Object.values(conditions.exclude).some((v) => v && v.length > 0),
   );
@@ -121,7 +75,7 @@ export function SearchConditionsBlock({
         <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           По значениям
         </div>
-        {ENTITIES.map((ent) => (
+        {entities.map((ent) => (
           <ConditionRow
             key={ent.key}
             label={ent.label}
@@ -159,7 +113,7 @@ export function SearchConditionsBlock({
           <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Исключить из поиска
           </div>
-          {ENTITIES.map((ent) => (
+          {entities.map((ent) => (
             <ConditionRow
               key={ent.key}
               label={ent.label}

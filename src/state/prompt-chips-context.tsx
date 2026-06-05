@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { nanoid } from "nanoid";
+import { useScopeReset } from "./use-scope-reset";
 
 export type PromptChipKind = "trigger" | "mode" | "node" | "section";
 
@@ -132,6 +133,12 @@ export function PromptChipsProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const clearChips = useCallback(() => dispatch({ type: "clear" }), []);
+
+  // Чипы — часть нижнего драйвера: чистятся при смене раздела тем же правилом,
+  // что чат и очередь черновиков. Раньше это делал ClearChipsOnViewChangeEffect
+  // внутри ShellBottomBar и только по view.kind (переход секция→секция чипы не
+  // сбрасывал) — теперь централизовано и охватывает все переходы.
+  useScopeReset(clearChips);
 
   const api = useMemo<PromptChipsApi>(
     () => ({

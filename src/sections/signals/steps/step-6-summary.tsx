@@ -8,7 +8,8 @@ import { StepProps } from "@/types/campaign";
 import { useAppState } from "@/state/app-state-context";
 import { computeShortfall } from "@/sections/signals/top-up-modal";
 import { cn } from "@/lib/utils";
-import { SCENARIO_NAMES, SEGMENT_NAMES, SEGMENT_PRICES } from "@/sections/signals/signal-summary-data";
+import { SCENARIO_NAMES, SEGMENT_NAMES } from "@/sections/signals/signal-summary-data";
+import { signalCountRange } from "@/state/metrics";
 
 function formatRub(amount: number): string {
   return `₽ ${amount.toLocaleString("ru-RU", { maximumFractionDigits: 2 })}`;
@@ -48,9 +49,11 @@ function SummaryRow({
 export function Step6Summary({ data, onNext, onGoToStep }: StepProps) {
   const { balance } = useAppState();
   const budget = data.budget ?? 0;
-  const prices = data.segments.map((s) => SEGMENT_PRICES[s] ?? 0).filter(Boolean);
-  const minSignals = prices.length ? Math.floor(budget / Math.max(...prices)) : 0;
-  const maxSignals = prices.length ? Math.floor(budget / Math.min(...prices)) : 0;
+  const { min: minSignals, max: maxSignals } = signalCountRange(
+    data.segments,
+    budget,
+  );
+  const hasEstimate = maxSignals > 0;
   const signalsStr =
     minSignals === maxSignals
       ? `${maxSignals.toLocaleString("ru")} сигналов`
@@ -105,7 +108,7 @@ export function Step6Summary({ data, onNext, onGoToStep }: StepProps) {
           />
           <SummaryRow
             label="Максимум сигналов"
-            value={budget && prices.length ? signalsStr : "—"}
+            value={hasEstimate ? signalsStr : "—"}
           />
         </div>
       </div>

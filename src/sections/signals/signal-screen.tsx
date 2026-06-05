@@ -68,7 +68,7 @@ export function SignalScreen() {
         </span>
       }
       primaryAction={{
-        label: "Запустить кампанию по сигналу",
+        label: "Использовать в кампании",
         onClick: () => dispatch({ type: "campaign_from_signal", signalId: signal.id }),
         icon: <Zap className="h-4 w-4" />,
       }}

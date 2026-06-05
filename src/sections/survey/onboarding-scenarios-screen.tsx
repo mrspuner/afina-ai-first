@@ -2,7 +2,7 @@
 
 import { motion } from "motion/react";
 import { Button } from "@/components/ui/button";
-import { scenarioCount } from "@/data/scenarios";
+import { curatedScenarioCount } from "@/data/scenarios";
 
 interface OnboardingScenariosScreenProps {
   onChooseScenario: () => void;
@@ -22,7 +22,7 @@ export function OnboardingScenariosScreen({ onChooseScenario }: OnboardingScenar
         transition={{ duration: 0.45, delay: 0.05, ease: [0.23, 1, 0.32, 1] }}
         className="text-[38px] font-semibold leading-[1.1] tracking-tight"
       >
-        Готово — подобрали {scenarioCount} сценариев<br />под ваш бизнес
+        Готово — подобрали {curatedScenarioCount} сценариев<br />под ваш бизнес
       </motion.h1>
       <motion.p
         initial={{ opacity: 0, y: 8 }}

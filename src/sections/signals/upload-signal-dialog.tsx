@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/select";
 import { useAppDispatch } from "@/state/app-state-context";
 import { SIGNAL_TYPES, type Signal, type SignalType } from "@/state/app-state";
+import { rngFor, seededInt, segmentsForSignal } from "@/state/metrics";
 
 interface UploadSignalDialogProps {
   open: boolean;
@@ -29,13 +30,16 @@ interface UploadSignalDialogProps {
 }
 
 function buildSignalFromFile(type: SignalType): Signal {
-  const count = Math.floor(Math.random() * 4500) + 500;
+  const id = `sig_${nanoid(6)}`;
+  // Детерминировано по id: число и сегменты выводятся из единого движка, как у
+  // пресетов и сигналов визарда. Сегменты в сумме дают count.
+  const count = seededInt(rngFor("upload-count", id), 500, 5000);
   const now = new Date().toISOString();
   return {
-    id: `sig_${nanoid(6)}`,
+    id,
     type,
     count,
-    segments: { max: 0, high: 0, mid: count, low: 0 },
+    segments: segmentsForSignal(id, count),
     createdAt: now,
     updatedAt: now,
     isCustom: true,

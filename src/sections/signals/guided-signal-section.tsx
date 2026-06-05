@@ -7,6 +7,7 @@ import type { Signal } from "@/state/app-state";
 import type { SignalStatus } from "@/types/signal-status";
 import type { StepData } from "@/types/campaign";
 import { SCENARIO_TO_TYPE } from "@/state/scenario-map";
+import { segmentsForSignal } from "@/state/metrics";
 import { SCENARIO_NAMES } from "@/data/scenarios";
 import { SurveySection } from "@/sections/survey/survey-section";
 import { CampaignWorkspace } from "./campaign-workspace";
@@ -167,7 +168,9 @@ export function GuidedSignalSection() {
         type,
         name: scenarioName,
         count: params.count,
-        segments: { max: 1000, high: 1500, mid: 1200, low: 612 },
+        // Сегменты выводятся из count (сумма = count), поэтому «сигналов
+        // найдено» в step-8 совпадает с count в карточке и в разделе.
+        segments: segmentsForSignal(id, params.count),
         createdAt: now,
         updatedAt: now,
         status: enoughBalance ? "processing" : "awaiting_payment",

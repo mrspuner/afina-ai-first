@@ -212,6 +212,7 @@ export function WorkflowSection() {
           nodeFieldPatch={workflowNodeFieldPatch}
           onNodeFieldPatchHandled={handleNodeFieldPatchHandled}
           selectedNodeId={selectedWorkflowNode?.id ?? null}
+          campaignId={currentCampaign.id}
           signalType={currentSignal?.type}
           signal={currentSignal ?? undefined}
           onGraphChange={handleGraphChange}

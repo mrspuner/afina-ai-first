@@ -6,28 +6,13 @@ import { Input } from "@/components/ui/input";
 import { StepContent } from "@/sections/signals/steps/step-content";
 import { StepProps } from "@/types/campaign";
 import { cn } from "@/lib/utils";
-
-const SEGMENT_PRICES: Record<string, number> = {
-  max: 0.45,
-  "very-high": 0.35,
-  high: 0.25,
-  medium: 0.07,
-};
+import { recommendBudget, signalCountRange } from "@/state/metrics";
 
 function calcSignals(segments: string[], budget: number): string {
-  if (segments.length === 0 || budget <= 0) return "—";
-  const prices = segments.map((s) => SEGMENT_PRICES[s] ?? 0).filter(Boolean);
-  if (prices.length === 0) return "—";
-  const minPrice = Math.min(...prices);
-  const maxPrice = Math.max(...prices);
-  const maxSignals = Math.floor(budget / minPrice);
-  const minSignals = Math.floor(budget / maxPrice);
-  if (minSignals === maxSignals) return `${maxSignals.toLocaleString("ru")} сигналов`;
-  return `${minSignals.toLocaleString("ru")} – ${maxSignals.toLocaleString("ru")} сигналов`;
-}
-
-function recommendBudget(rowCount: number): number {
-  return Math.max(50, Math.round(rowCount * (0.05 + Math.random() * 0.4)));
+  const { min, max } = signalCountRange(segments, budget);
+  if (max <= 0) return "—";
+  if (min === max) return `${max.toLocaleString("ru")} сигналов`;
+  return `${min.toLocaleString("ru")} – ${max.toLocaleString("ru")} сигналов`;
 }
 
 function formatRub(amount: number): string {
@@ -37,16 +22,14 @@ function formatRub(amount: number): string {
 type Mode = "recommended" | "custom";
 
 export function Step5Limit({ data, onNext }: StepProps) {
-  // Recommended value is computed once on mount and cached. We don't recompute
-  // on each render because Math.random would yield a different number every
-  // time, breaking revisit equivalence.
+  // Рекомендация детерминирована по размеру базы (recommendBudget из движка
+  // чисел), поэтому стабильна между ре-рендерами и повторными заходами на шаг.
   const recommendedValue = useMemo(
     () =>
       typeof data.fileRowCount === "number"
         ? recommendBudget(data.fileRowCount)
         : 0,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    []
+    [data.fileRowCount]
   );
 
   const [mode, setMode] = useState<Mode>(data.budgetMode ?? "recommended");

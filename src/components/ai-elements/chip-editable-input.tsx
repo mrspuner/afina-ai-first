@@ -194,11 +194,16 @@ export const ChipEditableInput = forwardRef<
   // Register the imperative inserter with the prompt-input controller so
   // `controller.textInput.insertAtCursor()` calls actually reach this
   // contenteditable surface (the textarea path can't write to it).
+  // No unregister on cleanup. The inserter ref is shared and overwritten by
+  // whichever editor mounts last (collapsed bar ↔ drawer). Nulling it on
+  // unmount caused a race: after closing the drawer, the bottom bar remounts
+  // and registers, then the drawer's delayed unmount nulled the ref — so the
+  // first suggestion click fell through to the dead textarea path (invisible)
+  // and only the value-change-triggered re-register made the second click
+  // work. A stale inserter from an unmounted editor is harmless: its editorRef
+  // is null, so insertTextImperative early-returns.
   useEffect(() => {
     controller.textInput.__registerEditorInserter(insertTextImperative);
-    return () => {
-      controller.textInput.__registerEditorInserter(null);
-    };
   }, [controller.textInput, insertTextImperative]);
 
   // Save the last in-editor range so chip insertion can target the user's

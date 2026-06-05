@@ -14,6 +14,7 @@ import { Step6Summary } from "@/sections/signals/steps/step-6-summary";
 import { Step7Processing } from "@/sections/signals/steps/step-7-processing";
 import { Step8Result } from "@/sections/signals/steps/step-8-result";
 import type { Signal } from "@/state/app-state";
+import { estimateSignalCount } from "@/state/metrics";
 
 export interface LaunchRequest {
   scenarioId: string;
@@ -168,8 +169,8 @@ function WorkspaceInner({
     onLaunchRequested({
       scenarioId: stepData.scenario ?? "",
       cost: stepData.budget ?? 0,
-      // Estimated count — derived in step-6 from budget + cheapest segment.
-      count: estimateSignalCount(stepData),
+      // Estimated count — единая формула бюджет→сигналы из движка чисел.
+      count: estimateSignalCount(stepData.segments, stepData.budget ?? 0),
       stepData,
       proceed: () => advanceTo(7),
     });
@@ -249,23 +250,6 @@ function WorkspaceInner({
 
     </div>
   );
-}
-
-const SEGMENT_PRICES: Record<string, number> = {
-  max: 0.45,
-  "very-high": 0.35,
-  high: 0.25,
-  medium: 0.07,
-};
-
-function estimateSignalCount(data: StepData): number {
-  const budget = data.budget ?? 0;
-  const prices = data.segments
-    .map((s) => SEGMENT_PRICES[s] ?? 0)
-    .filter(Boolean);
-  if (!prices.length || !budget) return 0;
-  const cheapest = Math.min(...prices);
-  return Math.floor(budget / cheapest);
 }
 
 export function CampaignWorkspace({

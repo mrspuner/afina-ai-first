@@ -2,7 +2,7 @@ import { nanoid } from "nanoid";
 import type { StructuralOp } from "./structural-commands";
 import type { CampaignSort } from "./parse-campaign-filter";
 import type { Survey, SurveyStatus } from "@/types/survey";
-import { EMPTY_SURVEY } from "@/types/survey";
+import { EMPTY_SURVEY, DEMO_SURVEY } from "@/types/survey";
 import type { SignalStatus } from "@/types/signal-status";
 import type { StepData } from "@/types/campaign";
 import type { NodeParams } from "@/types/workflow";
@@ -564,10 +564,48 @@ export function appReducer(state: AppState, action: Action): AppState {
       const keepWorkflow =
         workflowCampaignId !== null &&
         action.preset.campaigns.some((c) => c.id === workflowCampaignId);
+      // Preset campaign dates span the last 30–90 days. Reset the stats period
+      // to cover them (last 90 days) and clear any stale conditions, so the
+      // preset's campaigns are immediately visible in the report.
+      const now = new Date();
+      const from = new Date(now);
+      from.setDate(from.getDate() - 89);
+      const stats: StatisticsFilters = {
+        ...DEFAULT_FILTERS,
+        period: {
+          preset: "custom",
+          from: from.toISOString().slice(0, 10),
+          to: now.toISOString().slice(0, 10),
+        },
+      };
+      // Непустой пресет автоматически заполняет анкету (демо-данные) и
+      // подтягивает сайт в настройки — чтобы тестировать без прохождения формы;
+      // empty — сбрасывает анкету обратно.
+      const isEmptyPreset = action.preset.key === "empty";
+      const survey = isEmptyPreset ? EMPTY_SURVEY : DEMO_SURVEY;
+      const surveyStatus: SurveyStatus = isEmptyPreset
+        ? "not_started"
+        : "completed";
+      const clientDirection = isEmptyPreset
+        ? DEFAULT_DIRECTION_ID
+        : businessDirectionFromSurvey(DEMO_SURVEY.directionId);
+      const accountSettings = isEmptyPreset
+        ? state.accountSettings
+        : {
+            ...state.accountSettings,
+            companyWebsite: DEMO_SURVEY.companyWebsite,
+            companyName: DEMO_SURVEY.companyName,
+            directionId: DEMO_SURVEY.directionId,
+          };
       return {
         ...state,
         signals: action.preset.signals,
         campaigns: action.preset.campaigns,
+        stats,
+        survey,
+        surveyStatus,
+        clientDirection,
+        accountSettings,
         view:
           state.view.kind === "workflow" && !keepWorkflow
             ? { kind: "section", name: "Кампании" }
@@ -593,10 +631,12 @@ export function appReducer(state: AppState, action: Action): AppState {
       return { ...state, selectedWorkflowNode: null };
 
     case "workflow_node_command_submit":
+      // Keep the edited node selected/open so the user can keep tweaking it —
+      // только применяем команду. (Снятие выделения происходит по клику на
+      // полотно/крестик или при структурных операциях, меняющих граф.)
       return {
         ...state,
         workflowNodeCommand: { commands: action.commands },
-        selectedWorkflowNode: null,
       };
 
     case "workflow_node_command_handled":
@@ -632,6 +672,19 @@ export function appReducer(state: AppState, action: Action): AppState {
         ...state,
         view: { kind: "section", name: "Статистика", campaignId: action.campaignId },
         workflowCommand: null,
+        selectedWorkflowNode: null,
+        // Открытие статистики из карточки кампании выставляет ЖИВОЕ условие
+        // поиска — оно и фильтрует куб, и видно в «Условиях поиска». Ключ
+        // совпадает с ключом измерения campaigns в кубе (`cmp-<id>`).
+        stats: action.campaignId
+          ? {
+              ...state.stats,
+              conditions: {
+                include: { campaigns: [`cmp-${action.campaignId}`] },
+                exclude: {},
+              },
+            }
+          : state.stats,
         activeSection: "Статистика",
         campaignFilter: [],
         campaignSort: "default",
@@ -642,6 +695,7 @@ export function appReducer(state: AppState, action: Action): AppState {
         ...state,
         view: { kind: "section", name: action.section },
         workflowCommand: null,
+        selectedWorkflowNode: null,
         activeSection: action.section,
         campaignFilter: [],
         campaignSort: "default",
@@ -724,6 +778,17 @@ export function appReducer(state: AppState, action: Action): AppState {
         // Анкета — единственный источник «направления клиента» для пользователя.
         // Дев-панель просто отражает это значение и позволяет тестово переопределить.
         clientDirection: businessDirectionFromSurvey(action.survey.directionId),
+        // Сайт (и название/направление), введённые в анкете, подтягиваются в
+        // «Настройки» — это первичный источник данных аккаунта.
+        accountSettings: {
+          ...state.accountSettings,
+          companyWebsite:
+            action.survey.companyWebsite || state.accountSettings.companyWebsite,
+          companyName:
+            action.survey.companyName || state.accountSettings.companyName,
+          directionId:
+            action.survey.directionId ?? state.accountSettings.directionId,
+        },
       };
 
     case "open_survey":
@@ -1006,6 +1071,23 @@ export const isWorkflowView = (s: AppState) => s.view.kind === "workflow";
 export const isOnWelcome = (s: AppState) => s.view.kind === "welcome";
 export const isOnStatisticsSection = (s: AppState): boolean =>
   s.view.kind === "section" && s.view.name === "Статистика";
+
+/**
+ * Канонический ключ «разговорного контекста» текущего экрана — единственное
+ * определение того, что считать сменой раздела для эфемерного ввода (чат,
+ * чипы, очередь черновиков). Все драйверы подписаны на него через
+ * `useScopeReset`, поэтому очищаются синхронно и предсказуемо.
+ *
+ * Секции различаем по имени (переход Сигналы→Статистика — смена scope), прочие
+ * экраны — по kind. `awaiting-campaign` сворачиваем в `guided-signal`: это
+ * продолжение того же signal-флоу (как и в page.tsx viewKey), а не новый scope,
+ * иначе ввод стирался бы в середине создания сигнала.
+ */
+export function navigationScopeKey(view: View): string {
+  if (view.kind === "section") return `section:${view.name}`;
+  const kind = view.kind === "awaiting-campaign" ? "guided-signal" : view.kind;
+  return `view:${kind}`;
+}
 
 /**
  * Какой пункт левого меню подсвечен. Выводится из текущего view, чтобы пункт

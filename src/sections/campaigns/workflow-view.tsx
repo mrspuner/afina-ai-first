@@ -24,6 +24,7 @@ import {
   type StructuralOp,
 } from "@/state/structural-commands";
 import { useChat } from "@/state/chat-context";
+import { getCachedGraph, setCachedGraph } from "./workflow-graph-cache";
 
 interface GraphState {
   nodes: WorkflowNode[];
@@ -41,6 +42,8 @@ interface WorkflowViewProps {
   nodeFieldPatch?: { nodeId: string; patch: Partial<NodeParams> } | null;
   onNodeFieldPatchHandled?: () => void;
   selectedNodeId?: string | null;
+  /** Кампания, к которой относится граф — ключ для durable-кэша графа. */
+  campaignId?: string;
   signalType?: SignalType;
   signal?: Signal;
   onGraphChange?: (graph: GraphState) => void;
@@ -249,6 +252,7 @@ export function WorkflowView({
   nodeFieldPatch,
   onNodeFieldPatchHandled,
   selectedNodeId,
+  campaignId,
   signalType,
   signal,
   onGraphChange,
@@ -256,13 +260,16 @@ export function WorkflowView({
   onPaneClick,
 }: WorkflowViewProps) {
   const chat = useChat();
-  const [graph, setGraph] = useState<GraphState>(() =>
-    initialGraph(signalType, signal)
+  // Rehydrate from the durable cache so manual edits survive the unmount on
+  // launch (workflow → campaign) and navigation; fall back to the template.
+  const [graph, setGraph] = useState<GraphState>(
+    () => getCachedGraph(campaignId) ?? initialGraph(signalType, signal)
   );
 
   useEffect(() => {
     onGraphChange?.(graph);
-  }, [graph, onGraphChange]);
+    setCachedGraph(campaignId, graph);
+  }, [graph, onGraphChange, campaignId]);
   const [unknownCmd, setUnknownCmd] = useState<string | null>(null);
   const unknownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const graphRef = useRef<HTMLDivElement>(null);

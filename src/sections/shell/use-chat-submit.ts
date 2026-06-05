@@ -24,7 +24,13 @@ import {
   STATS_DEMO_YEAR,
   type StatsQueryId,
 } from "@/lib/stats-query-matcher";
-import type { ChatComposerSubmitPayload } from "./chat-composer";
+import type { ChipSegment } from "@/state/prompt-chips-context";
+
+/** Текст + сегменты (тег + текст после него), отправляемые в чат. */
+export interface ChatSubmitPayload {
+  text: string;
+  segments: ChipSegment[];
+}
 
 const LIGHT_QUERY = "лёгкий запрос";
 const HEAVY_QUERY = "сложный запрос";
@@ -37,7 +43,7 @@ const READ_ONLY_WORKFLOW_REPLY =
   "и ноды снова можно будет править.";
 
 /** Общий обработчик сабмита чата — используется и collapsed-баром, и drawer. */
-export function useChatSubmit(): { submit: (payload: ChatComposerSubmitPayload) => void } {
+export function useChatSubmit(): { submit: (payload: ChatSubmitPayload) => void } {
   const chat = useChat();
   const triggerEdit = useTriggerEdit();
   const appState = useAppState();
@@ -179,7 +185,7 @@ export function useChatSubmit(): { submit: (payload: ChatComposerSubmitPayload) 
     }
   }
 
-  function submit(payload: ChatComposerSubmitPayload) {
+  function submit(payload: ChatSubmitPayload) {
     const { text, segments } = payload;
     const normalized = text.trim().toLowerCase();
 
