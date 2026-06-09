@@ -150,7 +150,14 @@ export function CanvasHeader({
     : "Сигнал не привязан";
 
   return (
-    <div className="sticky top-0 z-20 border-b border-border bg-background/90 px-6 py-3 backdrop-blur">
+    <div
+      className="sticky top-0 z-20 border-b border-border bg-background/90 py-3 pl-6 backdrop-blur transition-[padding] duration-300"
+      // Правый отступ растёт на ширину AI-дровера, когда тот открыт
+      // (--chat-sidebar-width задаётся ChatDrawer на <html>). Так кнопка
+      // действия (Запустить / Приостановить / Возобновить) уезжает из-под
+      // дровера и сохраняет те же 1.5rem отступа, что и до его открытия.
+      style={{ paddingRight: "calc(1.5rem + var(--chat-sidebar-width, 0px))" }}
+    >
       <div className="flex items-start justify-between gap-4">
         <div className="flex min-w-0 flex-1 items-start gap-3">
           {isReadOnly && onBack && (
