@@ -11,6 +11,9 @@ import { cn } from "@/lib/utils";
 
 interface OnboardingInterestsScreenProps {
   onContinue: () => void;
+  /** Step back to the website-entry screen. When omitted, the «Назад»
+   *  button is hidden (e.g. when this is the first screen of a flow). */
+  onBack?: () => void;
 }
 
 export function defaultInterestLabels(direction: string): string[] {
@@ -20,7 +23,7 @@ export function defaultInterestLabels(direction: string): string[] {
   return vertical?.interests.slice(0, 4).map((i) => i.label) ?? [];
 }
 
-export function OnboardingInterestsScreen({ onContinue }: OnboardingInterestsScreenProps) {
+export function OnboardingInterestsScreen({ onContinue, onBack }: OnboardingInterestsScreenProps) {
   const { clientDirection } = useAppState();
   const initial = useMemo(() => defaultInterestLabels(clientDirection), [clientDirection]);
   const [labels, setLabels] = useState<string[]>(initial);
@@ -111,7 +114,14 @@ export function OnboardingInterestsScreen({ onContinue }: OnboardingInterestsScr
         )}
       </div>
 
-      <div className="mt-2 flex justify-start">
+      <div className="mt-2 flex items-center justify-between">
+        {onBack ? (
+          <Button variant="outline" onClick={onBack}>
+            Назад
+          </Button>
+        ) : (
+          <span />
+        )}
         <Button onClick={onContinue} disabled={labels.length === 0}>
           Продолжить →
         </Button>

@@ -113,7 +113,12 @@ function WorkspaceInner({
       // choices for the new scenario.
       if (scenarioChanged) {
         setStepData({ ...initialStepData, ...partial });
-        const next = currentStep + 1;
+        // The scenario is step 1's field, so a change always rewinds to
+        // step 2 — never `currentStep + 1`. `currentStep` can be stale (e.g.
+        // the user scrolled back up to step 1 without the stepper updating
+        // it, so it still points at 2+): `currentStep + 1` would then land on
+        // step 3/4/5 and skip the interests screen entirely.
+        const next = 2;
         setMaxStep(next);
         setAnimatingStep(next);
         setCurrentStep(next);

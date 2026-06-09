@@ -17,6 +17,7 @@ type Phase =
   | { kind: "form" }
   | { kind: "awaiting"; survey: Survey }
   | { kind: "interests"; survey: Survey }
+  | { kind: "matching"; survey: Survey }
   | { kind: "scenarios"; survey: Survey };
 
 interface SurveySectionProps {
@@ -67,6 +68,16 @@ export function SurveySection({
 
   function handleInterestsContinue() {
     if (phase.kind !== "interests") return;
+    setPhase({ kind: "matching", survey: phase.survey });
+  }
+
+  function handleInterestsBack() {
+    if (phase.kind !== "interests") return;
+    setPhase({ kind: "form" });
+  }
+
+  function handleMatchingDone() {
+    if (phase.kind !== "matching") return;
     setPhase({ kind: "scenarios", survey: phase.survey });
   }
 
@@ -136,7 +147,26 @@ export function SurveySection({
             transition={{ duration: 0.28, ease: [0.23, 1, 0.32, 1] }}
             className="flex w-full justify-center"
           >
-            <OnboardingInterestsScreen onContinue={handleInterestsContinue} />
+            <OnboardingInterestsScreen
+              onContinue={handleInterestsContinue}
+              onBack={handleInterestsBack}
+            />
+          </motion.div>
+        )}
+        {phase.kind === "matching" && (
+          <motion.div
+            key="matching"
+            initial={{ opacity: 0, x: 16 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -16 }}
+            transition={{ duration: 0.28, ease: [0.23, 1, 0.32, 1] }}
+            className="flex w-full justify-center"
+          >
+            <SurveyAwaiting
+              onDone={handleMatchingDone}
+              title="Подбираем сценарии"
+              subtitle="Готовим подходящие сценарии под ваш бизнес…"
+            />
           </motion.div>
         )}
         {phase.kind === "scenarios" && (
