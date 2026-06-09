@@ -7,6 +7,7 @@ import {
   GripVerticalIcon,
   Trash2Icon,
 } from "lucide-react";
+import { Reorder, useDragControls } from "motion/react";
 
 import { cn } from "@/lib/utils";
 
@@ -108,6 +109,49 @@ const ALL_COLUMNS: ColumnKey[] = [
   "rr",
 ];
 
+function ColumnReorderItem({
+  col,
+  onToggle,
+}: {
+  col: ColumnKey;
+  onToggle: (column: ColumnKey) => void;
+}) {
+  // Перетаскивание стартует только с ручки-грипа — клики по чекбоксу и
+  // кнопке удаления остаются обычными кликами.
+  const controls = useDragControls();
+  return (
+    <Reorder.Item
+      value={col}
+      dragListener={false}
+      dragControls={controls}
+      className="flex items-center gap-2 rounded-md bg-background px-2 py-1.5 text-sm hover:bg-muted/50"
+    >
+      <GripVerticalIcon
+        onPointerDown={(e) => controls.start(e)}
+        className="size-3.5 shrink-0 cursor-grab touch-none text-muted-foreground active:cursor-grabbing"
+        aria-label="Перетащить столбец"
+      />
+      <label className="flex flex-1 items-center gap-2 cursor-pointer">
+        <input
+          type="checkbox"
+          checked
+          onChange={() => onToggle(col)}
+          className="size-3.5 accent-primary"
+        />
+        <span>{COLUMN_LABELS[col]}</span>
+      </label>
+      <button
+        type="button"
+        onClick={() => onToggle(col)}
+        className="rounded p-0.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+        aria-label="Удалить"
+      >
+        <Trash2Icon className="size-3.5" />
+      </button>
+    </Reorder.Item>
+  );
+}
+
 function ColumnsList({
   selected,
   sort,
@@ -121,75 +165,44 @@ function ColumnsList({
   onReorder: (columns: ColumnKey[]) => void;
   onSortChange: (sort: SortState | null) => void;
 }) {
-  const ordered = [
-    ...selected,
-    ...ALL_COLUMNS.filter((c) => !selected.includes(c)),
-  ];
-
-  function move(column: ColumnKey, direction: -1 | 1) {
-    const list = [...selected];
-    const idx = list.indexOf(column);
-    if (idx < 0) return;
-    const nextIdx = idx + direction;
-    if (nextIdx < 0 || nextIdx >= list.length) return;
-    [list[idx], list[nextIdx]] = [list[nextIdx], list[idx]];
-    onReorder(list);
-  }
+  const hidden = ALL_COLUMNS.filter((c) => !selected.includes(c));
 
   return (
     <div className="flex flex-col gap-1.5 rounded-lg border border-border bg-background p-1">
-      {ordered.map((col) => {
-        const isSelected = selected.includes(col);
-        return (
-          <div
-            key={col}
-            className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/50"
-          >
-            <GripVerticalIcon
-              className={`size-3.5 ${
-                isSelected ? "text-muted-foreground" : "opacity-0"
-              }`}
-            />
-            <label className="flex flex-1 items-center gap-2 cursor-pointer">
+      <Reorder.Group
+        axis="y"
+        values={selected}
+        onReorder={onReorder}
+        className="flex flex-col gap-1.5"
+      >
+        {selected.map((col) => (
+          <ColumnReorderItem key={col} col={col} onToggle={onToggle} />
+        ))}
+      </Reorder.Group>
+
+      {hidden.length > 0 && (
+        <div className="mt-1 border-t border-border pt-2">
+          <div className="px-2 py-1 text-xs text-muted-foreground">
+            Скрытые столбцы
+          </div>
+          {hidden.map((col) => (
+            <label
+              key={col}
+              className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-muted/50"
+            >
+              {/* Спейсер под ширину грипа — выравнивает чекбоксы со списком выше. */}
+              <span className="size-3.5 shrink-0" />
               <input
                 type="checkbox"
-                checked={isSelected}
+                checked={false}
                 onChange={() => onToggle(col)}
                 className="size-3.5 accent-primary"
               />
               <span>{COLUMN_LABELS[col]}</span>
             </label>
-            {isSelected && (
-              <div className="flex items-center gap-0.5">
-                <button
-                  type="button"
-                  onClick={() => move(col, -1)}
-                  className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-                  aria-label="Вверх"
-                >
-                  ↑
-                </button>
-                <button
-                  type="button"
-                  onClick={() => move(col, 1)}
-                  className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-                  aria-label="Вниз"
-                >
-                  ↓
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onToggle(col)}
-                  className="rounded p-0.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                  aria-label="Удалить"
-                >
-                  <Trash2Icon className="size-3.5" />
-                </button>
-              </div>
-            )}
-          </div>
-        );
-      })}
+          ))}
+        </div>
+      )}
 
       <div className="mt-2 border-t border-border pt-2">
         <div className="px-2 py-1 text-xs text-muted-foreground">

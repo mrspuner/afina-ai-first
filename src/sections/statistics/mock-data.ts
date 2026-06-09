@@ -52,9 +52,15 @@ export function sortRows(
 ): GeneratedRow[] {
   if (!sort) return rows;
   const factor = sort.direction === "asc" ? 1 : -1;
+  if (sort.column === "label") {
+    return [...rows].sort(
+      (a, b) => a.label.localeCompare(b.label, "ru") * factor,
+    );
+  }
+  const column = sort.column;
   return [...rows].sort((a, b) => {
-    const av = numericCellValue(a.data, sort.column);
-    const bv = numericCellValue(b.data, sort.column);
+    const av = numericCellValue(a.data, column);
+    const bv = numericCellValue(b.data, column);
     return (av - bv) * factor;
   });
 }

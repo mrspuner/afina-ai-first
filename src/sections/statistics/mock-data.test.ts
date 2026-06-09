@@ -59,6 +59,20 @@ describe("sortRows", () => {
     expect(out.map((r) => r.key)).toEqual(["r", "p", "q"]);
   });
 
+  it("сортирует по имени строки (label) по алфавиту", () => {
+    const named: GeneratedRow[] = [
+      { ...row("1", {}), label: "Берёза" },
+      { ...row("2", {}), label: "Авто" },
+      { ...row("3", {}), label: "Яблоко" },
+    ];
+    expect(
+      sortRows(named, { column: "label", direction: "asc" }).map((r) => r.key),
+    ).toEqual(["2", "1", "3"]);
+    expect(
+      sortRows(named, { column: "label", direction: "desc" }).map((r) => r.key),
+    ).toEqual(["3", "1", "2"]);
+  });
+
   it("не мутирует входной массив", () => {
     const input = [...rows];
     sortRows(input, { column: "clicks", direction: "asc" });
