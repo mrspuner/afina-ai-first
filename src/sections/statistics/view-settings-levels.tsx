@@ -1,15 +1,11 @@
 "use client";
 
 import {
-  ArrowDownIcon,
-  ArrowUpIcon,
   ChevronRightIcon,
   GripVerticalIcon,
   Trash2Icon,
 } from "lucide-react";
 import { Reorder, useDragControls } from "motion/react";
-
-import { cn } from "@/lib/utils";
 
 import { GroupedSelect } from "./fields/grouped-select";
 import { PeriodField } from "./fields/period-field";
@@ -20,7 +16,6 @@ import type {
   ColumnKey,
   Currency,
   RowKind,
-  SortState,
   StatisticsAction,
   StatisticsFilters,
 } from "./statistics-state";
@@ -154,16 +149,12 @@ function ColumnReorderItem({
 
 function ColumnsList({
   selected,
-  sort,
   onToggle,
   onReorder,
-  onSortChange,
 }: {
   selected: ColumnKey[];
-  sort: SortState | null;
   onToggle: (column: ColumnKey) => void;
   onReorder: (columns: ColumnKey[]) => void;
-  onSortChange: (sort: SortState | null) => void;
 }) {
   const hidden = ALL_COLUMNS.filter((c) => !selected.includes(c));
 
@@ -203,63 +194,6 @@ function ColumnsList({
           ))}
         </div>
       )}
-
-      <div className="mt-2 border-t border-border pt-2">
-        <div className="px-2 py-1 text-xs text-muted-foreground">
-          Сортировка
-        </div>
-        {selected.map((col) => {
-          const isSortCol = sort?.column === col;
-          return (
-            <div
-              key={`sort-${col}`}
-              className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/50"
-            >
-              <span>{COLUMN_LABELS[col]}</span>
-              <div className="flex items-center gap-0.5">
-                <button
-                  type="button"
-                  aria-label={`Сортировать ${COLUMN_LABELS[col]} по возрастанию`}
-                  onClick={() =>
-                    onSortChange(
-                      isSortCol && sort?.direction === "asc"
-                        ? null
-                        : { column: col, direction: "asc" },
-                    )
-                  }
-                  className={cn(
-                    "rounded p-0.5 transition-colors hover:bg-muted",
-                    isSortCol && sort?.direction === "asc"
-                      ? "text-primary"
-                      : "text-muted-foreground",
-                  )}
-                >
-                  <ArrowUpIcon className="size-3.5" />
-                </button>
-                <button
-                  type="button"
-                  aria-label={`Сортировать ${COLUMN_LABELS[col]} по убыванию`}
-                  onClick={() =>
-                    onSortChange(
-                      isSortCol && sort?.direction === "desc"
-                        ? null
-                        : { column: col, direction: "desc" },
-                    )
-                  }
-                  className={cn(
-                    "rounded p-0.5 transition-colors hover:bg-muted",
-                    isSortCol && sort?.direction === "desc"
-                      ? "text-primary"
-                      : "text-muted-foreground",
-                  )}
-                >
-                  <ArrowDownIcon className="size-3.5" />
-                </button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
     </div>
   );
 }
@@ -313,10 +247,8 @@ export function buildViewSettingsLevel(
     render: () => (
       <ColumnsList
         selected={draft.columns}
-        sort={draft.sort}
         onToggle={(column) => dispatch({ type: "TOGGLE_COLUMN", column })}
         onReorder={(columns) => dispatch({ type: "REORDER_COLUMNS", columns })}
-        onSortChange={(sort) => dispatch({ type: "SET_SORT", sort })}
       />
     ),
   };
