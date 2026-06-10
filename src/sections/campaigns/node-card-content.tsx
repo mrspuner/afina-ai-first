@@ -1,11 +1,8 @@
 "use client";
 
-import { AlertTriangle, Check, Pencil } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import Image from "next/image";
-import { useState } from "react";
-import { usePromptInputController } from "@/components/ai-elements/prompt-input";
 import type { NodeParams, WorkflowNodeData } from "@/types/workflow";
-import { NODE_ACTIONS } from "@/state/node-actions";
 import { getFieldMeta } from "@/state/node-field-editability";
 import { usePromptChips } from "@/state/prompt-chips-context";
 import type { NodeTagPayload } from "@/state/prompt-chips-context";
@@ -13,6 +10,9 @@ import { useAppDispatch } from "@/state/app-state-context";
 import { cn } from "@/lib/utils";
 import { getNodeColor } from "./node-visuals";
 import { useWorkflowReadOnly } from "./workflow-readonly-context";
+import { NodeFieldCombobox } from "./node-field-combobox";
+import { EmailField } from "./email-field";
+import { SplitFields } from "./split-fields";
 
 type ParamRow = { label: string; value: string };
 
@@ -61,8 +61,22 @@ const PARAM_RENDERERS: {
     { label: "Триггер", value: conditionTriggerLabel(p.trigger) },
   ],
   split: (p) => [
-    { label: "По", value: p.by === "segment" ? "Сегменту" : "Случайно" },
-    { label: "Ветки", value: String(p.branches) },
+    {
+      label: "По",
+      value:
+        p.by === "segment"
+          ? "По сегменту"
+          : p.by === "random"
+            ? "Рандомно"
+            : "Поровну",
+    },
+    {
+      label: "Ветки",
+      value:
+        p.by === "segment"
+          ? "По категориям сигнала"
+          : String(p.branches),
+    },
   ],
   merge: () => [],
   signal: (p) => [
@@ -130,42 +144,22 @@ interface NodeCardBodyProps {
  * Rendered inline inside WorkflowNodeComponent when the node is selected.
  */
 export function NodeCardBody({ id, data }: NodeCardBodyProps) {
-  const actions = data.params ? NODE_ACTIONS[data.params.kind] ?? [] : [];
-  const { textInput } = usePromptInputController();
   const { pushChip } = usePromptChips();
   const dispatch = useAppDispatch();
   // Launched/paused/completed campaigns: the card opens for inspection only —
   // every field stays read-only regardless of its manual/ai editability.
   const readOnly = useWorkflowReadOnly();
-  const [editing, setEditing] = useState<{ label: string; value: string } | null>(null);
 
-  function commitEdit() {
-    if (!editing || !data.params) return;
-    const meta = getFieldMeta(data.params.kind, editing.label);
-    if (!meta?.paramKey) {
-      setEditing(null);
-      return;
-    }
+  const rows = data.params ? getParamRows(data.params) : [];
+
+  /** Применяет значение combo-поля к параметрам ноды (A7). */
+  function applyFieldValue(paramKey: string, value: string) {
     dispatch({
       type: "workflow_node_field_set",
       nodeId: id,
-      patch: { [meta.paramKey]: editing.value } as Partial<NodeParams>,
-    });
-    setEditing(null);
-  }
-
-  function insertPrompt(template: string) {
-    textInput.insertAtCursor(template, {
-      separator: "smart",
-      preserveTags: true,
+      patch: { [paramKey]: value } as Partial<NodeParams>,
     });
   }
-
-  const rows = data.params ? getParamRows(data.params) : [];
-  // Map chipLabel → promptTemplate so ai rows can look up their inserter.
-  const templateByLabel = new Map(
-    actions.map((a) => [a.chipLabel, a.promptTemplate] as const)
-  );
 
   function handleAiField(rowLabel: string) {
     const nodeType = data.nodeType;
@@ -201,13 +195,28 @@ export function NodeCardBody({ id, data }: NodeCardBodyProps) {
 
       <div className="text-[10px] text-muted-foreground/50">id: {id}</div>
 
-      {rows.length > 0 && (
+      {/* A6 — сплиттер: поля «По»/«Ветки» рендерятся селектами (не из общего
+          цикла), т.к. «Ветки» зависят от типа разделения и категорий сигнала. */}
+      {data.params?.kind === "split" && (
+        <div className="flex flex-col gap-0.5">
+          <SplitFields
+            nodeId={id}
+            params={data.params}
+            dirtyParams={data.dirtyParams}
+            readOnly={readOnly}
+            onAiHandoff={() => handleAiField("По")}
+          />
+        </div>
+      )}
+
+      {data.params?.kind !== "split" && rows.length > 0 && (
         <div className="flex flex-col gap-0.5">
           {rows.map((row) => {
             const meta = data.params
               ? getFieldMeta(data.params.kind, row.label)
               : undefined;
             const editability = meta?.editability;
+            const control = meta?.control;
             // Persistent yellow dot on a field whose param was edited.
             const isDirty = meta?.paramKey
               ? data.dirtyParams?.includes(meta.paramKey) ?? false
@@ -219,50 +228,54 @@ export function NodeCardBody({ id, data }: NodeCardBodyProps) {
                 className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#FFEC00]"
               />
             ) : null;
-            const isEditingRow = editing?.label === row.label;
             const rowGrid =
               "grid grid-cols-[minmax(72px,max-content)_1fr_auto] items-center gap-x-2.5 text-[11px]";
+            const rawValue = row.value === "—" ? "" : row.value;
 
-            // While editing, the row hosts an <input> + save button — it can't
-            // be a <button> (no nested interactives), so render the plain grid.
-            if (isEditingRow) {
+            // A5 — поле письма email.Текст: спец-контрол (дропдаун писем).
+            if (control === "email" && data.params?.kind === "email") {
               return (
-                <div key={row.label} className={cn(rowGrid, "px-1 py-0.5")}>
-                  <span className="text-muted-foreground">{row.label}</span>
-                  <input
-                    autoFocus
-                    value={editing.value}
-                    onChange={(e) => setEditing({ label: row.label, value: e.target.value })}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") commitEdit();
-                      if (e.key === "Escape") setEditing(null);
-                    }}
-                    className="nodrag min-w-0 flex-1 rounded border border-border bg-background px-1.5 py-0.5 text-[11px] text-foreground"
-                  />
-                  <button
-                    type="button"
-                    aria-label="Сохранить поле"
-                    className="nodrag ml-1 flex shrink-0 items-center text-muted-foreground/50 hover:text-muted-foreground focus-visible:outline-none"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      commitEdit();
-                    }}
-                  >
-                    <Check className="h-3 w-3" />
-                  </button>
-                </div>
+                <EmailField
+                  key={row.label}
+                  nodeId={id}
+                  params={data.params}
+                  isDirty={isDirty}
+                  readOnly={readOnly}
+                />
               );
             }
 
-            // Whole-row affordance: clicking anywhere on a manual row opens its
-            // inline editor; on an ai row sends the field tag to the prompt bar.
-            // The trailing icon is now just a visual marker, not the only target.
-            const interactive =
-              !readOnly && (editability === "manual" || editability === "ai");
+            // A7 — combo-контрол: справочник + ручной ввод + ИИ.
+            if (control === "combo" && meta?.optionsKey && meta.paramKey) {
+              if (readOnly) {
+                return (
+                  <div key={row.label} className={cn(rowGrid, "px-1 py-0.5")}>
+                    <span className="text-muted-foreground">{row.label}</span>
+                    <span className="truncate text-foreground" title={row.value}>
+                      {row.value}
+                    </span>
+                    <span className="flex items-center justify-end">{dirtyDot}</span>
+                  </div>
+                );
+              }
+              const paramKey = meta.paramKey;
+              return (
+                <NodeFieldCombobox
+                  key={row.label}
+                  label={row.label}
+                  value={rawValue}
+                  optionsKey={meta.optionsKey}
+                  isDirty={isDirty}
+                  onSelect={(next) => applyFieldValue(paramKey, next)}
+                  onAiHandoff={() => handleAiField(row.label)}
+                />
+              );
+            }
+
+            // ai — иконка-маскот, тег поля улетает ассистенту (без изменений).
+            const interactive = !readOnly && editability === "ai";
             const icon =
-              editability === "manual" ? (
-                <Pencil className="h-3 w-3" />
-              ) : editability === "ai" ? (
+              editability === "ai" ? (
                 <Image src="/mascot-icon.svg" width={12} height={12} alt="" aria-hidden />
               ) : null;
 
@@ -282,18 +295,10 @@ export function NodeCardBody({ id, data }: NodeCardBodyProps) {
               <button
                 key={row.label}
                 type="button"
-                aria-label={
-                  editability === "manual"
-                    ? `Редактировать поле «${row.label}»`
-                    : `Передать поле «${row.label}» ассистенту`
-                }
+                aria-label={`Передать поле «${row.label}» ассистенту`}
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (editability === "manual") {
-                    setEditing({ label: row.label, value: row.value });
-                  } else {
-                    handleAiField(row.label);
-                  }
+                  handleAiField(row.label);
                 }}
                 className={cn(
                   rowGrid,

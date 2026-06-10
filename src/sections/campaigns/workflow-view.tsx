@@ -83,7 +83,11 @@ function computeDynamicSublabel(
   }
   // Split → reflect mode.
   if (kind === "split" && "by" in patch && patch.by !== undefined) {
-    return patch.by === "segment" ? "По сегменту" : "Случайно";
+    return patch.by === "segment"
+      ? "По сегменту"
+      : patch.by === "random"
+        ? "Рандомно"
+        : "Поровну";
   }
   return null;
 }
@@ -416,10 +420,24 @@ export function WorkflowView({
 
   useEffect(() => {
     if (!nodeFieldPatch) return;
-    setGraph((prev) => ({
-      ...prev,
-      nodes: patchNodeParams(prev.nodes, nodeFieldPatch.nodeId, nodeFieldPatch.patch),
-    }));
+    setGraph((prev) => {
+      // Помечаем изменённые ключи параметров жёлтой точкой (dirtyParams) и
+      // снимаем «требует внимания» — правка поля делает ноду изменённой
+      // (A7/A5), как и правка через ИИ-цикл.
+      const existingDirty =
+        prev.nodes.find((n) => n.id === nodeFieldPatch.nodeId)?.data.dirtyParams ??
+        [];
+      const dirtyParams = Array.from(
+        new Set([...existingDirty, ...Object.keys(nodeFieldPatch.patch)])
+      );
+      let nodes = patchNode(prev.nodes, nodeFieldPatch.nodeId, {
+        needsAttention: false,
+        attentionReason: undefined,
+        dirtyParams,
+      });
+      nodes = patchNodeParams(nodes, nodeFieldPatch.nodeId, nodeFieldPatch.patch);
+      return { ...prev, nodes };
+    });
     onNodeFieldPatchHandled?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodeFieldPatch]);
@@ -534,6 +552,7 @@ export function WorkflowView({
           edges={graph.edges}
           compact={launched}
           readOnly={launched}
+          signal={signal ?? null}
           onNodeClick={onNodeClick}
           onPaneClick={onPaneClick}
         />

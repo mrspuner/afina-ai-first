@@ -223,7 +223,9 @@ export const NODE_ACTIONS: ActionsForAll = {
         const v = captureAfter("по", t);
         if (!v) return null;
         if (/сегмент/i.test(v)) return { by: "segment" } as Partial<NodeParams>;
-        if (/случайн/i.test(v)) return { by: "random" } as Partial<NodeParams>;
+        if (/случайн|рандом/i.test(v)) return { by: "random" } as Partial<NodeParams>;
+        if (/поровну|равномерн|поделить поровну|equal/i.test(v))
+          return { by: "equal" } as Partial<NodeParams>;
         return null;
       },
     },

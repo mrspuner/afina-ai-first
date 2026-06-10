@@ -26,22 +26,27 @@ function EmptyHistory() {
   );
 }
 
+const EMAIL_PREVIEW_WIDTH_PX = 600;
+
 /** Глобальный правый AI-drawer. Открывается кнопкой PanelRightOpen в PromptBar. */
 export function ChatDrawer({ placeholder }: { placeholder: string }) {
   const chat = useChat();
   const composerRef = useRef<PromptComposerHandle>(null);
   const isSidebar = chat.mode === "sidebar";
+  // Когда открыт редактор письма (A5), дровер встаёт на левую границу
+  // предпросмотра, а канвас резервирует справа сумму обеих ширин.
+  const emailPreviewOpen = chat.emailEditor.open;
 
   useLayoutEffect(() => {
     const root = document.documentElement;
-    root.style.setProperty(
-      "--chat-sidebar-width",
-      isSidebar ? `${SIDEBAR_WIDTH_PX}px` : "0px"
-    );
+    const reserved =
+      (isSidebar ? SIDEBAR_WIDTH_PX : 0) +
+      (emailPreviewOpen ? EMAIL_PREVIEW_WIDTH_PX : 0);
+    root.style.setProperty("--chat-sidebar-width", `${reserved}px`);
     return () => {
       root.style.removeProperty("--chat-sidebar-width");
     };
-  }, [isSidebar]);
+  }, [isSidebar, emailPreviewOpen]);
 
   return (
     <AnimatePresence>
@@ -53,7 +58,8 @@ export function ChatDrawer({ placeholder }: { placeholder: string }) {
           animate={{ x: 0 }}
           exit={{ x: "100%" }}
           transition={{ duration: 0.46, ease: [0.16, 1, 0.3, 1] }}
-          className="fixed right-0 top-0 z-30 flex h-screen w-[420px] flex-col gap-3 border-l border-white/10 bg-[rgba(10,10,10,0.85)] p-4 backdrop-blur-[2px]"
+          style={{ right: "var(--email-preview-width, 0px)" }}
+          className="fixed top-0 z-30 flex h-screen w-[420px] flex-col gap-3 border-l border-white/10 bg-[rgba(10,10,10,0.85)] p-4 backdrop-blur-[2px] transition-[right] duration-300"
         >
           <ChatPanelHeader
             mode={chat.mode}

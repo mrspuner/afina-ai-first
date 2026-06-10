@@ -41,6 +41,8 @@ export type EmailParams = {
   body: string;
   sender: string;
   link?: string;
+  /** Ссылка на письмо из справочника (A5) — какое письмо выбрано в ноде. */
+  emailId?: string;
 };
 
 export type PushParams = {
@@ -73,7 +75,8 @@ export type ConditionParams = {
 
 export type SplitParams = {
   kind: "split";
-  by: "segment" | "random";
+  /** Тип разделения: поровну (equal), случайно (random), по сегменту (A6). */
+  by: "equal" | "random" | "segment";
   branches: number;
 };
 
