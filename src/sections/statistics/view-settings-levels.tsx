@@ -285,19 +285,6 @@ export function buildViewSettingsLevel(
             groups={ROW_GROUPS}
           />
         </FieldRow>
-        <FieldRow label="Количество строк">
-          <input
-            type="number"
-            value={draft.rowCount}
-            onChange={(e) =>
-              dispatch({
-                type: "SET_ROW_COUNT",
-                count: Math.max(1, Number(e.target.value) || 0),
-              })
-            }
-            className="flex h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm outline-none transition-colors hover:bg-muted/40 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
-          />
-        </FieldRow>
         <FieldRow label="Подстроки">
           <GroupedSelect<RowKind | "none">
             value={draft.subRows}

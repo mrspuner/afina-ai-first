@@ -10,6 +10,14 @@ export interface ChatMessage {
   triggerLabel?: string;
   /** Placeholder while the simulated AI tick runs. Replaced by update_pending. */
   pending?: boolean;
+  /**
+   * Chain-of-thought шаги, стримящиеся в ОДИН сворачиваемый reasoning-блок.
+   * Наличие массива помечает сообщение как reasoning-блок (рендерится через
+   * components/ai-elements/reasoning вместо обычного пузыря).
+   */
+  reasoningSteps?: string[];
+  /** true пока шаги ещё стримятся; по завершении → false, блок сворачивается. */
+  reasoningStreaming?: boolean;
   createdAt: number;
 }
 
@@ -23,6 +31,12 @@ export interface ChatState {
 export type ChatAction =
   | { type: "append"; message: ChatMessage }
   | { type: "update_pending"; id: string; text: string }
+  | {
+      type: "update_reasoning";
+      id: string;
+      steps: string[];
+      streaming: boolean;
+    }
   | { type: "clear" }
   | { type: "open_sidebar" }
   | { type: "close_sidebar" };
@@ -37,6 +51,21 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         ...state,
         messages: state.messages.map((m) =>
           m.id === action.id ? { ...m, text: action.text, pending: undefined } : m
+        ),
+      };
+    }
+    case "update_reasoning": {
+      return {
+        ...state,
+        messages: state.messages.map((m) =>
+          m.id === action.id
+            ? {
+                ...m,
+                reasoningSteps: action.steps,
+                reasoningStreaming: action.streaming,
+                pending: undefined,
+              }
+            : m
         ),
       };
     }
@@ -85,6 +114,8 @@ interface ChatContextValue {
   /** Returns the id of the new message so the caller can update_pending later. */
   append: (input: Omit<ChatMessage, "id" | "createdAt">) => string;
   updatePending: (id: string, text: string) => void;
+  /** Push the current reasoning steps into an existing reasoning message. */
+  updateReasoning: (id: string, steps: string[], streaming: boolean) => void;
   clear: () => void;
   openSidebar: () => void;
   closeSidebar: () => void;
@@ -145,6 +176,13 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     dispatch({ type: "update_pending", id, text });
   }, []);
 
+  const updateReasoning = useCallback(
+    (id: string, steps: string[], streaming: boolean) => {
+      dispatch({ type: "update_reasoning", id, steps, streaming });
+    },
+    []
+  );
+
   const clear = useCallback(() => dispatch({ type: "clear" }), []);
   const openSidebar = useCallback(() => dispatch({ type: "open_sidebar" }), []);
   const closeSidebar = useCallback(() => dispatch({ type: "close_sidebar" }), []);
@@ -155,11 +193,21 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       mode: state.mode,
       append,
       updatePending,
+      updateReasoning,
       clear,
       openSidebar,
       closeSidebar,
     }),
-    [state.messages, state.mode, append, updatePending, clear, openSidebar, closeSidebar]
+    [
+      state.messages,
+      state.mode,
+      append,
+      updatePending,
+      updateReasoning,
+      clear,
+      openSidebar,
+      closeSidebar,
+    ]
   );
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

@@ -228,11 +228,14 @@ function WorkspaceInner({
           className="absolute top-6 z-10 transition-[right] duration-300"
           style={{ right: "calc(1.5rem + var(--chat-sidebar-width, 0px))" }}
         >
+          {/* Пока степпер виден — переход по любому пройденному шагу работает
+              всегда, в обе стороны. Шаг 7 («Обработка») неинтерактивен сам по
+              себе как активный шаг во время процесса, но не блокирует остальные
+              (раньше disabled={currentStep === 7} замораживал весь степпер). */}
           <CampaignStepper
             currentStep={currentStep}
             maxStep={maxStep}
             onStepClick={handleStepperClick}
-            disabled={currentStep === 7}
           />
         </div>
       )}

@@ -1,9 +1,15 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import type { ChatMessage } from "@/state/chat-context";
+import {
+  Reasoning,
+  ReasoningContent,
+  ReasoningTrigger,
+} from "@/components/ai-elements/reasoning";
+import { Shimmer } from "@/components/ai-elements/shimmer";
 
 function MascotIcon({ className }: { className?: string }) {
   return (
@@ -28,8 +34,34 @@ function ThinkingDots() {
   );
 }
 
+function reasoningThinkingMessage(isStreaming: boolean): ReactNode {
+  if (isStreaming) {
+    return <Shimmer duration={1}>Размышляю…</Shimmer>;
+  }
+  return <span>Размышления</span>;
+}
+
 function MessageRow({ message }: { message: ChatMessage }) {
   if (message.role === "assistant") {
+    // Reasoning-блок: один сворачиваемый блок с накапливающимися шагами.
+    if (message.reasoningSteps) {
+      return (
+        <div className="flex items-start gap-2 py-1.5">
+          <MascotIcon className="mt-0.5" />
+          <div className="min-w-0 flex-1">
+            <Reasoning
+              isStreaming={message.reasoningStreaming ?? false}
+              className="mb-0"
+            >
+              <ReasoningTrigger getThinkingMessage={reasoningThinkingMessage} />
+              <ReasoningContent>
+                {message.reasoningSteps.join("\n\n")}
+              </ReasoningContent>
+            </Reasoning>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="flex items-start gap-2 py-1.5 text-sm text-foreground/90">
         <MascotIcon className="mt-0.5" />

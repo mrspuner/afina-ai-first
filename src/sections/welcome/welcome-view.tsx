@@ -49,7 +49,7 @@ function FirstTimeHero({
     <>
       <div className="flex w-full flex-col items-start gap-3">
         <h1 className="text-[28px] font-bold leading-8 text-foreground">
-          Добро пожаловать в афина
+          Добро пожаловать в афину
         </h1>
         <p className="text-[18px] leading-[26px] text-muted-foreground">
           В афине собраны готовые сценарии для работы с вашими клиентами:

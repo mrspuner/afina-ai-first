@@ -36,18 +36,33 @@ export function DomainsBlock() {
 
   const [value, setValue] = useState("");
 
-  function addDomain() {
-    const next = value.trim().toLowerCase();
-    if (!next) return;
-    if (blocklist.includes(next)) {
+  // Принимаем как одиночный ввод, так и вставленный список: домены могут быть
+  // разделены переносом строки, табом, запятой или точкой с запятой (типичная
+  // вставка столбца из таблицы). Пустые строки пропускаются, дубликаты (в т.ч.
+  // внутри самой вставки) игнорируются.
+  function addDomains(raw: string) {
+    const seen = new Set(blocklist);
+    const toAdd: string[] = [];
+    for (const token of raw.split(/[\n\t,;]+/)) {
+      const next = token.trim().toLowerCase();
+      if (!next) continue;
+      if (seen.has(next)) continue;
+      seen.add(next);
+      toAdd.push(next);
+    }
+    if (toAdd.length === 0) {
       setValue("");
       return;
     }
     dispatch({
       type: "settings_updated",
-      patch: { domainBlocklist: [...blocklist, next] },
+      patch: { domainBlocklist: [...blocklist, ...toAdd] },
     });
     setValue("");
+  }
+
+  function addDomain() {
+    addDomains(value);
   }
 
   function removeDomain(domain: string) {
@@ -86,6 +101,16 @@ export function DomainsBlock() {
             placeholder="example.ru"
             value={value}
             onChange={(e) => setValue(e.target.value)}
+            onPaste={(e) => {
+              // Одиночный домен — обычная вставка в поле. Список (есть
+              // разделитель) добавляем сразу: <input> всё равно схлопнул бы
+              // переносы строк и потерял список.
+              const text = e.clipboardData.getData("text/plain");
+              if (/[\n\t,;]/.test(text)) {
+                e.preventDefault();
+                addDomains(text);
+              }
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();

@@ -29,12 +29,30 @@ describe("extractDomains", () => {
   it("returns empty array for free text without domains", () => {
     expect(extractDomains("привет, как дела")).toEqual([]);
   });
+
+  it("splits a pasted column with newline/tab separators (C6)", () => {
+    expect(extractDomains("a.ru\nb.ru\tc.ru\n\n d.ru ")).toEqual([
+      "a.ru",
+      "b.ru",
+      "c.ru",
+      "d.ru",
+    ]);
+  });
 });
 
 describe("parseTriggerCommand", () => {
   it("parses 'добавь d1.ru, d2.ru'", () => {
     const r = parseTriggerCommand("добавь d1.ru, d2.ru");
     expect(r).toEqual({ kind: "edit", add: ["d1.ru", "d2.ru"], exclude: [] });
+  });
+
+  it("parses a pasted domain list after 'добавь домен' (C6)", () => {
+    const r = parseTriggerCommand("добавь домен a.ru\nb.ru\tc.ru");
+    expect(r).toEqual({
+      kind: "edit",
+      add: ["a.ru", "b.ru", "c.ru"],
+      exclude: [],
+    });
   });
 
   it("parses 'исключи d3.ru'", () => {
