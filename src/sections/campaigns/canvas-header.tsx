@@ -124,7 +124,6 @@ export function CanvasHeader({
   mode = "edit",
   onBack,
   saveState,
-  onSave,
   cost,
   onExplainCost,
 }: CanvasHeaderProps) {
@@ -237,7 +236,9 @@ export function CanvasHeader({
           <div className="mt-1 flex flex-wrap items-center gap-2">
             <StatusBadge status={campaign.status} />
             <span className="text-xs text-muted-foreground">
-              {statusDescription(campaign)}
+              {!isReadOnly && campaign.status === "draft" && saveState
+                ? "Изменения сохранены"
+                : statusDescription(campaign)}
             </span>
           </div>
           </div>
@@ -264,34 +265,6 @@ export function CanvasHeader({
               </button>
             </div>
           )}
-          {!isReadOnly &&
-            campaign.status === "draft" &&
-            saveState &&
-            onSave && (
-              <div className="flex items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <span
-                    aria-hidden
-                    className={
-                      saveState === "saved"
-                        ? "h-1.5 w-1.5 rounded-full bg-emerald-500"
-                        : "h-1.5 w-1.5 rounded-full bg-amber-500"
-                    }
-                  />
-                  {saveState === "saved"
-                    ? "Изменения сохранены"
-                    : "Есть несохранённые изменения"}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={onSave}
-                  disabled={saveState === "saved"}
-                >
-                  Сохранить
-                </Button>
-              </div>
-            )}
           {campaign.status === "draft" && (
             <Button onClick={onLaunch}>Запустить</Button>
           )}

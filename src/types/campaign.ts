@@ -38,5 +38,6 @@ export const initialStepData: StepData = {
 export interface StepProps {
   data: StepData;
   onNext: (partial: Partial<StepData>) => void;
+  onBack?: () => void;
   onGoToStep?: (step: number) => void;
 }

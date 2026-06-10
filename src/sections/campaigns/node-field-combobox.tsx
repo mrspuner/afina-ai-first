@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { Pencil } from "lucide-react";
 import { useState } from "react";
 import {
   Popover,
@@ -105,6 +106,9 @@ export function NodeFieldCombobox({
               className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#FFEC00]"
             />
           )}
+          {/* Индикатор «поле редактируемо» — не отдельная кнопка, клик по нему
+              открывает тот же дропдаун, что и вся строка-триггер. */}
+          <Pencil aria-hidden className="h-3 w-3 shrink-0" />
         </span>
       </PopoverTrigger>
       <PopoverContent

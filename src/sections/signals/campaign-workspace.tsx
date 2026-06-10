@@ -184,16 +184,21 @@ function WorkspaceInner({
 
   function renderStepContent(step: number) {
     const props = { data: stepData, onNext: handleNext };
+    // «Назад» возвращает на предыдущий шаг (плавный скролл к нему). Шаг 1
+    // автопереходит по выбору сценария и футера не имеет, поэтому начинаем
+    // прокидывать onBack со 2-го.
+    const onBack = () => handleGoToStep(step - 1);
     switch (step) {
       case 1: return <Step1Scenario {...props} />;
-      case 2: return <Step2Interests {...props} />;
-      case 3: return <Step3Segments {...props} />;
-      case 4: return <Step4Upload {...props} />;
-      case 5: return <Step5Limit {...props} />;
+      case 2: return <Step2Interests {...props} onBack={onBack} />;
+      case 3: return <Step3Segments {...props} onBack={onBack} />;
+      case 4: return <Step4Upload {...props} onBack={onBack} />;
+      case 5: return <Step5Limit {...props} onBack={onBack} />;
       case 6:
         return (
           <Step6Summary
             {...props}
+            onBack={onBack}
             onGoToStep={handleGoToStep}
             onNext={() => handleLaunchFromSummary()}
           />

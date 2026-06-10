@@ -1,14 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
 import { DropZone } from "@/components/ui/drop-zone";
 import { HashingLoader } from "@/components/ui/hashing-loader";
 import { StepContent } from "@/sections/signals/steps/step-content";
+import { StepFooter } from "@/sections/signals/steps/step-footer";
 import { StepProps } from "@/types/campaign";
 import { rngFor, seededInt } from "@/state/metrics";
 
-export function Step4Upload({ data, onNext }: StepProps) {
+export function Step4Upload({ data, onNext, onBack }: StepProps) {
   const [file, setFile] = useState<File | null>(data.file);
   const [isHashing, setIsHashing] = useState(false);
 
@@ -66,11 +66,12 @@ export function Step4Upload({ data, onNext }: StepProps) {
           строк · Один номер на строку
         </p>
 
-        <div className="flex justify-start">
-          <Button disabled={!file || isHashing} onClick={handleNext}>
-            Далее
-          </Button>
-        </div>
+        <StepFooter
+          onBack={onBack}
+          onContinue={handleNext}
+          continueLabel="Далее"
+          continueDisabled={!file || isHashing}
+        />
       </div>
     </StepContent>
   );
