@@ -12,6 +12,7 @@ import type { NodeTagPayload } from "@/state/prompt-chips-context";
 import { useAppDispatch } from "@/state/app-state-context";
 import { cn } from "@/lib/utils";
 import { getNodeColor } from "./node-visuals";
+import { UNIT_COST } from "./campaign-cost";
 import { useWorkflowReadOnly } from "./workflow-readonly-context";
 
 type ParamRow = { label: string; value: string };
@@ -24,17 +25,20 @@ const PARAM_RENDERERS: {
     { label: "Alpha-name", value: p.alphaName || "—" },
     { label: "Время", value: p.scheduledAt === "immediate" ? "Сразу" : p.scheduledAt },
     ...(p.link ? [{ label: "Ссылка", value: p.link }] : []),
+    costRow("sms"),
   ],
   email: (p) => [
     { label: "Тема", value: p.subject || "—" },
     { label: "Текст", value: p.body || "—" },
     { label: "Отправитель", value: p.sender || "—" },
     ...(p.link ? [{ label: "Ссылка", value: p.link }] : []),
+    costRow("email"),
   ],
   push: (p) => [
     { label: "Заголовок", value: p.title || "—" },
     { label: "Текст", value: p.body || "—" },
     ...(p.deeplink ? [{ label: "Deeplink", value: p.deeplink }] : []),
+    costRow("push"),
   ],
   ivr: (p) => [
     { label: "Сценарий", value: p.scenario || "—" },
@@ -47,6 +51,7 @@ const PARAM_RENDERERS: {
             ? "Женский"
             : "Нейтральный",
     },
+    costRow("ivr"),
   ],
   wait: (p) => [
     { label: "Режим", value: p.mode === "duration" ? "Длительность" : "До события" },
@@ -83,6 +88,14 @@ const PARAM_RENDERERS: {
     { label: "Оффер", value: p.offerTitle },
   ],
 };
+
+/** Readonly «средняя стоимость одной отправки» row for a communication node. */
+function costRow(channel: keyof typeof UNIT_COST): ParamRow {
+  const unit = UNIT_COST[channel].toLocaleString("ru-RU", {
+    maximumFractionDigits: 2,
+  });
+  return { label: "Стоимость", value: `≈ ${unit} ₽ за отправку` };
+}
 
 function formatDuration(hours: number): string {
   if (hours < 1) return `${Math.round(hours * 60)} мин`;

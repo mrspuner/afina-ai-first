@@ -4,34 +4,8 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { StepContent } from "@/sections/signals/steps/step-content";
 import { StepProps } from "@/types/campaign";
+import { SEGMENTS } from "@/sections/signals/segments-catalog";
 import { cn } from "@/lib/utils";
-
-const SEGMENTS = [
-  {
-    id: "max",
-    name: "Максимальный",
-    price: 0.45,
-    description: "Высочайшая вероятность отклика",
-  },
-  {
-    id: "very-high",
-    name: "Очень высокий",
-    price: 0.35,
-    description: "Сильный интерес, высокая готовность",
-  },
-  {
-    id: "high",
-    name: "Высокий",
-    price: 0.25,
-    description: "Выраженный интерес к категории",
-  },
-  {
-    id: "medium",
-    name: "Средний и ниже",
-    price: 0.07,
-    description: "Общий интерес без явных триггеров",
-  },
-];
 
 export function Step3Segments({ data, onNext }: StepProps) {
   const [selected, setSelected] = useState<string[]>(data.segments);
