@@ -225,14 +225,18 @@ export function GuidedSignalSection() {
     ? signals.find((s) => s.id === activeResume.id) ?? null
     : null;
 
-  // When a freshly-launched signal finishes processing we deliberately KEEP
-  // the user on the wizard's step-8 result rather than auto-handing off to the
-  // signal card. The card has no stepper, so the old auto-`signal_opened`
-  // bounce stranded the user with no way to revisit earlier steps (C5). The
-  // signal still lands in the cabinet via `signal_added`; navigation away now
-  // happens only on an explicit action — «Использовать в кампании» (→
-  // `signal_complete`) or stepping back through the (now always-visible)
-  // stepper. The full result screen stays interactive.
+  // Once a freshly-launched signal finishes processing, hand off to the real
+  // signal card instead of the wizard's step-8 result — the final state of a
+  // found signal IS its card (same total, settings table, actions, back
+  // button). Keyed on `pendingSignalId` so resumed signals are untouched.
+  useEffect(() => {
+    if (!pendingSignalId) return;
+    const sig = signals.find((s) => s.id === pendingSignalId);
+    if (sig && (sig.status ?? "ready") === "ready") {
+      dispatch({ type: "signal_opened", id: pendingSignalId });
+      setPendingSignalId(null);
+    }
+  }, [pendingSignalId, signals, dispatch]);
 
   // Survey gate must be after all hooks — React rule.
   const showSurvey =
