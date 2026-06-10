@@ -191,6 +191,13 @@ export type AppState = {
   workflowNodeFieldPatch: { nodeId: string; patch: Partial<NodeParams> } | null;
   // Owned by stats-promptbar-queries: filters for the Statistics view
   stats: StatisticsFilters;
+  /**
+   * Whether the first-run «Знакомство с ИИ афина» overlay has been seen
+   * (completed or skipped). Drives the IntroOverlay on the welcome screen:
+   * it renders only while this is `false`. Prototype state isn't persisted,
+   * so a fresh load re-shows the overlay — acceptable per the spec.
+   */
+  introSeen: boolean;
 };
 
 export type Action =
@@ -262,7 +269,8 @@ export type Action =
   | { type: "stats_set_condition"; scope: "include" | "exclude"; entity: string; values: string[] }
   | { type: "stats_set_sort"; sort: SortState | null }
   | { type: "stats_reset"; filters: StatisticsFilters }
-  | { type: "stats_apply_patch"; patch: Partial<StatisticsFilters> };
+  | { type: "stats_apply_patch"; patch: Partial<StatisticsFilters> }
+  | { type: "intro_dismissed" };
 // PARALLEL-WORKTREE INSERTION POINT — survey actions (B), billing/signal-status actions (E).
 // Each worktree appends its own action variants to the union above; resolve merges by
 // keeping every appended line and adding the matching reducer case at the end of appReducer.
@@ -292,6 +300,7 @@ export const initialState: AppState = {
   wizardRemixToken: 0,
   workflowNodeFieldPatch: null,
   stats: DEFAULT_FILTERS,
+  introSeen: false,
 };
 
 export function appReducer(state: AppState, action: Action): AppState {
@@ -968,6 +977,9 @@ export function appReducer(state: AppState, action: Action): AppState {
       return { ...state, stats: statisticsReducer(state.stats, { type: "RESET", filters: action.filters }) };
     case "stats_apply_patch":
       return { ...state, stats: { ...state.stats, ...action.patch } };
+
+    case "intro_dismissed":
+      return { ...state, introSeen: true };
     // PARALLEL-WORTREE INSERTION POINT — append survey/billing/signal-status cases
     // immediately above this comment to keep merges trivial.
   }

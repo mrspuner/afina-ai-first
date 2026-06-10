@@ -1447,3 +1447,21 @@ describe("appReducer — entity cards", () => {
     expect(viewToAddress(view)).toEqual({ kind: "signal", signalId: "sig_1" });
   });
 });
+
+describe("appReducer — intro overlay", () => {
+  it("starts with introSeen false", () => {
+    expect(initialState.introSeen).toBe(false);
+  });
+
+  it("intro_dismissed flips introSeen to true", () => {
+    const next = appReducer(initialState, { type: "intro_dismissed" });
+    expect(next.introSeen).toBe(true);
+  });
+
+  it("intro_dismissed is idempotent and leaves the welcome view intact", () => {
+    const once = appReducer(initialState, { type: "intro_dismissed" });
+    const twice = appReducer(once, { type: "intro_dismissed" });
+    expect(twice.introSeen).toBe(true);
+    expect(twice.view).toEqual({ kind: "welcome" });
+  });
+});

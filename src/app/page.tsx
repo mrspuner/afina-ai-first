@@ -17,6 +17,7 @@ import { LaunchFlyout } from "@/sections/shell/launch-flyout";
 import { ShellBottomBar } from "@/sections/shell/shell-bottom-bar";
 import { PromptInputScopeReset } from "@/sections/shell/prompt-composer";
 import { WelcomeSection } from "@/sections/welcome/welcome-section";
+import { IntroOverlay } from "@/sections/welcome/intro-overlay";
 import { SurveySection } from "@/sections/survey/survey-section";
 import { WelcomeChatProvider } from "@/sections/welcome/welcome-chat-context";
 import { useOnboardingChat } from "@/sections/welcome/use-onboarding-chat";
@@ -171,6 +172,11 @@ export default function Home() {
             <DevPanel />
           </div>
         </div>
+        <AnimatePresence>
+          {view.kind === "welcome" && !state.introSeen && (
+            <IntroOverlay onDismiss={() => dispatch({ type: "intro_dismissed" })} />
+          )}
+        </AnimatePresence>
         </TriggerEditRegistryProvider>
         </DraftQueueProvider>
       </WelcomeChatBridge>
