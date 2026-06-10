@@ -49,3 +49,6 @@ next-env.d.ts
 
 # superpowers transient brainstorm artifacts
 /.superpowers
+
+# aim skill local server state
+.claude/aim/

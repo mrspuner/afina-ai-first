@@ -20,6 +20,11 @@ export function IntroOverlay({ onDismiss }: { onDismiss: () => void }) {
   const isLast = step === STEPS.length - 1;
   const current = STEPS[step];
 
+  // Шаг про нижнюю строку ИИ (index 1): backdrop не доходит до промбара, чтобы
+  // он остался в полном цвете. Высоту бара читаем из --promptbar-height,
+  // которую публикует PromptBar (+ его отступ bottom-5 ≈ 1.25rem и зазор).
+  const isPromptStep = step === 1;
+
   return (
     <motion.div
       role="dialog"
@@ -29,22 +34,31 @@ export function IntroOverlay({ onDismiss }: { onDismiss: () => void }) {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.32, ease: EASE_OUT }}
-      className="fixed inset-0 z-50 flex flex-col bg-background"
+      style={{
+        bottom: isPromptStep
+          ? "calc(var(--promptbar-height, 96px) + 2rem)"
+          : 0,
+      }}
+      className="fixed inset-x-0 top-0 z-50 flex items-center justify-center bg-background/70 px-6 backdrop-blur-sm transition-[bottom] duration-300 ease-out"
     >
-      {/* «Пропустить» — тихий выход, доступен на любом состоянии (в т.ч.
-          последнем). Держим в углу, чтобы не конкурировать с основным CTA. */}
-      <div className="flex shrink-0 justify-end p-5">
+      <motion.div
+        initial={{ opacity: 0, y: 12, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 8, scale: 0.98 }}
+        transition={{ duration: 0.32, ease: EASE_OUT }}
+        className="relative w-full max-w-[420px] rounded-2xl border border-border bg-card p-8 shadow-2xl"
+      >
+        {/* «Пропустить» — тихий выход, доступен на любом состоянии. В углу
+            карточки, чтобы не конкурировать с основным CTA. */}
         <Button
           variant="ghost"
           size="sm"
           onClick={onDismiss}
-          className="text-muted-foreground"
+          className="absolute right-3 top-3 h-7 px-2 text-xs text-muted-foreground"
         >
           Пропустить
         </Button>
-      </div>
 
-      <div className="flex flex-1 items-center justify-center overflow-y-auto px-6 pb-16">
         <AnimatePresence mode="wait">
           <motion.div
             key={step}
@@ -52,14 +66,14 @@ export function IntroOverlay({ onDismiss }: { onDismiss: () => void }) {
             initial="hidden"
             animate="show"
             exit="exit"
-            className="flex w-full max-w-[440px] flex-col items-center gap-5 text-center"
+            className="flex flex-col items-center gap-5 text-center"
           >
             <motion.div variants={ITEM}>
               <Image
                 src="/mascot-icon.svg"
                 alt=""
-                width={88}
-                height={88}
+                width={72}
+                height={72}
                 aria-hidden
                 priority
                 className="select-none"
@@ -69,14 +83,14 @@ export function IntroOverlay({ onDismiss }: { onDismiss: () => void }) {
             <motion.h1
               id="intro-overlay-title"
               variants={ITEM}
-              className="text-2xl font-bold leading-tight text-foreground"
+              className="text-xl font-bold leading-tight text-foreground"
             >
               {current.title}
             </motion.h1>
 
             <motion.p
               variants={ITEM}
-              className="text-base leading-relaxed text-muted-foreground"
+              className="text-sm leading-relaxed text-muted-foreground"
             >
               {current.body}
             </motion.p>
@@ -102,7 +116,7 @@ export function IntroOverlay({ onDismiss }: { onDismiss: () => void }) {
             </motion.div>
           </motion.div>
         </AnimatePresence>
-      </div>
+      </motion.div>
     </motion.div>
   );
 }

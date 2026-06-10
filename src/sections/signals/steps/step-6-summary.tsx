@@ -4,12 +4,12 @@ import { Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { StepContent } from "@/sections/signals/steps/step-content";
+import { StepFooter } from "@/sections/signals/steps/step-footer";
 import { StepProps } from "@/types/campaign";
 import { useAppState } from "@/state/app-state-context";
 import { computeShortfall } from "@/sections/signals/top-up-modal";
 import { cn } from "@/lib/utils";
 import { SCENARIO_NAMES, SEGMENT_NAMES } from "@/sections/signals/signal-summary-data";
-import { SegmentPriorityBreakdown } from "@/sections/signals/segment-priority-breakdown";
 
 function formatRub(amount: number): string {
   return `₽ ${amount.toLocaleString("ru-RU", { maximumFractionDigits: 2 })}`;
@@ -46,7 +46,7 @@ function SummaryRow({
   );
 }
 
-export function Step6Summary({ data, onNext, onGoToStep }: StepProps) {
+export function Step6Summary({ data, onNext, onBack, onGoToStep }: StepProps) {
   const { balance } = useAppState();
   const budget = data.budget ?? 0;
 
@@ -98,11 +98,6 @@ export function Step6Summary({ data, onNext, onGoToStep }: StepProps) {
             onClick={goto ? () => goto(5) : undefined}
           />
         </div>
-      </div>
-
-      {/* Порядок подбора сигналов по сегментам */}
-      <div className="mt-4">
-        <SegmentPriorityBreakdown segments={data.segments} budget={budget} />
       </div>
 
       {/* Стоимость / Баланс */}

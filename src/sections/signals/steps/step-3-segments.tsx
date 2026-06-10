@@ -1,13 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
 import { StepContent } from "@/sections/signals/steps/step-content";
+import { StepFooter } from "@/sections/signals/steps/step-footer";
 import { StepProps } from "@/types/campaign";
 import { SEGMENTS } from "@/sections/signals/segments-catalog";
 import { cn } from "@/lib/utils";
 
-export function Step3Segments({ data, onNext }: StepProps) {
+export function Step3Segments({ data, onNext, onBack }: StepProps) {
   const [selected, setSelected] = useState<string[]>(data.segments);
 
   function toggle(id: string) {
@@ -21,7 +21,7 @@ export function Step3Segments({ data, onNext }: StepProps) {
   return (
     <StepContent
       title="Выберите сегменты сигнала"
-      subtitle="Чем выше сегмент, тем свежее и точнее сигнал — и тем выше отклик и цена. Можно выбрать несколько"
+      subtitle="Чем выше сегмент, тем свежее и точнее сигнал — и тем выше вероятность отклика при коммуникации и цена. Можно выбрать несколько"
     >
       <div className="flex flex-col gap-3">
         {SEGMENTS.map((seg) => {
@@ -75,11 +75,11 @@ export function Step3Segments({ data, onNext }: StepProps) {
           );
         })}
 
-        <div className="mt-2 flex justify-start">
-          <Button disabled={!canContinue} onClick={() => onNext({ segments: selected })}>
-            Продолжить
-          </Button>
-        </div>
+        <StepFooter
+          onBack={onBack}
+          onContinue={() => onNext({ segments: selected })}
+          continueDisabled={!canContinue}
+        />
       </div>
     </StepContent>
   );

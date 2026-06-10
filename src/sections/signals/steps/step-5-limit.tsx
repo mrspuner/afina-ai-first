@@ -1,9 +1,9 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StepContent } from "@/sections/signals/steps/step-content";
+import { StepFooter } from "@/sections/signals/steps/step-footer";
 import { StepProps } from "@/types/campaign";
 import { cn } from "@/lib/utils";
 import { recommendBudget } from "@/state/metrics";
@@ -15,7 +15,7 @@ function formatRub(amount: number): string {
 
 type Mode = "recommended" | "custom";
 
-export function Step5Limit({ data, onNext }: StepProps) {
+export function Step5Limit({ data, onNext, onBack }: StepProps) {
   // Рекомендация детерминирована по размеру базы (recommendBudget из движка
   // чисел), поэтому стабильна между ре-рендерами и повторными заходами на шаг.
   const recommendedValue = useMemo(
@@ -158,19 +158,12 @@ export function Step5Limit({ data, onNext }: StepProps) {
           budget={activeValue}
         />
 
-        <div className="flex justify-start">
-          <Button
-            disabled={!canContinue}
-            onClick={() =>
-              onNext({
-                budget: activeValue,
-                budgetMode: mode,
-              })
-            }
-          >
-            Далее
-          </Button>
-        </div>
+        <StepFooter
+          onBack={onBack}
+          onContinue={() => onNext({ budget: activeValue, budgetMode: mode })}
+          continueLabel="Далее"
+          continueDisabled={!canContinue}
+        />
       </div>
     </StepContent>
   );
