@@ -68,8 +68,11 @@ export type ColumnKey =
 
 export type SortDirection = "asc" | "desc";
 
+/** Колонка сортировки: метрика-столбец или строковое имя строки. */
+export type SortColumn = ColumnKey | "label";
+
 export type SortState = {
-  column: ColumnKey;
+  column: SortColumn;
   direction: SortDirection;
 };
 

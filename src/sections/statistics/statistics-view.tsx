@@ -47,6 +47,9 @@ import {
   filtersEqual,
   statisticsReducer,
   type ColumnKey,
+  type SortColumn,
+  type SortDirection,
+  type SortState,
 } from "./statistics-state";
 
 function DataCells({
@@ -67,6 +70,26 @@ function DataCells({
         </td>
       ))}
     </>
+  );
+}
+
+function SortIndicator({
+  active,
+  direction,
+}: {
+  active: boolean;
+  direction?: SortDirection;
+}) {
+  if (active) {
+    return direction === "asc" ? (
+      <ArrowUpIcon className="h-3 w-3" />
+    ) : (
+      <ArrowDownIcon className="h-3 w-3" />
+    );
+  }
+  // Скрытый намёк на сортируемость — проявляется при наведении на заголовок.
+  return (
+    <ChevronsUpDown className="h-3 w-3 opacity-0 transition-opacity group-hover/th:opacity-60" />
   );
 }
 
@@ -171,6 +194,22 @@ export function StatisticsView({ campaignId }: { campaignId?: string } = {}) {
   );
 
   const hasSubRows = applied.subRows !== "none";
+
+  // Клик по заголовку столбца циклически переключает сортировку:
+  // нет → defaultDir → обратное → выкл. Применяется сразу к таблице
+  // (минуя draft), как и смена периода в тулбаре.
+  function cycleSort(column: SortColumn, defaultDir: SortDirection) {
+    const current = applied.sort;
+    let next: SortState | null;
+    if (!current || current.column !== column) {
+      next = { column, direction: defaultDir };
+    } else if (current.direction === defaultDir) {
+      next = { column, direction: defaultDir === "desc" ? "asc" : "desc" };
+    } else {
+      next = null;
+    }
+    appDispatch({ type: "stats_set_sort", sort: next });
+  }
 
   const toggleRow = (key: string) => {
     setExpandedKeys((prev) => {
@@ -384,31 +423,45 @@ export function StatisticsView({ campaignId }: { campaignId?: string } = {}) {
         >
           <thead className="sticky top-0 z-10">
             <tr className="border-b border-border bg-background">
-              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">
-                <div className="flex items-center gap-1.5">
+              <th className="px-4 py-3 text-left text-xs font-medium whitespace-nowrap">
+                <button
+                  type="button"
+                  onClick={() => cycleSort("label", "asc")}
+                  className={cn(
+                    "group/th -mx-1 inline-flex select-none items-center gap-1.5 rounded px-1 py-0.5 outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring/50",
+                    applied.sort?.column === "label"
+                      ? "text-foreground"
+                      : "text-muted-foreground",
+                  )}
+                >
                   Название
-                  <ChevronsUpDown className="h-3 w-3 opacity-60" />
-                </div>
+                  <SortIndicator
+                    active={applied.sort?.column === "label"}
+                    direction={applied.sort?.direction}
+                  />
+                </button>
               </th>
               {applied.columns.map((col) => {
                 const isSortCol = applied.sort?.column === col;
                 return (
                   <th
                     key={col}
-                    className={cn(
-                      "px-4 py-3 text-right text-xs font-medium whitespace-nowrap",
-                      isSortCol ? "text-foreground" : "text-muted-foreground",
-                    )}
+                    className="px-4 py-3 text-right text-xs font-medium whitespace-nowrap"
                   >
-                    <span className="inline-flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => cycleSort(col, "desc")}
+                      className={cn(
+                        "group/th -mx-1 inline-flex select-none items-center gap-1 rounded px-1 py-0.5 outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring/50",
+                        isSortCol ? "text-foreground" : "text-muted-foreground",
+                      )}
+                    >
                       {COLUMN_HEADERS[col]}
-                      {isSortCol &&
-                        (applied.sort?.direction === "asc" ? (
-                          <ArrowUpIcon className="h-3 w-3" />
-                        ) : (
-                          <ArrowDownIcon className="h-3 w-3" />
-                        ))}
-                    </span>
+                      <SortIndicator
+                        active={isSortCol}
+                        direction={applied.sort?.direction}
+                      />
+                    </button>
                   </th>
                 );
               })}
