@@ -7,7 +7,6 @@ import {
   ChevronRight,
   ChevronsUpDown,
   Download,
-  RefreshCw,
   Search,
   SlidersHorizontal,
 } from "lucide-react";
@@ -166,7 +165,6 @@ export function StatisticsView({ campaignId }: { campaignId?: string } = {}) {
 
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
 
   const dirty = useMemo(
     () => !filtersEqual(draft, applied),
@@ -251,12 +249,6 @@ export function StatisticsView({ campaignId }: { campaignId?: string } = {}) {
     setActiveTemplateId(id);
     appDispatch({ type: "stats_reset", filters: draft });
     setExpandedKeys(new Set());
-  }
-
-  function handleRefresh() {
-    if (refreshing) return;
-    setRefreshing(true);
-    window.setTimeout(() => setRefreshing(false), 650);
   }
 
   function handleDownload() {
@@ -373,15 +365,6 @@ export function StatisticsView({ campaignId }: { campaignId?: string } = {}) {
         />
 
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={handleRefresh}
-            aria-label="Обновить"
-          >
-            <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} />
-          </Button>
-          <Separator orientation="vertical" className="h-5" />
           <DrillInPopover
             trigger={
               <>
@@ -415,12 +398,7 @@ export function StatisticsView({ campaignId }: { campaignId?: string } = {}) {
 
       {/* Table */}
       <div className="flex-1 overflow-auto px-8 pb-promptbar">
-        <table
-          className={cn(
-            "w-full border-collapse transition-opacity",
-            refreshing && "opacity-60",
-          )}
-        >
+        <table className="w-full border-collapse">
           <thead className="sticky top-0 z-10">
             <tr className="border-b border-border bg-background">
               <th className="px-4 py-3 text-left text-xs font-medium whitespace-nowrap">

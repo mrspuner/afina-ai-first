@@ -65,21 +65,36 @@ export function useChatSubmit(): { submit: (payload: ChatSubmitPayload) => void 
     timersRef.current.push(id);
   }
 
+  // Chain-of-thought рендерится ОДНИМ reasoning-блоком: шаги стримятся внутрь
+  // него по очереди (накапливаются), по завершении блок сворачивается, и только
+  // потом добавляется единственный финальный ответ — без дублирующихся пузырей.
   function playComplexThinking(opts: {
     steps: ComplexThinkingStep[];
     finalReply: string;
   }) {
     chat.openSidebar();
+    const reasoningId = chat.append({
+      role: "assistant",
+      text: "",
+      reasoningSteps: [],
+      reasoningStreaming: true,
+    });
+    const collected: string[] = [];
     let cursor = 0;
     function nextStep() {
       if (cursor >= opts.steps.length) {
-        chat.append({ role: "assistant", text: opts.finalReply });
+        // Шаги кончились → помечаем reasoning завершённым (блок свернётся),
+        // затем добавляем один финальный ответ отдельным сообщением.
+        chat.updateReasoning(reasoningId, collected, false);
+        schedule(() => {
+          chat.append({ role: "assistant", text: opts.finalReply });
+        }, 500);
         return;
       }
       const step = opts.steps[cursor++];
-      const id = chat.append({ role: "assistant", text: "", pending: true });
       schedule(() => {
-        chat.updatePending(id, step.reasoning);
+        collected.push(step.reasoning);
+        chat.updateReasoning(reasoningId, [...collected], true);
         nextStep();
       }, step.delayMs);
     }

@@ -180,6 +180,13 @@
   html {
     @apply font-sans;
   }
+  /* Кликабельные элементы выглядят кликабельными. Нативные <button> и
+     role="button"-обёртки (строки нод-карты, заголовки столбцов, строки
+     сводки) получают «палец»; отключённые — обычный курсор. */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
 }
 
 /* PromptBar chip hover — full-pill brightness boost.

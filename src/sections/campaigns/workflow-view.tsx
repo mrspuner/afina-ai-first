@@ -171,7 +171,10 @@ function fallbackParamsPatch(
     case "condition":
       return { trigger: randPick(["opened", "not_opened", "clicked", "not_clicked"] as const) };
     case "split":
-      return { branches: 2 + Math.floor(Math.random() * 4) };
+      // Число веток меняется только осознанно — через параметр «Ветки» или
+      // тип разделения (структурный парсер), не случайно. Свободный промпт,
+      // не разобранный структурно, ветки не трогает.
+      return null;
     case "merge":
     case "signal":
       return null;

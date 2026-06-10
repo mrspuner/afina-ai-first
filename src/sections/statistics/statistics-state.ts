@@ -119,6 +119,9 @@ export type StatisticsAction =
   | { type: "SET_CALC_METHOD"; method: CalcMethod }
   | { type: "SET_CURRENCY"; currency: Currency }
   | { type: "SET_ROWS"; rows: RowKind }
+  // Поле «Количество строк» убрано из UI (C3), но rowCount остаётся в стейте
+  // фиксированным дефолтом и управляется из чата (напр. «топ-10»). Экшен
+  // сохранён для этих программных патчей.
   | { type: "SET_ROW_COUNT"; count: number }
   | { type: "SET_SUB_ROWS"; subRows: RowKind | "none" }
   | { type: "TOGGLE_COLUMN"; column: ColumnKey }
