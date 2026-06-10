@@ -10,7 +10,12 @@ import type { Scope, SuggestionItem } from "./types";
 import { resolveNodeContext } from "./node-context";
 import { resolveSection } from "./sections";
 import { resolveWizardStep, resolveTriggerContext } from "./wizard";
-import { resolveCampaignFeed, resolveAwaitingCampaign, resolveCampaignSelect } from "./views";
+import {
+  resolveCampaignFeed,
+  resolveAwaitingCampaign,
+  resolveCampaignSelect,
+  resolveWorkflowScenario,
+} from "./views";
 import type { CampaignStatus } from "@/state/app-state";
 import { resolveDraftQueue } from "./commands";
 import { resolveWelcomeWave } from "./welcome-waves";
@@ -33,6 +38,8 @@ export function resolveSuggestions(scope: Scope): SuggestionItem[] {
       return resolveAwaitingCampaign();
     case "campaign-select":
       return resolveCampaignSelect();
+    case "workflow-scenario":
+      return resolveWorkflowScenario();
     case "campaign-feed":
       return resolveCampaignFeed(scope.status as CampaignStatus);
   }

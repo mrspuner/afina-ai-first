@@ -188,9 +188,17 @@ export function selectPromptSuggestions(
     case "campaign-select":
       return resolved({ kind: "campaign-select" });
     case "workflow": {
-      const status: CampaignStatus = v.launched
-        ? feedStatusForCampaign(state, v.campaign.id, "active")
-        : "draft";
+      // Запущенный (read-only) workflow → лента кампании по её статусу.
+      // Редактируемый draft без выбранной ноды → подсказки уровня сценария
+      // (выбранная нода обрабатывается раньше, в правиле 2 по активному тегу).
+      if (!v.launched) {
+        return resolved({ kind: "workflow-scenario" });
+      }
+      const status: CampaignStatus = feedStatusForCampaign(
+        state,
+        v.campaign.id,
+        "active"
+      );
       return resolved({ kind: "campaign-feed", status });
     }
     case "campaign": {

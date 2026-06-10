@@ -7,7 +7,6 @@ import type { CampaignSort } from "@/state/parse-campaign-filter";
 import { STATUS_LABELS } from "./status-badge";
 
 const SORT_LABELS: Record<Exclude<CampaignSort, "default">, string> = {
-  "profit-desc": "По прибыли ↓",
   "conversion-desc": "По конверсии ↓",
 };
 

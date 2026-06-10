@@ -385,7 +385,7 @@ export function StatisticsView({ campaignId }: { campaignId?: string } = {}) {
             trigger={
               <>
                 <Search className="h-4 w-4" />
-                Условия поиска
+                Источники данных
               </>
             }
             root={buildSearchSettingsLevel(draft, dispatch)}

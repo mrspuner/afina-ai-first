@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useRef, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
 import Image from "next/image";
 import { PanelRightOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -14,6 +14,13 @@ interface PromptBarProps {
   slot?: ReactNode;
   /** Доп. классы карточки. */
   cardClassName?: string;
+  /**
+   * Одноразовая подсветка бара под цвет выбранной ноды (B1). `token`
+   * монотонно растёт при каждом новом выборе ноды; смена `token` запускает
+   * мягкую box-shadow-анимацию цветом `color`. Повторный выбор той же ноды
+   * `token` не меняет — подсветка не мерцает.
+   */
+  glow?: { color: string; token: number } | null;
 }
 
 /**
@@ -22,8 +29,26 @@ interface PromptBarProps {
  * Карточка измеряется через ResizeObserver — это единственный источник
  * CSS-переменной --promptbar-height (потребляется утилитой pb-promptbar).
  */
-export function PromptBar({ children, onOpenDrawer, slot, cardClassName }: PromptBarProps) {
+export function PromptBar({ children, onOpenDrawer, slot, cardClassName, glow }: PromptBarProps) {
   const cardRef = useRef<HTMLDivElement>(null);
+
+  // Одноразовая подсветка под цвет выбранной ноды. Перезапуск анимации —
+  // через remove → reflow → add, как в wf-graph-flash.
+  const glowToken = glow?.token ?? 0;
+  useEffect(() => {
+    if (glowToken === 0) return;
+    const el = cardRef.current;
+    if (!el || !glow) return;
+    el.style.setProperty("--node-glow", glow.color);
+    el.classList.remove("promptbar-glow");
+    void el.offsetWidth;
+    el.classList.add("promptbar-glow");
+    const onEnd = () => el.classList.remove("promptbar-glow");
+    el.addEventListener("animationend", onEnd, { once: true });
+    return () => el.removeEventListener("animationend", onEnd);
+    // Цвет читаем из свежего glow внутри эффекта; перезапуск — только по token.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [glowToken]);
 
   useLayoutEffect(() => {
     const el = cardRef.current;
@@ -78,6 +103,25 @@ export function PromptBar({ children, onOpenDrawer, slot, cardClassName }: Promp
         {slot}
         {children}
       </div>
+      <style>{`
+        @keyframes promptbar-glow-anim {
+          0% {
+            box-shadow: 0 0 0 0 transparent,
+              0 0 17px 9px rgba(0, 0, 0, 0.19);
+          }
+          35% {
+            box-shadow: 0 0 26px 7px color-mix(in srgb, var(--node-glow) 55%, transparent),
+              0 0 17px 9px rgba(0, 0, 0, 0.19);
+          }
+          100% {
+            box-shadow: 0 0 0 0 transparent,
+              0 0 17px 9px rgba(0, 0, 0, 0.19);
+          }
+        }
+        .promptbar-glow {
+          animation: promptbar-glow-anim 1.1s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+      `}</style>
     </div>
   );
 }

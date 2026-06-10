@@ -90,9 +90,10 @@ export function UploadSignalDialog({ open, onOpenChange }: UploadSignalDialogPro
         className="max-w-md [--tw-animation-duration:220ms] [--tw-ease:cubic-bezier(0.23,1,0.32,1)] data-closed:[--tw-animation-duration:160ms]"
       >
         <DialogHeader>
-          <DialogTitle>Загрузите файл с номерами</DialogTitle>
+          <DialogTitle>Загрузите свой список сигналов</DialogTitle>
           <DialogDescription>
-            CSV, XLSX, TXT · до 50 МБ · по одному номеру на строку
+            Загрузите свой список сигналов, если сформировали его отдельно.
+            Укажите тип сигнала — так мы правильно его обработаем.
           </DialogDescription>
         </DialogHeader>
 
@@ -103,6 +104,9 @@ export function UploadSignalDialog({ open, onOpenChange }: UploadSignalDialogPro
           >
             Тип сигнала
           </label>
+          <p className="text-xs text-muted-foreground/80">
+            По типу система поймёт, как обработать список и куда его подключить.
+          </p>
           <Select
             value={type}
             onValueChange={(v) => {
@@ -138,7 +142,12 @@ export function UploadSignalDialog({ open, onOpenChange }: UploadSignalDialogPro
             <HashingLoader onComplete={handleHashingComplete} />
           </div>
         ) : (
-          <DropZone accept=".csv,.xlsx,.txt" file={file} onFile={setFile} />
+          <div className="flex flex-col gap-1.5">
+            <DropZone accept=".csv,.xlsx,.txt" file={file} onFile={setFile} />
+            <p className="text-xs text-muted-foreground/80">
+              CSV, XLSX, TXT · до 50 МБ · по одному номеру на строку
+            </p>
+          </div>
         )}
 
         <DialogFooter>

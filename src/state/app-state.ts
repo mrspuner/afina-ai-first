@@ -483,6 +483,10 @@ export function appReducer(state: AppState, action: Action): AppState {
     }
 
     case "campaign_saved_draft":
+      // Сохранение черновика workflow. Уровень «несохранённости» отслеживается
+      // в WorkflowSection (подпись графа с момента последнего сохранения), а сам
+      // граф живёт в локальном стейте редактора — поэтому глобальный стейт здесь
+      // не меняется. Экшен сохраняем как точку синхронизации/возможный хук.
       return state;
 
     case "campaign_created":

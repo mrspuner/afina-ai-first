@@ -48,6 +48,14 @@ interface CanvasHeaderProps {
    * back arrow. Ignored in edit mode.
    */
   onBack?: () => void;
+  /**
+   * Состояние сохранения черновика (B7). Показывается только в edit-режиме для
+   * draft-кампании: `saved` — изменений нет, `unsaved` — есть несохранённые.
+   * `undefined` → индикатор не показываем.
+   */
+  saveState?: "saved" | "unsaved";
+  /** Сохранить черновик (сбрасывает несохранённое состояние). */
+  onSave?: () => void;
 }
 
 function formatDate(iso: string): string {
@@ -104,6 +112,8 @@ export function CanvasHeader({
   onDismissToast,
   mode = "edit",
   onBack,
+  saveState,
+  onSave,
 }: CanvasHeaderProps) {
   const isReadOnly = mode === "read-only";
   const [editing, setEditing] = useState(false);
@@ -221,6 +231,34 @@ export function CanvasHeader({
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
+          {!isReadOnly &&
+            campaign.status === "draft" &&
+            saveState &&
+            onSave && (
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <span
+                    aria-hidden
+                    className={
+                      saveState === "saved"
+                        ? "h-1.5 w-1.5 rounded-full bg-emerald-500"
+                        : "h-1.5 w-1.5 rounded-full bg-amber-500"
+                    }
+                  />
+                  {saveState === "saved"
+                    ? "Изменения сохранены"
+                    : "Есть несохранённые изменения"}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onSave}
+                  disabled={saveState === "saved"}
+                >
+                  Сохранить
+                </Button>
+              </div>
+            )}
           {campaign.status === "draft" && (
             <Button onClick={onLaunch}>Запустить</Button>
           )}

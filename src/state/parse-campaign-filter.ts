@@ -1,6 +1,6 @@
 import type { CampaignStatus } from "./app-state";
 
-export type CampaignSort = "default" | "profit-desc" | "conversion-desc";
+export type CampaignSort = "default" | "conversion-desc";
 
 export interface CampaignQuery {
   statuses: CampaignStatus[];
@@ -15,7 +15,6 @@ const STATUS_ROOTS: Array<{ status: CampaignStatus; roots: string[] }> = [
 ];
 
 const SORT_ROOTS: Array<{ sort: CampaignSort; roots: string[] }> = [
-  { sort: "profit-desc", roots: ["прибыльн", "прибыл", "доходн", "profitable", "profit"] },
   { sort: "conversion-desc", roots: ["конверси", "conversion"] },
 ];
 

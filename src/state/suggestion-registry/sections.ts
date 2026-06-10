@@ -60,15 +60,6 @@ const CAMPAIGN_FILTER_CHIPS: Record<CampaignStatus, SuggestionItem> = {
   },
 };
 
-const CAMPAIGN_SORT_PROFIT: SuggestionItem = {
-  id: "sec-camp-profit",
-  label: "Самые прибыльные",
-  action: {
-    kind: "dispatch",
-    action: { type: "campaigns_query_set", statuses: [], sort: "profit-desc" },
-  },
-};
-
 const CAMPAIGN_SORT_CONVERSION: SuggestionItem = {
   id: "sec-camp-conversion",
   label: "По конверсии",
@@ -113,7 +104,6 @@ function resolveCampaigns(s: CampaignsSub): SuggestionItem[] {
     .map((status) => CAMPAIGN_FILTER_CHIPS[status]);
 
   const sortChips: SuggestionItem[] = [];
-  if (s.sort !== "profit-desc") sortChips.push(CAMPAIGN_SORT_PROFIT);
   if (s.sort !== "conversion-desc") sortChips.push(CAMPAIGN_SORT_CONVERSION);
 
   // Когда есть активный фильтр или сортировка — даём «Сбросить» первым.

@@ -13,7 +13,7 @@ export function buildSearchSettingsLevel(
 ): DrillLevel {
   return {
     id: "search-root",
-    title: "Условия поиска",
+    title: "Источники данных",
     render: () => (
       <div className="p-2">
         <SearchConditionsBlock conditions={draft.conditions} dispatch={dispatch} />

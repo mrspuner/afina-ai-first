@@ -113,6 +113,11 @@ export type Scope =
   | { kind: "awaiting-campaign" }
   | { kind: "campaign-select" }
   /**
+   * Открытый редактируемый workflow без выбранной ноды — подсказки уровня
+   * всего сценария (настроить логику сценария целиком).
+   */
+  | { kind: "workflow-scenario" }
+  /**
    * Лента кампании. Различаем по `CampaignStatus`:
    * - `draft` → draft-чипы (запустить/изменить);
    * - `active` → пауза / открыть статистику;

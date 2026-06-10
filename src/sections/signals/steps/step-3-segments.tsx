@@ -11,25 +11,25 @@ const SEGMENTS = [
     id: "max",
     name: "Максимальный",
     price: 0.45,
-    description: "Высочайшая вероятность отклика",
+    description: "Сигнал только что зафиксирован — максимальный отклик",
   },
   {
     id: "very-high",
     name: "Очень высокий",
     price: 0.35,
-    description: "Сильный интерес, высокая готовность",
+    description: "Активный интерес прямо сейчас — высокий отклик",
   },
   {
     id: "high",
     name: "Высокий",
     price: 0.25,
-    description: "Выраженный интерес к категории",
+    description: "Заметный интерес к теме — уверенный отклик",
   },
   {
     id: "medium",
     name: "Средний и ниже",
     price: 0.07,
-    description: "Общий интерес без явных триггеров",
+    description: "Общий интерес — самый широкий и доступный охват",
   },
 ];
 
@@ -47,7 +47,7 @@ export function Step3Segments({ data, onNext }: StepProps) {
   return (
     <StepContent
       title="Выберите сегменты сигнала"
-      subtitle="Чем лучше сегмент, тем точнее сигнал и выше стоимость. Можно выбрать несколько"
+      subtitle="Чем выше сегмент, тем свежее и точнее сигнал — и тем выше отклик и цена. Можно выбрать несколько"
     >
       <div className="flex flex-col gap-3">
         {SEGMENTS.map((seg) => {
