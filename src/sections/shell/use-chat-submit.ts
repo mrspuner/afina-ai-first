@@ -6,6 +6,7 @@ import { useTriggerEdit } from "@/state/trigger-edit-context";
 import { useAppState, useAppDispatch } from "@/state/app-state-context";
 import { isOnStatisticsSection } from "@/state/app-state";
 import { mockReplyFor } from "@/lib/mock-ai-reply";
+import { applyEmailEdit, generateEmailDraft } from "@/state/email-directory";
 import {
   lookupInformationalReply,
   warmFallbackReply,
@@ -203,6 +204,41 @@ export function useChatSubmit(): { submit: (payload: ChatSubmitPayload) => void 
   function submit(payload: ChatSubmitPayload) {
     const { text, segments } = payload;
     const normalized = text.trim().toLowerCase();
+
+    // Email-редактор открыт (A5): сообщение в дровере правит черновик письма —
+    // точечная правка (applyEmailEdit) либо пересборка по описанию для нового
+    // письма. На read-only кампании редактор не правится — обычный ответ ниже.
+    const emailEditor = chat.emailEditor;
+    const readOnlyWorkflow =
+      appState.view.kind === "workflow" && appState.view.launched;
+    if (emailEditor.open && emailEditor.draft && !readOnlyWorkflow) {
+      const draft = emailEditor.draft;
+      chat.append({ role: "user", text });
+      const id = chat.append({ role: "assistant", text: "", pending: true });
+      const editPatch = applyEmailEdit(text, draft);
+      schedule(() => {
+        if (editPatch) {
+          chat.setEmailDraft(editPatch);
+          chat.updatePending(id, "Готово — обновил письмо в предпросмотре.");
+        } else {
+          // Нет точечной правки — пересобираем черновик по описанию (первый
+          // ответ на «какое письмо вы хотите?»).
+          const regenerated = generateEmailDraft(text);
+          chat.setEmailDraft({
+            name: regenerated.name,
+            subject: regenerated.subject,
+            body: regenerated.body,
+            cta: regenerated.cta,
+            showCta: regenerated.showCta,
+          });
+          chat.updatePending(
+            id,
+            "Собрал черновик письма — посмотрите предпросмотр справа, можно уточнить."
+          );
+        }
+      }, 500);
+      return;
+    }
 
     // Read-only (запущенный) сценарий: правка ноды невозможна. Если пользователь
     // что-то напечатал после тега узла — эхо его запроса в историю и ответ,

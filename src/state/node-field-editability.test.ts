@@ -45,4 +45,33 @@ describe("NODE_FIELD_EDITABILITY", () => {
   it("returns undefined for an unknown field", () => {
     expect(getFieldMeta("sms", "Неизвестно")).toBeUndefined();
   });
+
+  it("gives former-manual fields a combo control with an optionsKey", () => {
+    const combo = getFieldMeta("sms", "Текст");
+    expect(combo?.control).toBe("combo");
+    expect(combo?.optionsKey).toBe("smsText");
+    expect(getFieldMeta("landing", "Оффер")?.control).toBe("combo");
+  });
+
+  it("gives the email body the email control, not combo", () => {
+    const body = getFieldMeta("email", "Текст");
+    expect(body?.control).toBe("email");
+    expect(body?.optionsKey).toBeUndefined();
+    // Subject stays a normal combo.
+    expect(getFieldMeta("email", "Тема")?.control).toBe("combo");
+  });
+
+  it("leaves ai fields without a combo control", () => {
+    expect(getFieldMeta("sms", "Ссылка")?.control).toBeUndefined();
+  });
+
+  it("every combo field carries an optionsKey", () => {
+    for (const fields of Object.values(NODE_FIELD_EDITABILITY)) {
+      for (const meta of Object.values(fields)) {
+        if (meta.control === "combo") {
+          expect(typeof meta.optionsKey).toBe("string");
+        }
+      }
+    }
+  });
 });

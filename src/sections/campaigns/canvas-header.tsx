@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import { ArrowLeft, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,6 +57,16 @@ interface CanvasHeaderProps {
   saveState?: "saved" | "unsaved";
   /** Сохранить черновик (сбрасывает несохранённое состояние). */
   onSave?: () => void;
+  /**
+   * Расчётная стоимость кампании (₽), посчитанная из текущего графа. Когда
+   * задана и > 0, в шапке показывается блок «Расчётная стоимость ≈ {cost} ₽»
+   * с иконкой афины. Пересчитывается на каждое изменение сценария.
+   */
+  cost?: number | null;
+  /**
+   * Клик по иконке афины рядом со стоимостью — ассистент объясняет расчёт.
+   */
+  onExplainCost?: () => void;
 }
 
 function formatDate(iso: string): string {
@@ -114,6 +125,8 @@ export function CanvasHeader({
   onBack,
   saveState,
   onSave,
+  cost,
+  onExplainCost,
 }: CanvasHeaderProps) {
   const isReadOnly = mode === "read-only";
   const [editing, setEditing] = useState(false);
@@ -230,7 +243,27 @@ export function CanvasHeader({
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 items-center gap-3">
+          {typeof cost === "number" && cost > 0 && (
+            <div className="flex items-center gap-1.5">
+              <div className="flex flex-col items-end leading-tight">
+                <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                  Расчётная стоимость
+                </span>
+                <span className="text-sm font-semibold tabular-nums text-foreground">
+                  ≈ {formatNumber(cost)} ₽
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={onExplainCost}
+                aria-label="Как посчитана стоимость"
+                className="flex size-7 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+              >
+                <Image src="/mascot-icon.svg" width={16} height={16} alt="" aria-hidden />
+              </button>
+            </div>
+          )}
           {!isReadOnly &&
             campaign.status === "draft" &&
             saveState &&

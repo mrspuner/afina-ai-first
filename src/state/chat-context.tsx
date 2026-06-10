@@ -1,5 +1,7 @@
 "use client";
 
+import type { EmailDraft } from "./email-directory";
+
 export type ChatRole = "user" | "assistant";
 
 export interface ChatMessage {
@@ -23,9 +25,26 @@ export interface ChatMessage {
 
 export type ChatPanelMode = "collapsed" | "sidebar";
 
+/**
+ * Состояние редактора письма email-ноды (спека A5). Когда `open` — справа
+ * висит панель предпросмотра ~600px, а AI-дровер смещается влево.
+ * `draft` — редактируемый черновик письма (живёт здесь, чтобы и панель, и
+ * обработчик чата могли его читать/править).
+ */
+export interface EmailEditorState {
+  open: boolean;
+  nodeId: string | null;
+  /** id письма из справочника (при открытии готового). */
+  emailId?: string;
+  /** true — письмо создаётся с нуля через ИИ. */
+  isNew?: boolean;
+  draft: EmailDraft | null;
+}
+
 export interface ChatState {
   messages: ChatMessage[];
   mode: ChatPanelMode;
+  emailEditor: EmailEditorState;
 }
 
 export type ChatAction =
@@ -39,7 +58,16 @@ export type ChatAction =
     }
   | { type: "clear" }
   | { type: "open_sidebar" }
-  | { type: "close_sidebar" };
+  | { type: "close_sidebar" }
+  | {
+      type: "open_email_editor";
+      nodeId: string;
+      emailId?: string;
+      isNew?: boolean;
+      draft: EmailDraft | null;
+    }
+  | { type: "close_email_editor" }
+  | { type: "set_email_draft"; patch: Partial<EmailDraft> };
 
 export function chatReducer(state: ChatState, action: ChatAction): ChatState {
   switch (action.type) {
@@ -78,12 +106,44 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
     case "close_sidebar": {
       return state.mode === "collapsed" ? state : { ...state, mode: "collapsed" };
     }
+    case "open_email_editor": {
+      return {
+        ...state,
+        emailEditor: {
+          open: true,
+          nodeId: action.nodeId,
+          emailId: action.emailId,
+          isNew: action.isNew,
+          draft: action.draft,
+        },
+      };
+    }
+    case "close_email_editor": {
+      return { ...state, emailEditor: INITIAL_EMAIL_EDITOR };
+    }
+    case "set_email_draft": {
+      if (!state.emailEditor.draft) return state;
+      return {
+        ...state,
+        emailEditor: {
+          ...state.emailEditor,
+          draft: { ...state.emailEditor.draft, ...action.patch },
+        },
+      };
+    }
   }
 }
+
+const INITIAL_EMAIL_EDITOR: EmailEditorState = {
+  open: false,
+  nodeId: null,
+  draft: null,
+};
 
 export const INITIAL_CHAT_STATE: ChatState = {
   messages: [],
   mode: "collapsed",
+  emailEditor: INITIAL_EMAIL_EDITOR,
 };
 
 let messageCounter = 0;
@@ -119,6 +179,14 @@ interface ChatContextValue {
   clear: () => void;
   openSidebar: () => void;
   closeSidebar: () => void;
+  /** Email-редактор (A5): текущее состояние + операции. */
+  emailEditor: EmailEditorState;
+  openEmailEditor: (
+    nodeId: string,
+    opts: { emailId?: string; isNew?: boolean; draft: EmailDraft | null }
+  ) => void;
+  closeEmailEditor: () => void;
+  setEmailDraft: (patch: Partial<EmailDraft>) => void;
 }
 
 const ChatContext = createContext<ChatContextValue | null>(null);
@@ -137,6 +205,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const resetChat = useCallback(() => {
     dispatch({ type: "clear" });
     dispatch({ type: "close_sidebar" });
+    dispatch({ type: "close_email_editor" });
   }, []);
   useScopeReset(resetChat);
 
@@ -187,6 +256,29 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const openSidebar = useCallback(() => dispatch({ type: "open_sidebar" }), []);
   const closeSidebar = useCallback(() => dispatch({ type: "close_sidebar" }), []);
 
+  const openEmailEditor = useCallback(
+    (
+      nodeId: string,
+      opts: { emailId?: string; isNew?: boolean; draft: EmailDraft | null }
+    ) =>
+      dispatch({
+        type: "open_email_editor",
+        nodeId,
+        emailId: opts.emailId,
+        isNew: opts.isNew,
+        draft: opts.draft,
+      }),
+    []
+  );
+  const closeEmailEditor = useCallback(
+    () => dispatch({ type: "close_email_editor" }),
+    []
+  );
+  const setEmailDraft = useCallback(
+    (patch: Partial<EmailDraft>) => dispatch({ type: "set_email_draft", patch }),
+    []
+  );
+
   const value = useMemo<ChatContextValue>(
     () => ({
       messages: state.messages,
@@ -197,6 +289,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       clear,
       openSidebar,
       closeSidebar,
+      emailEditor: state.emailEditor,
+      openEmailEditor,
+      closeEmailEditor,
+      setEmailDraft,
     }),
     [
       state.messages,
@@ -207,6 +303,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       clear,
       openSidebar,
       closeSidebar,
+      state.emailEditor,
+      openEmailEditor,
+      closeEmailEditor,
+      setEmailDraft,
     ]
   );
 

@@ -1,7 +1,10 @@
 import type { Campaign, Signal } from "@/state/app-state";
 import { aggregate, buildFacts } from "@/sections/statistics/fact-cube";
 import { recommendBudget } from "@/state/metrics";
-import { COST_PER_TOUCH } from "./campaign-payment-math";
+import { UNIT_COST } from "./campaign-cost";
+
+/** Референсная цена за касание — та же база (SMS), что и в прогнозе оплаты. */
+const COST_PER_TOUCH = UNIT_COST.sms;
 
 /**
  * Метрики карточки кампании, посчитанные из того же куба статистики

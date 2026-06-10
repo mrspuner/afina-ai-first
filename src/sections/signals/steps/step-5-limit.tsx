@@ -6,14 +6,8 @@ import { Input } from "@/components/ui/input";
 import { StepContent } from "@/sections/signals/steps/step-content";
 import { StepProps } from "@/types/campaign";
 import { cn } from "@/lib/utils";
-import { recommendBudget, signalCountRange } from "@/state/metrics";
-
-function calcSignals(segments: string[], budget: number): string {
-  const { min, max } = signalCountRange(segments, budget);
-  if (max <= 0) return "—";
-  if (min === max) return `${max.toLocaleString("ru")} сигналов`;
-  return `${min.toLocaleString("ru")} – ${max.toLocaleString("ru")} сигналов`;
-}
+import { recommendBudget } from "@/state/metrics";
+import { SegmentPriorityBreakdown } from "@/sections/signals/segment-priority-breakdown";
 
 function formatRub(amount: number): string {
   return `₽ ${amount.toLocaleString("ru-RU", { maximumFractionDigits: 2 })}`;
@@ -48,7 +42,6 @@ export function Step5Limit({ data, onNext }: StepProps) {
     mode === "recommended" ? recommendedValue : customIsValid ? customParsed : 0;
   const canContinue =
     mode === "recommended" ? recommendedValue > 0 : customIsValid;
-  const estimatedSignals = calcSignals(data.segments, activeValue);
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const raw = e.target.value.replace(/[^0-9.,]/g, "").replace(",", ".");
@@ -160,12 +153,10 @@ export function Step5Limit({ data, onNext }: StepProps) {
           </button>
         </div>
 
-        <p className="text-sm text-muted-foreground">
-          Приблизительное количество сигналов:{" "}
-          <span className="font-medium text-foreground">
-            {estimatedSignals}
-          </span>
-        </p>
+        <SegmentPriorityBreakdown
+          segments={data.segments}
+          budget={activeValue}
+        />
 
         <div className="flex justify-start">
           <Button

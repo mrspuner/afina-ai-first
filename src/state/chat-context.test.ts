@@ -5,6 +5,7 @@ import { chatReducer, type ChatState, type ChatMessage } from "./chat-context";
 const empty: ChatState = {
   messages: [],
   mode: "collapsed",
+  emailEditor: { open: false, nodeId: null, draft: null },
 };
 
 function msg(partial: Partial<ChatMessage> & Pick<ChatMessage, "role" | "text">): ChatMessage {
@@ -73,5 +74,56 @@ describe("chatReducer mode transitions", () => {
 
   it("close_sidebar when already collapsed is a no-op (same reference)", () => {
     expect(chatReducer(empty, { type: "close_sidebar" })).toBe(empty);
+  });
+});
+
+describe("chatReducer email editor", () => {
+  const draft = {
+    id: "eml_x",
+    name: "Тест",
+    subject: "Тема",
+    body: "Здравствуйте!\n\nТекст.",
+    link: "https://x",
+    cta: "Перейти",
+    sender: "s",
+    showCta: true,
+    showImage: false,
+  };
+
+  it("open_email_editor sets open state with draft", () => {
+    const s = chatReducer(empty, {
+      type: "open_email_editor",
+      nodeId: "email",
+      isNew: true,
+      draft,
+    });
+    expect(s.emailEditor.open).toBe(true);
+    expect(s.emailEditor.nodeId).toBe("email");
+    expect(s.emailEditor.draft?.subject).toBe("Тема");
+  });
+
+  it("set_email_draft patches the current draft", () => {
+    let s = chatReducer(empty, {
+      type: "open_email_editor",
+      nodeId: "email",
+      draft,
+    });
+    s = chatReducer(s, { type: "set_email_draft", patch: { subject: "Новая" } });
+    expect(s.emailEditor.draft?.subject).toBe("Новая");
+  });
+
+  it("set_email_draft is a no-op without an open draft", () => {
+    expect(chatReducer(empty, { type: "set_email_draft", patch: { subject: "x" } })).toBe(empty);
+  });
+
+  it("close_email_editor resets to closed", () => {
+    let s = chatReducer(empty, {
+      type: "open_email_editor",
+      nodeId: "email",
+      draft,
+    });
+    s = chatReducer(s, { type: "close_email_editor" });
+    expect(s.emailEditor.open).toBe(false);
+    expect(s.emailEditor.draft).toBeNull();
   });
 });

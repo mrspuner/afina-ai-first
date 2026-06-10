@@ -8,15 +8,24 @@ import { Separator } from "@/components/ui/separator";
 import { useAppDispatch, useAppState } from "@/state/app-state-context";
 import { TopUpModal, computeShortfall } from "@/sections/signals/top-up-modal";
 import { cn } from "@/lib/utils";
+import { createTemplate } from "@/state/workflow-templates";
+import { getCachedGraph } from "./workflow-graph-cache";
 import {
   estimateTouches,
-  recommendCampaignBudget,
-} from "./campaign-payment-math";
+  computeCampaignCost,
+  CHANNEL_LABEL,
+  type CampaignCost,
+} from "./campaign-cost";
 
 type Mode = "recommended" | "custom";
 
 function formatNumber(n: number): string {
   return n.toLocaleString("ru-RU");
+}
+
+/** «1 234 ₽» / «0,5 ₽» — plain rouble value with a trailing sign. */
+function formatRubPlain(n: number): string {
+  return `${n.toLocaleString("ru-RU", { maximumFractionDigits: 2 })} ₽`;
 }
 
 function formatRub(n: number): string {
@@ -40,13 +49,17 @@ export function CampaignPaymentScreen() {
     : null;
   const audienceSize = signal?.count ?? 0;
 
-  // Cache the recommended value once per mount — Math.random would otherwise
-  // jump on every render. Same convention as step-5-limit.tsx.
-  const recommended = useMemo(
-    () => recommendCampaignBudget(audienceSize),
+  // Расчётная стоимость кампании из её workflow (тот же модуль, что в шапке).
+  // Граф берём из durable-кэша (учитывает ручные правки) либо строим из
+  // шаблона; N = signal.count. Рекомендуемая сумма = computeCampaignCost.total.
+  const cost = useMemo<CampaignCost | null>(() => {
+    if (!campaign || !signal) return null;
+    const graph =
+      getCachedGraph(campaign.id) ?? createTemplate(signal.type, signal);
+    return computeCampaignCost(graph.nodes, graph.edges, signal.count);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    []
-  );
+  }, [campaign?.id, signal?.id, audienceSize]);
+  const recommended = cost?.total ?? 0;
 
   const [mode, setMode] = useState<Mode>("recommended");
   const [customValue, setCustomValue] = useState<string>(
@@ -161,6 +174,46 @@ export function CampaignPaymentScreen() {
           </div>
         </div>
 
+        {/* Cost breakdown — из чего складывается рекомендуемая сумма */}
+        {cost && cost.lines.length > 0 && (
+          <div className="rounded-lg border border-border bg-card px-4 py-3.5">
+            <h2 className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+              Из чего складывается стоимость
+            </h2>
+            <ul className="mt-2.5 flex flex-col gap-1.5">
+              {cost.lines.map((line) => (
+                <li
+                  key={line.nodeId}
+                  className="flex items-baseline justify-between gap-3 text-sm"
+                >
+                  <span className="min-w-0 truncate text-muted-foreground">
+                    <span className="text-foreground">
+                      {CHANNEL_LABEL[line.channel]}
+                    </span>
+                    {line.label ? ` · ${line.label}` : ""}
+                  </span>
+                  <span className="shrink-0 tabular-nums text-muted-foreground">
+                    {formatRubPlain(line.unit)} × ~{formatNumber(line.reach)} ={" "}
+                    <span className="font-medium text-foreground">
+                      {formatRubPlain(line.sum)}
+                    </span>
+                  </span>
+                </li>
+              ))}
+              {cost.hasDynamic && (
+                <li className="flex items-baseline justify-between gap-3 border-t border-border pt-1.5 text-sm">
+                  <span className="text-muted-foreground">
+                    Повторные коммуникации (+30% буфер)
+                  </span>
+                  <span className="shrink-0 font-medium tabular-nums text-foreground">
+                    {formatRubPlain(cost.repeat)}
+                  </span>
+                </li>
+              )}
+            </ul>
+          </div>
+        )}
+
         {/* Budget cards — mirror of step-5-limit.tsx */}
         <div className="grid grid-cols-2 gap-3">
           <button
@@ -198,7 +251,9 @@ export function CampaignPaymentScreen() {
               {recommended > 0 ? formatRub(recommended) : "—"}
             </span>
             <span className="mt-auto text-xs text-muted-foreground">
-              На основе размера аудитории
+              {cost
+                ? `Первичные ${formatNumber(cost.primary)} ₽ + повторные ${formatNumber(cost.repeat)} ₽`
+                : "На основе размера аудитории"}
             </span>
           </button>
 

@@ -2,8 +2,10 @@
 
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useAppState, useAppDispatch } from "@/state/app-state-context";
+import { useChat } from "@/state/chat-context";
 import { CanvasHeader, type CanvasHeaderToast } from "./canvas-header";
 import { WorkflowView } from "./workflow-view";
+import { computeCampaignCost } from "./campaign-cost";
 import { validateWorkflow } from "@/state/workflow-validation";
 import { normalizeNodeRef } from "@/state/structural-commands";
 import type {
@@ -53,6 +55,7 @@ export function WorkflowSection() {
     campaigns,
   } = useAppState();
   const dispatch = useAppDispatch();
+  const chat = useChat();
 
   const graphRef = useRef<GraphSnapshot | null>(null);
   const [graphTick, setGraphTick] = useState(0);
@@ -147,6 +150,20 @@ export function WorkflowSection() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workflowNodeCommand, graphTick]);
 
+  // Расчётная стоимость кампании из текущего графа. N берём из ноды signal
+  // самого графа (она патчится реальным signal.count). Пересчёт — на каждое
+  // изменение сценария (graphTick растёт в handleGraphChange).
+  const cost = useMemo(() => {
+    const g = graphRef.current;
+    if (!g) return null;
+    const signalNode = g.nodes.find((n) => n.data.nodeType === "signal");
+    const N =
+      signalNode?.data.params?.kind === "signal" ? signalNode.data.params.count : 0;
+    if (!N) return null;
+    return computeCampaignCost(g.nodes, g.edges, N);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [graphTick]);
+
   if (view.kind !== "workflow") return null;
 
   const currentCampaign = campaigns.find((c) => c.id === view.campaign.id) ?? null;
@@ -201,6 +218,24 @@ export function WorkflowSection() {
       status: "active",
       timestamp: new Date().toISOString(),
     });
+  }
+
+  function handleExplainCost() {
+    if (!cost) return;
+    const fmt = (n: number) => `${n.toLocaleString("ru-RU")} ₽`;
+    chat.openSidebar();
+    chat.append({
+      role: "user",
+      text: "Как посчитана стоимость?",
+      triggerLabel: "Расчётная стоимость",
+    });
+    const id = chat.append({ role: "assistant", text: "", pending: true });
+    const reply =
+      `Стоимость складывается из первичных коммуникаций (${fmt(cost.primary)}) ` +
+      `и буфера на повторные, динамические коммуникации (+30%, ${fmt(cost.repeat)}). ` +
+      `Итог зависит от числа сигналов, каналов и того, сколько коммуникаций ` +
+      `в сценарии повторные.`;
+    window.setTimeout(() => chat.updatePending(id, reply), 400);
   }
 
   if (!currentCampaign) {
@@ -259,6 +294,8 @@ export function WorkflowSection() {
         }
         saveState={saveState}
         onSave={isDraftEditable ? handleSave : undefined}
+        cost={cost?.total ?? null}
+        onExplainCost={handleExplainCost}
       />
       <div className="relative flex flex-1 flex-col overflow-hidden">
         <WorkflowView
