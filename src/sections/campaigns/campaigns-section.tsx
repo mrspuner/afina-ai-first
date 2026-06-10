@@ -7,25 +7,17 @@ import { NewCampaignCard } from "./new-campaign-card";
 import { NewCampaignMenu } from "./new-campaign-menu";
 import { CampaignFilterChips } from "./campaign-filter-chips";
 import { CampaignsNoResults } from "./campaigns-no-results";
-import { getCampaignStats } from "./mock-stats";
+import { getCampaignCardMetrics } from "./campaign-metrics";
 import type { Campaign, Signal } from "@/state/app-state";
 
 function relevantTimestamp(c: Campaign): string {
   return c.launchedAt ?? c.completedAt ?? c.createdAt;
 }
 
-function hasStats(c: Campaign): boolean {
-  return c.status === "active" || c.status === "completed";
-}
-
-function profitFor(c: Campaign, signal: Signal | undefined): number {
-  if (!hasStats(c)) return Number.NEGATIVE_INFINITY;
-  return getCampaignStats(c, signal).profit;
-}
-
 function conversionFor(c: Campaign, signal: Signal | undefined): number {
-  if (!hasStats(c)) return Number.NEGATIVE_INFINITY;
-  return getCampaignStats(c, signal).conversionPct;
+  const m = getCampaignCardMetrics(c, signal);
+  if (!m.launched) return Number.NEGATIVE_INFINITY;
+  return m.crPct;
 }
 
 export function CampaignsSection() {
@@ -39,13 +31,7 @@ export function CampaignsSection() {
 
   const sorted = useMemo(() => {
     const arr = [...campaigns];
-    if (campaignSort === "profit-desc") {
-      arr.sort(
-        (a, b) =>
-          profitFor(b, signalById.get(b.signalId)) -
-          profitFor(a, signalById.get(a.signalId))
-      );
-    } else if (campaignSort === "conversion-desc") {
+    if (campaignSort === "conversion-desc") {
       arr.sort(
         (a, b) =>
           conversionFor(b, signalById.get(b.signalId)) -

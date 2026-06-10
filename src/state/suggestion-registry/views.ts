@@ -31,6 +31,30 @@ const FEED_DRAFT: SuggestionItem[] = [
   ask("view-feed-draft-edit", "Изменить сценарий", "хочу поправить сценарий кампании"),
 ];
 
+/**
+ * Подсказки уровня всего сценария — когда workflow открыт, но ни одна нода не
+ * выбрана. Первый чип выделен (brand): по нажатию ИИ уводит запрос в дровер и
+ * помогает настроить логику сценария целиком.
+ */
+const WORKFLOW_SCENARIO: SuggestionItem[] = [
+  {
+    id: "view-wf-scenario-setup",
+    label: "Настроить логику сценария",
+    action: {
+      kind: "ask",
+      prompt:
+        "помоги настроить логику всего сценария кампании — задай уточняющие вопросы, что и как изменить",
+    },
+    variant: "brand",
+  },
+  ask(
+    "view-wf-scenario-what",
+    "Что можно изменить в сценарии",
+    "что можно изменить в этом сценарии целиком — какие шаги, ветвления и каналы стоит настроить"
+  ),
+  ask("view-wf-scenario-launch", "Запустить", "запусти эту кампанию"),
+];
+
 const FEED_ACTIVE: SuggestionItem[] = [
   ask("view-feed-active-stats", "Открыть статистику", "покажи статистику этой кампании"),
   ask("view-feed-active-pause", "Поставить на паузу", "поставь кампанию на паузу"),
@@ -55,6 +79,10 @@ export function resolveAwaitingCampaign(): SuggestionItem[] {
 
 export function resolveCampaignSelect(): SuggestionItem[] {
   return CAMPAIGN_SELECT;
+}
+
+export function resolveWorkflowScenario(): SuggestionItem[] {
+  return WORKFLOW_SCENARIO;
 }
 
 export function resolveCampaignFeed(status: CampaignStatus): SuggestionItem[] {

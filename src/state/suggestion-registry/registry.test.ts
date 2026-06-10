@@ -107,13 +107,12 @@ describe("registry — section.campaigns (filter-aware)", () => {
     expect(items.find((i) => i.id === "sec-camp-active")).toBeUndefined();
   });
 
-  it("sort=profit-desc → 'profit' выпадает, остаётся conversion", () => {
+  it("sort=conversion-desc → 'conversion' выпадает, остаётся reset", () => {
     const items = resolveSuggestions({
       kind: "section",
-      sub: { kind: "campaigns", hasCampaigns: true, activeFilter: [], sort: "profit-desc" },
+      sub: { kind: "campaigns", hasCampaigns: true, activeFilter: [], sort: "conversion-desc" },
     });
-    expect(items.find((i) => i.id === "sec-camp-profit")).toBeUndefined();
-    expect(items.find((i) => i.id === "sec-camp-conversion")).toBeDefined();
+    expect(items.find((i) => i.id === "sec-camp-conversion")).toBeUndefined();
     expect(items.find((i) => i.id === "sec-camp-reset")).toBeDefined();
   });
 });

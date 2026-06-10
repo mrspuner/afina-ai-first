@@ -16,6 +16,25 @@ import type {
 
 type GraphSnapshot = { nodes: WorkflowNode[]; edges: WorkflowEdge[] };
 
+/**
+ * Стабильная подпись графа для отслеживания несохранённых правок: тип и
+ * параметры каждой ноды + структура связей. Транзиентные флаги
+ * (`justUpdated`, `dirtyParams`, `sublabel`) намеренно не учитываем.
+ */
+function graphSignature(g: GraphSnapshot): string {
+  const nodes = g.nodes
+    .map((n) => {
+      const d = n.data as WorkflowNodeData;
+      return `${n.id}:${d.nodeType}:${JSON.stringify(d.params ?? {})}`;
+    })
+    .join("|");
+  const edges = g.edges
+    .map((e) => `${e.source}>${e.target}`)
+    .sort()
+    .join(",");
+  return `${nodes}||${edges}`;
+}
+
 const ERROR_TEXT: Record<string, string> = {
   "no-signal": "Сигнал не привязан.",
   "needs-attention": "У вас есть ноды не готовые к запуску.",
@@ -43,6 +62,17 @@ export function WorkflowSection() {
   const [toast, setToast] = useState<CanvasHeaderToast | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // B7: «несохранённость» черновика = граф изменился с момента последнего
+  // сохранения. Базовую подпись фиксируем при первом снимке графа каждой
+  // кампании; «Сохранить» обновляет её до текущей.
+  const savedSigRef = useRef<Map<string, string>>(new Map());
+  const [, setSaveTick] = useState(0);
+  // Какой кампании принадлежит текущий снимок графа в graphRef — защищает от
+  // ложной «несохранённости» в кадр между сменой кампании и перемонтированием
+  // редактора (graphRef ещё держит граф прежней кампании).
+  const currentCampaignIdRef = useRef<string | null>(null);
+  const graphOwnerRef = useRef<string | null>(null);
+
   const handleCommandHandled = useCallback(
     () => dispatch({ type: "workflow_command_handled" }),
     [dispatch]
@@ -65,6 +95,7 @@ export function WorkflowSection() {
 
   const handleGraphChange = useCallback((g: GraphSnapshot) => {
     graphRef.current = g;
+    graphOwnerRef.current = currentCampaignIdRef.current;
     setGraphTick((v) => v + 1);
   }, []);
 
@@ -215,6 +246,34 @@ export function WorkflowSection() {
     );
   }
 
+  // B7: индикатор сохранения показываем только для draft в редактируемом
+  // workflow. Базовую подпись фиксируем при первом снимке графа.
+  currentCampaignIdRef.current = currentCampaign.id;
+  const isDraftEditable = !view.launched && currentCampaign.status === "draft";
+  // Используем graphRef только если он относится к текущей кампании.
+  const currentSig =
+    graphRef.current && graphOwnerRef.current === currentCampaign.id
+      ? graphSignature(graphRef.current)
+      : null;
+  if (currentSig !== null && !savedSigRef.current.has(currentCampaign.id)) {
+    savedSigRef.current.set(currentCampaign.id, currentSig);
+  }
+  const savedSig = savedSigRef.current.get(currentCampaign.id) ?? null;
+  const saveState: "saved" | "unsaved" | undefined = isDraftEditable
+    ? currentSig !== null && savedSig !== null && currentSig !== savedSig
+      ? "unsaved"
+      : "saved"
+    : undefined;
+
+  function handleSave() {
+    if (!currentCampaign) return;
+    if (currentSig !== null) {
+      savedSigRef.current.set(currentCampaign.id, currentSig);
+    }
+    dispatch({ type: "campaign_saved_draft", id: currentCampaign.id });
+    setSaveTick((t) => t + 1);
+  }
+
   return (
     <div className="relative flex flex-1 flex-col">
       <CanvasHeader
@@ -233,6 +292,8 @@ export function WorkflowSection() {
                 dispatch({ type: "campaign_opened", id: currentCampaign.id })
             : undefined
         }
+        saveState={saveState}
+        onSave={isDraftEditable ? handleSave : undefined}
         cost={cost?.total ?? null}
         onExplainCost={handleExplainCost}
       />

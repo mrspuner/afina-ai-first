@@ -3,11 +3,7 @@
 import { Card } from "@/components/ui/card";
 import type { Campaign, Signal } from "@/state/app-state";
 import { StatusBadge } from "./status-badge";
-import {
-  formatCompactRub,
-  formatCount,
-  getCampaignStats,
-} from "./mock-stats";
+import { getCampaignCardMetrics } from "./campaign-metrics";
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("ru-RU");
@@ -15,6 +11,14 @@ function formatDate(iso: string): string {
 
 function formatNumber(n: number): string {
   return n.toLocaleString("ru-RU");
+}
+
+/** Компактный рубль: точные значения до 10 тыс., дальше — «тыс»/«млн». */
+function formatRub(value: number): string {
+  const abs = Math.round(value);
+  if (abs >= 1_000_000) return `${(abs / 1_000_000).toFixed(1)} млн ₽`;
+  if (abs >= 10_000) return `${Math.round(abs / 1_000)} тыс ₽`;
+  return `${abs.toLocaleString("ru-RU")} ₽`;
 }
 
 function timestampLine(c: Campaign): string {
@@ -34,9 +38,7 @@ export function CampaignCard({ campaign, signal, onOpen }: CampaignCardProps) {
     ? `Сигнал: ${signal.type} · ${formatNumber(signal.count)}`
     : "Сигнал: —";
 
-  const showStats =
-    campaign.status === "active" || campaign.status === "completed";
-  const stats = showStats ? getCampaignStats(campaign, signal) : null;
+  const metrics = getCampaignCardMetrics(campaign, signal);
 
   return (
     <Card
@@ -59,43 +61,31 @@ export function CampaignCard({ campaign, signal, onOpen }: CampaignCardProps) {
         <p className="text-xs text-muted-foreground">{signalLine}</p>
         <p className="text-xs text-muted-foreground">{timestampLine(campaign)}</p>
       </div>
-      {stats && (
-        <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border/60 pt-2 text-xs">
-          <StatItem label="Охват" value={formatCount(stats.reach)} />
-          <StatItem
-            label="Конверсия"
-            value={`${stats.conversionPct.toFixed(1)}%`}
-          />
-          <StatItem
-            label="Прибыль"
-            value={formatCompactRub(stats.profit)}
-            tone={stats.profit >= 0 ? "positive" : "negative"}
-          />
-        </div>
-      )}
+      <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border/60 pt-2 text-xs">
+        {metrics.launched && (
+          <>
+            <StatItem label="Отправки" value={formatNumber(metrics.sends)} />
+            <StatItem label="CR" value={`${metrics.crPct.toFixed(1)}%`} />
+          </>
+        )}
+        <StatItem
+          label="Бюджет"
+          value={
+            metrics.launched
+              ? `расчётный ${formatRub(metrics.plannedBudget)} · факт ${formatRub(metrics.actualSpend)}`
+              : `расчётный ${formatRub(metrics.plannedBudget)}`
+          }
+        />
+      </div>
     </Card>
   );
 }
 
-function StatItem({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string;
-  tone?: "positive" | "negative";
-}) {
-  const valueClass =
-    tone === "positive"
-      ? "text-emerald-600 dark:text-emerald-400"
-      : tone === "negative"
-        ? "text-destructive"
-        : "text-foreground";
+function StatItem({ label, value }: { label: string; value: string }) {
   return (
     <span className="flex items-baseline gap-1">
       <span className="text-muted-foreground">{label}</span>
-      <span className={`font-medium ${valueClass}`}>{value}</span>
+      <span className="font-medium text-foreground">{value}</span>
     </span>
   );
 }

@@ -80,17 +80,6 @@ describe("parseCampaignQuery", () => {
     });
   });
 
-  it("detects profit sort", () => {
-    expect(parseCampaignQuery("Прибыльные кампании")).toEqual({
-      statuses: [],
-      sort: "profit-desc",
-    });
-    expect(parseCampaignQuery("покажи доходные")).toEqual({
-      statuses: [],
-      sort: "profit-desc",
-    });
-  });
-
   it("detects conversion sort", () => {
     expect(parseCampaignQuery("кампании с высокой конверсией")).toEqual({
       statuses: [],
@@ -99,13 +88,13 @@ describe("parseCampaignQuery", () => {
   });
 
   it("combines status filter with sort", () => {
-    expect(parseCampaignQuery("прибыльные активные")).toEqual({
+    expect(parseCampaignQuery("активные по конверсии")).toEqual({
       statuses: ["active"],
-      sort: "profit-desc",
+      sort: "conversion-desc",
     });
-    expect(parseCampaignQuery("завершённые прибыльные")).toEqual({
+    expect(parseCampaignQuery("завершённые с конверсией")).toEqual({
       statuses: ["completed"],
-      sort: "profit-desc",
+      sort: "conversion-desc",
     });
   });
 });

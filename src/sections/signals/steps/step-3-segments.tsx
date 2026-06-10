@@ -21,7 +21,7 @@ export function Step3Segments({ data, onNext }: StepProps) {
   return (
     <StepContent
       title="Выберите сегменты сигнала"
-      subtitle="Чем лучше сегмент, тем точнее сигнал и выше стоимость. Можно выбрать несколько"
+      subtitle="Чем выше сегмент, тем свежее и точнее сигнал — и тем выше отклик и цена. Можно выбрать несколько"
     >
       <div className="flex flex-col gap-3">
         {SEGMENTS.map((seg) => {

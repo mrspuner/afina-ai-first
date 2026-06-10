@@ -77,16 +77,16 @@ describe("selectPromptSuggestions — section.campaigns", () => {
     expect(r.items.some((i) => i.id === "sec-camp-active")).toBe(false);
   });
 
-  it("с sort=profit-desc → 'profit' выпадает", () => {
+  it("с sort=conversion-desc → 'conversion' выпадает", () => {
     const r = selectPromptSuggestions(
       withView(
         { kind: "section", name: "Кампании" },
-        { campaigns: [mkCampaign("c1", "active")], campaignSort: "profit-desc" }
+        { campaigns: [mkCampaign("c1", "active")], campaignSort: "conversion-desc" }
       ),
       ctx()
     );
     if (r.kind !== "items") throw new Error();
-    expect(r.items.some((i) => i.id === "sec-camp-profit")).toBe(false);
+    expect(r.items.some((i) => i.id === "sec-camp-conversion")).toBe(false);
   });
 });
 
@@ -209,13 +209,14 @@ describe("selectPromptSuggestions — wizard", () => {
 });
 
 describe("selectPromptSuggestions — campaign-feed status-aware", () => {
-  it("workflow launched=false → status=draft", () => {
+  it("workflow launched=false без выбранной ноды → scope сценария", () => {
     const r = selectPromptSuggestions(
       withView({ kind: "workflow", campaign: { id: "c1", name: "X" }, launched: false }),
       ctx()
     );
     if (r.kind !== "items") throw new Error();
-    if (r.scope.kind === "campaign-feed") expect(r.scope.status).toBe("draft");
+    expect(r.scope.kind).toBe("workflow-scenario");
+    expect(r.items.some((i) => i.label === "Настроить логику сценария")).toBe(true);
   });
 
   it("workflow launched=true, campaign paused → status=paused", () => {

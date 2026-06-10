@@ -89,9 +89,9 @@ function sharedTokenCount(textTokens: Set<string>, phraseTokens: string[]): numb
 // ── Каталог ответов ─────────────────────────────────────────────────────────
 
 const ENTRIES: ReplyEntry[] = [
-  // ── Сплиттер — как работает разделение (A6) ───────────────────────────────
+  // ── Сплиттер — как работает разделение (A6, чип split-how из B1) ───────────
   {
-    id: "split-how-it-works",
+    id: "split-how",
     match: [
       "как работает разделение",
       "как работает сплит",
