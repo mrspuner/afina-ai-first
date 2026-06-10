@@ -334,6 +334,9 @@ function defaultParamsFor(kind: WorkflowNodeType): NodeParams | undefined {
       return { kind: "ivr", scenario: "", voiceType: "neutral" };
     case "wait":
       return { kind: "wait", mode: "duration", durationHours: 24 };
+    case "split":
+      // Дефолт для новых сплитов — поровну (A6).
+      return { kind: "split", by: "equal", branches: 2 };
     case "storefront":
       return { kind: "storefront", offers: [] };
     case "landing":

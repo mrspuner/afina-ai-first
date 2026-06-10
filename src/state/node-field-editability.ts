@@ -1,12 +1,25 @@
 import type { NodeParams } from "@/types/workflow";
+import type { FieldOptionsKey } from "./field-directory";
 
 export type FieldEditability = "manual" | "ai" | "readonly";
+
+/**
+ * Контрол поля (спека A7/A5):
+ *  - combo — справочник + ручной ввод + ИИ (бывшие manual);
+ *  - email — спец-контрол письма (дропдаун писем + «Создать новое» + «Открыть»);
+ * для `ai` и `readonly` контрол не задаётся (поведение по `editability`).
+ */
+export type FieldControl = "combo" | "email" | "select";
 
 export interface NodeFieldMeta {
   /** Способ редактирования поля. */
   editability: FieldEditability;
-  /** Имя поля в NodeParams — нужно инлайн-редактору для manual-полей. */
+  /** Имя поля в NodeParams — нужно редактору для записи значения. */
   paramKey?: string;
+  /** Контрол поля для manual-полей (A7): combo или email. */
+  control?: FieldControl;
+  /** Ключ справочника готовых значений для combo-контрола (A7). */
+  optionsKey?: FieldOptionsKey;
 }
 
 /**
@@ -22,24 +35,24 @@ export const NODE_FIELD_EDITABILITY: Record<
   Record<string, NodeFieldMeta>
 > = {
   sms: {
-    "Текст": { editability: "manual", paramKey: "text" },
+    "Текст": { editability: "manual", paramKey: "text", control: "combo", optionsKey: "smsText" },
     "Alpha-name": { editability: "ai", paramKey: "alphaName" },
     "Время": { editability: "ai", paramKey: "scheduledAt" },
     "Ссылка": { editability: "ai", paramKey: "link" },
   },
   email: {
-    "Тема": { editability: "manual", paramKey: "subject" },
-    "Текст": { editability: "manual", paramKey: "body" },
+    "Тема": { editability: "manual", paramKey: "subject", control: "combo", optionsKey: "emailSubject" },
+    "Текст": { editability: "manual", paramKey: "body", control: "email" },
     "Отправитель": { editability: "ai", paramKey: "sender" },
     "Ссылка": { editability: "ai", paramKey: "link" },
   },
   push: {
-    "Заголовок": { editability: "manual", paramKey: "title" },
-    "Текст": { editability: "manual", paramKey: "body" },
+    "Заголовок": { editability: "manual", paramKey: "title", control: "combo", optionsKey: "pushTitle" },
+    "Текст": { editability: "manual", paramKey: "body", control: "combo", optionsKey: "pushText" },
     "Deeplink": { editability: "ai", paramKey: "deeplink" },
   },
   ivr: {
-    "Сценарий": { editability: "manual", paramKey: "scenario" },
+    "Сценарий": { editability: "manual", paramKey: "scenario", control: "combo", optionsKey: "ivrScenario" },
     "Голос": { editability: "ai", paramKey: "voiceType" },
   },
   wait: {
@@ -51,8 +64,9 @@ export const NODE_FIELD_EDITABILITY: Record<
     "Триггер": { editability: "ai", paramKey: "trigger" },
   },
   split: {
-    "По": { editability: "ai", paramKey: "by" },
-    "Ветки": { editability: "ai", paramKey: "branches" },
+    // A6 — сознательное исключение из A7: сплиттер задаётся селектами, не ИИ.
+    "По": { editability: "manual", paramKey: "by", control: "select" },
+    "Ветки": { editability: "manual", paramKey: "branches", control: "select" },
   },
   merge: {},
   signal: {
@@ -61,17 +75,17 @@ export const NODE_FIELD_EDITABILITY: Record<
     "Сегменты": { editability: "readonly", paramKey: "segments" },
   },
   success: {
-    "Цель": { editability: "manual", paramKey: "goal" },
+    "Цель": { editability: "manual", paramKey: "goal", control: "combo", optionsKey: "successGoal" },
   },
   end: {
-    "Причина": { editability: "manual", paramKey: "reason" },
+    "Причина": { editability: "manual", paramKey: "reason", control: "combo", optionsKey: "endReason" },
   },
   storefront: {
     "Офферы": { editability: "ai", paramKey: "offers" },
   },
   landing: {
-    "CTA": { editability: "manual", paramKey: "cta" },
-    "Оффер": { editability: "manual", paramKey: "offerTitle" },
+    "CTA": { editability: "manual", paramKey: "cta", control: "combo", optionsKey: "landingCta" },
+    "Оффер": { editability: "manual", paramKey: "offerTitle", control: "combo", optionsKey: "landingOffer" },
   },
 };
 

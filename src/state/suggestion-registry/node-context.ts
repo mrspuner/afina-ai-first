@@ -133,6 +133,7 @@ const CONDITION: ParamSuggestions = {
 
 const SPLIT: ParamSuggestions = {
   "По": [
+    ask("split-by-equal", "Поровну", "разделяй аудиторию поровну на равные ветки"),
     ask("split-by-segment", "По сегменту", "разделяй по сегменту аудитории"),
     ask("split-by-random", "Случайно", "разделяй случайно для A/B-теста"),
   ],
@@ -141,6 +142,13 @@ const SPLIT: ParamSuggestions = {
     ask("split-branches-3", "3 ветки", "сделай 3 ветки"),
   ],
   [WHOLE_NODE_KEY]: [
+    // Первая выделенная подсказка — объясняет, как работает разделение (A6).
+    {
+      id: "split-how-it-works",
+      label: "Как работает разделение",
+      action: { kind: "ask", prompt: "как работает разделение" },
+      variant: "brand",
+    },
     ask("split-node-balance", "Уравновесить", "сделай ветки одинакового объёма"),
     ask("split-node-skew", "Сместить трафик", "пусти 80% трафика в первую ветку, 20% — во вторую"),
   ],
