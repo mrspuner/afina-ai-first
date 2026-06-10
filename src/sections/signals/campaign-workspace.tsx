@@ -15,6 +15,7 @@ import { Step7Processing } from "@/sections/signals/steps/step-7-processing";
 import { Step8Result } from "@/sections/signals/steps/step-8-result";
 import type { Signal } from "@/state/app-state";
 import { estimateSignalCount } from "@/state/metrics";
+import { computeStepTransition } from "@/sections/signals/wizard-navigation";
 
 export interface LaunchRequest {
   scenarioId: string;
@@ -105,20 +106,21 @@ function WorkspaceInner({
         partial.scenario !== undefined &&
         partial.scenario !== stepData.scenario;
 
+      const { step: next, resetData } = computeStepTransition({
+        currentStep,
+        maxStep,
+        scenarioChanged,
+      });
+
       // Changing scenario invalidates everything downstream (interests,
       // triggers, segments, file, budget) — reset those fields and rewind
-      // progress so the user re-walks the wizard linearly. Without this, the
-      // `currentStep < maxStep` branch below would jump straight to step-6
-      // and skip the interests/triggers screen that probably needs new
-      // choices for the new scenario.
-      if (scenarioChanged) {
+      // progress to the step right after the scenario picker. `next` is
+      // anchored to the scenario step (not `currentStep`), so picking a new
+      // scenario after scrolling back to the rendered step-1 panel lands on
+      // step 2 instead of overshooting. `setMaxStep(next)` collapses any
+      // phantom steps that were reached under the old scenario.
+      if (resetData) {
         setStepData({ ...initialStepData, ...partial });
-        // The scenario is step 1's field, so a change always rewinds to
-        // step 2 — never `currentStep + 1`. `currentStep` can be stale (e.g.
-        // the user scrolled back up to step 1 without the stepper updating
-        // it, so it still points at 2+): `currentStep + 1` would then land on
-        // step 3/4/5 and skip the interests screen entirely.
-        const next = 2;
         setMaxStep(next);
         setAnimatingStep(next);
         setCurrentStep(next);
@@ -131,11 +133,10 @@ function WorkspaceInner({
       // jump back to the furthest reached step instead of advancing linearly.
       if (currentStep < maxStep) {
         setAnimatingStep(null);
-        setCurrentStep(maxStep);
-        pendingScroll.current = { step: maxStep, behavior: "smooth" };
+        setCurrentStep(next);
+        pendingScroll.current = { step: next, behavior: "smooth" };
         return;
       }
-      const next = currentStep + 1;
       advanceTo(next);
     },
     [advanceTo, currentStep, maxStep, stepData.scenario]
