@@ -9,7 +9,7 @@ import { useAppState } from "@/state/app-state-context";
 import { computeShortfall } from "@/sections/signals/top-up-modal";
 import { cn } from "@/lib/utils";
 import { SCENARIO_NAMES, SEGMENT_NAMES } from "@/sections/signals/signal-summary-data";
-import { signalCountRange } from "@/state/metrics";
+import { SegmentPriorityBreakdown } from "@/sections/signals/segment-priority-breakdown";
 
 function formatRub(amount: number): string {
   return `₽ ${amount.toLocaleString("ru-RU", { maximumFractionDigits: 2 })}`;
@@ -49,15 +49,6 @@ function SummaryRow({
 export function Step6Summary({ data, onNext, onGoToStep }: StepProps) {
   const { balance } = useAppState();
   const budget = data.budget ?? 0;
-  const { min: minSignals, max: maxSignals } = signalCountRange(
-    data.segments,
-    budget,
-  );
-  const hasEstimate = maxSignals > 0;
-  const signalsStr =
-    minSignals === maxSignals
-      ? `${maxSignals.toLocaleString("ru")} сигналов`
-      : `${minSignals.toLocaleString("ru")} – ${maxSignals.toLocaleString("ru")} сигналов`;
 
   const cost = budget;
   const shortfall = computeShortfall(balance, cost);
@@ -106,11 +97,12 @@ export function Step6Summary({ data, onNext, onGoToStep }: StepProps) {
             value={budget ? formatRub(budget) : "—"}
             onClick={goto ? () => goto(5) : undefined}
           />
-          <SummaryRow
-            label="Максимум сигналов"
-            value={hasEstimate ? signalsStr : "—"}
-          />
         </div>
+      </div>
+
+      {/* Порядок подбора сигналов по сегментам */}
+      <div className="mt-4">
+        <SegmentPriorityBreakdown segments={data.segments} budget={budget} />
       </div>
 
       {/* Стоимость / Баланс */}
