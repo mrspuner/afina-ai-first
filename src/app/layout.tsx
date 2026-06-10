@@ -32,12 +32,7 @@ export default function RootLayout({
         <TooltipProvider>
           <AppStateProvider>{children}</AppStateProvider>
         </TooltipProvider>
-      {/* aim:injected */}
-        {process.env.NODE_ENV === "development" && (
-          <script src="http://localhost:8765/overlay.js" async></script>
-        )}
-        {/* /aim:injected */}
-        </body>
+      </body>
     </html>
   );
 }
