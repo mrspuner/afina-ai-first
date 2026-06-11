@@ -11,7 +11,7 @@
 | 003 | Живая статистика — метрики растут в течение сессии | P2 | M | — | DONE (commit `0294f4e`; unit ✓, +9 тестов; ручной чек — pending, env) |
 | 004 | Оркестратор `/api/ai/assist`: знания, answer, clarify | P1 | L | 001–003 | DONE (commit `cba1651`; unit ✓ (12 новых тестов в 004-T1..T2: afina-knowledge 3 + assist-contract 4 + data-summary 3 + orchestrator-prompt 2), live-проверка ✓ через curl (ключ оператора); e2e — pending, port 3000 held by main checkout) |
 | 005 | Инструменты графа: ops с контекстом, rebuild, params, откат | P1 | L | 004 | DONE (commit `bbf4f47`, ветка `feat/plans-001-003`; unit ✓ (+70 новых тестов за серию 005: graph-summary 2, rebuild-schema 5, ai-graph-validation 7, ops-wire-schema 6, assist-contract 5, оркестратор-prompt 2, data-summary обновлён, select-prompt-suggestions +3, итого); live-проверка инструментов — pending, daily quota exhausted; первый live-вызов выявил баг discriminated-union в Gemini tools — устранён переходом на плоскую wire-схему в ops-wire-schema.ts) |
-| 006 | configure_stats, navigate, edit_triggers, составные просьбы | P1 | M–L | 005 | TODO |
+| 006 | configure_stats, navigate, edit_triggers, составные просьбы | P1 | M–L | 005 | DONE (commit `30e138b`, ветка `feat/plans-001-003`; unit ✓ (+21 новых теста серии 006: stats-patch-schema 10, assist-contract 6+, data-summary +1, navigate-schema), live — pending quota) |
 | 007 | Экзамен (evals), журнал aiLog, доки, поглощение спайка | P1 | M–L | 006 | TODO |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (с причиной в одну строку) | REJECTED (с обоснованием).

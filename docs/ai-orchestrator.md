@@ -58,9 +58,9 @@ AssistResult: { kind: "answer" | "clarify" | "none" }
 | `rebuild_workflow` | `"rebuild"` | Пересобрать граф полностью по описанию | Реализован (план 005) |
 | `edit_node_params` | `"node-params"` | Изменить параметры конкретной ноды | Реализован (план 005) |
 | `undo_last` | `"undo"` | Откатить последнюю AI-правку графа | Реализован (план 005) |
-| `configure_stats` | _(план 006)_ | Применить фильтры/группировку в разделе Статистика | Плейсхолдер |
-| `navigate` | _(план 006)_ | Перейти в раздел/экран | Плейсхолдер |
-| `edit_triggers` | _(план 006)_ | Добавить/исключить домены в триггере | Плейсхолдер |
+| `configure_stats` | `"stats"` | Применить фильтры/группировку в разделе Статистика | Реализован (план 006) |
+| `navigate` | `"navigate"` | Перейти в раздел / открыть кампанию / открыть сигнал | Реализован (план 006) |
+| `edit_triggers` | `"triggers"` | Добавить/исключить домены в триггере | Реализован (план 006) |
 
 Инструменты фильтруются по `context.screen` (и `selectedNode`, `undoAvailable`) — на экране воркфлоу подключаются граф-инструменты (`edit_workflow`, `rebuild_workflow`, `edit_node_params`, `undo_last`), на секции статистики — `configure_stats`, и т.д.
 
@@ -73,6 +73,19 @@ AssistResult: { kind: "answer" | "clarify" | "none" }
 **`edit_node_params`** — принимает `{ nodeId, patch, confirmation }`. `patch` — `Record<string, unknown>` (сервер не может строго типизировать union по kind ноды); редьюсер мерджит patch поверх существующих params, невалидные ключи безвредны. Условие регистрации: `screen === "workflow" && selectedNode != null`.
 
 **`undo_last`** — принимает пустой объект `{}`. Условие регистрации: `screen === "workflow" && undoAvailable === true`.
+
+### Аргументы инструментов план 006
+
+**`configure_stats`** — принимает `{ patch: StatsPatch, confirmation: string }`. `StatsPatch` (`stats-patch-schema.ts`) охватывает rows/subRows/rowCount/sort/clearSort/period. `toFiltersPatch(patch)` нормирует wire-форму в `Partial<StatisticsFilters>` (clearSort:true → sort:null). Клиент диспатчит `stats_apply_patch`. Условие регистрации: сервер передаёт схему безусловно (инструмент работает с любого экрана).
+
+**`navigate`** — принимает `{ target: { kind } }`, где target — discriminated union трёх форм:
+- `{ kind: "section", name: SectionName }` — переход в раздел: `sidebar_nav`.
+- `{ kind: "campaign-workflow", campaignId: string }` — открыть воркфлоу кампании: `open_workflow` (launched = status !== "draft"). Несуществующий id → confirmations не накапливается → офлайн-фоллбек.
+- `{ kind: "signal", signalId: string }` — открыть экран сигнала: `signal_opened`. Несуществующий id — аналогично.
+
+Wire-схема для Gemini живёт в `navigate-schema.ts` (плоская форма без discriminated union); клиент получает уже валидированный контракт через `assistResultSchema`.
+
+**`edit_triggers`** — принимает `{ add: string[], exclude: string[], clearAdded?: boolean, clearExcluded?: boolean, confirmation: string }`. Требует активного trigger-тега в промпт-баре (activeTrigger в контексте). Клиент вызывает `triggerEdit.applyToTrigger` для каждой операции: clear-added/clear-excluded/edit. Если activeTrigger не передан — результат игнорируется, confirmations пусты → офлайн-фоллбек.
 
 ---
 
@@ -88,6 +101,18 @@ AssistResult: { kind: "answer" | "clarify" | "none" }
 
 ---
 
+## 2b. Составные просьбы (план 006)
+
+Оркестратор может вернуть до **2 результатов** в одном ответе (например: `navigate` + `stats`). Порядок исполнения совпадает с порядком в `results[]`. Правила:
+
+- Для граф-видов (`workflow-ops`, `rebuild`, `node-params`, `undo`) действует guard `graphOpApplied`: только первый из них исполняется — защита от двойной правки одного графа за один сабмит.
+- Кросс-экранная правка графа (navigate + graph-op в одном ответе) **запрещена** логически: navigate меняет view до того, как граф применяется — результат непредсказуем. Оркестратор не должен комбинировать эти виды (промпт-контракт). Если такой ответ придёт — graph-op будет заблокирован guard'ом.
+- `stats`, `navigate`, `answer`, `clarify` — исполняются в любой комбинации.
+
+Формат ответа сервера: `{ results: AssistResult[] }` (план 006); для обратной совместимости `fetchAssistMulti` принимает также старый одиночный `AssistResult`.
+
+---
+
 ## 3. Контракт
 
 **Файл:** `src/lib/ai/assist-contract.ts`
@@ -96,43 +121,58 @@ AssistResult: { kind: "answer" | "clarify" | "none" }
 
 Ключевые типы:
 - `AssistRequest` — `{ text, history: HistoryMessage[], context: AssistContext }`
-- `AssistContext` — `{ screen: string, dataSummary: string }`
-- `AssistResult` — discriminated union: `{ kind: "answer", text }` | `{ kind: "clarify", questions[] }` | `{ kind: "none" }`
+- `AssistContext` — `{ screen: string, dataSummary: string, wizardStep?: { step, title }, activeTrigger?: { id, label }, graph?, selectedNode?, undoAvailable? }`
+- `AssistResult` — discriminated union: `{ kind: "answer" | "clarify" | "none" | "workflow-ops" | "rebuild" | "node-params" | "undo" | "stats" | "navigate" | "triggers" }`
+- `AssistResponse` — `{ results: AssistResult[] }` (план 006, max 2)
 
-Zod-схемы (`assistRequestSchema`, `assistResultSchema`) используются для валидации как на клиенте (`fetchAssist` — `assistResultSchema.safeParse`), так и на сервере.
+Zod-схемы (`assistRequestSchema`, `assistResultSchema`, `assistResponseSchema`) используются для валидации как на клиенте (`fetchAssistMulti`), так и на сервере.
+
+Клиентский слой: `fetchAssistMulti` (приоритетный) возвращает `AssistResult[] | null`. Deprecated `fetchAssist` сохранён для документации — в потребителях (`use-chat-submit.ts`, `prompt-composer.tsx`) не используется.
 
 ---
 
-## 4. Fallback-цепочка
+## 4. Fallback-цепочка (use-chat-submit, план 006)
 
 ```
 Пользователь отправил свободный вопрос в чат
     │
     ▼
-isAiParserEnabled()? — нет (localStorage "off") ──→ офлайн-путь (синхронный)
+isAiParserEnabled()? — нет (localStorage "off") ──→ useAi=false
     │
    да
     │
     ▼
-assistAvailable? — нет (ключ не прошёл пробу) ──→ офлайн-путь (синхронный)
+assistAvailable? — нет (ключ не прошёл пробу) ──→ useAi=false
     │
-   да
+   да (useAi=true)
     │
     ▼
-fetchAssist({ text, history, context }) — AbortSignal.timeout(6000)
+Быстрые предварительные ветки (до AI):
+    • email-редактор: прямая обработка черновика
+    • read-only workflow + node-тег: ответ о дублировании
+    • домен/доступн: checkDomainAvailability
+    • LIGHT_QUERY / HEAVY_QUERY: demo-функции
+    • trigger-сегмент + parsed.kind !== "fallback": regex-fast-path (мгновенно)
     │
-    ├── таймаут (6с) ──────────────────→ null → офлайн-путь
-    ├── HTTP 503 (нет ключа) ──────────→ null → офлайн-путь
-    ├── HTTP 429 / 502 (rate limit) ───→ null → офлайн-путь
-    ├── невалидный JSON / схема ───────→ null → офлайн-путь
-    ├── kind: "none" ──────────────────→ офлайн-путь
+    ▼  (все быстрые ветки пропущены ИЛИ trigger-fallback)
+канированные stats-запросы? — ТОЛЬКО при useAi=false
     │
-    ├── kind: "answer" ────────────────→ chat.updatePending(id, result.text)
-    └── kind: "clarify" ───────────────→ chat.updatePending(id, questions.join(" "))
+    ▼
+fetchAssistMulti({ text, history, context }) — AbortSignal.timeout(6000)
+    │
+    ├── null (таймаут/ошибка/схема) ───→ офлайн-путь
+    │
+    └── results[] → executeAssistResults():
+        ├── stats   → stats_apply_patch(toFiltersPatch(patch)) + confirmation
+        ├── navigate→ sidebar_nav / open_workflow / signal_opened + confirmation
+        ├── triggers→ applyToTrigger (если activeTrigger в контексте) + confirmation
+        ├── answer  → confirmation.push(text)
+        ├── clarify → confirmation.push(questions.join(" "))
+        └── (all confirmations empty) → офлайн-путь
 
 Офлайн-путь:
     lookupInformationalReply(text) ?? warmFallbackReply()
-    (каталог ~40 записей + тёплая заглушка — бит-в-бит как до плана 004)
+    (каталог ~40 записей + тёплая заглушка — бит-в-бит как без ключа)
 ```
 
 **Важно:** путь «нет ключа» (`!assistAvailable || !isAiParserEnabled()`) — **синхронный**, без единого `await`. Поведение бит-в-бит как до интеграции.
@@ -157,7 +197,8 @@ fetchAssist({ text, history, context }) — AbortSignal.timeout(6000)
 |------|------|
 | `src/app/api/ai/assist/route.ts` | Route handler: GET (проба ключа), POST (LLM-вызов, инструменты) |
 | `src/lib/ai/assist-contract.ts` | Zod-схемы + TypeScript-типы запроса/ответа |
-| `src/lib/ai/assist-client.ts` | `fetchAssistAvailability()`, `fetchAssist()` — клиентский слой |
+| `src/lib/ai/assist-client.ts` | `fetchAssistAvailability()`, `fetchAssistMulti()` — клиентский слой (план 006) |
+| `src/lib/ai/stats-patch-schema.ts` | `StatsPatch` схема + `toFiltersPatch()` — wire → StatisticsFilters |
 | `src/lib/ai/orchestrator-prompt.ts` | `buildSystemPrompt()`, `buildMessages()` — системный промпт |
 | `src/lib/ai/afina-knowledge.ts` | `AFINA_KNOWLEDGE` — база знаний о продукте (~3–4K токенов) |
 | `src/lib/ai/data-summary.ts` | `buildDataSummary()` — сводка стейта для промпта |
