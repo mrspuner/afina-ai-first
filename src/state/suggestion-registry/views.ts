@@ -81,8 +81,15 @@ export function resolveCampaignSelect(): SuggestionItem[] {
   return CAMPAIGN_SELECT;
 }
 
-export function resolveWorkflowScenario(): SuggestionItem[] {
-  return WORKFLOW_SCENARIO;
+export function resolveWorkflowScenario(aiUndoAvailable: boolean): SuggestionItem[] {
+  if (!aiUndoAvailable) return WORKFLOW_SCENARIO;
+  // Подсказка «Откатить» появляется первой — только пока AI-снапшот существует.
+  const undoItem: SuggestionItem = {
+    id: "ai-undo",
+    label: "↩ Откатить",
+    action: { kind: "dispatch", action: { type: "workflow_ai_undo_request" } },
+  };
+  return [undoItem, ...WORKFLOW_SCENARIO];
 }
 
 export function resolveCampaignFeed(status: CampaignStatus): SuggestionItem[] {

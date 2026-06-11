@@ -114,9 +114,10 @@ export type Scope =
   | { kind: "campaign-select" }
   /**
    * Открытый редактируемый workflow без выбранной ноды — подсказки уровня
-   * всего сценария (настроить логику сценария целиком).
+   * всего сценария (настроить логику сценария целиком). `aiUndoAvailable` —
+   * есть ли снапшот для отката последней AI-правки.
    */
-  | { kind: "workflow-scenario" }
+  | { kind: "workflow-scenario"; aiUndoAvailable: boolean }
   /**
    * Лента кампании. Различаем по `CampaignStatus`:
    * - `draft` → draft-чипы (запустить/изменить);

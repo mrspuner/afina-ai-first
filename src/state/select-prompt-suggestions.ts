@@ -192,7 +192,7 @@ export function selectPromptSuggestions(
       // Редактируемый draft без выбранной ноды → подсказки уровня сценария
       // (выбранная нода обрабатывается раньше, в правиле 2 по активному тегу).
       if (!v.launched) {
-        return resolved({ kind: "workflow-scenario" });
+        return resolved({ kind: "workflow-scenario", aiUndoAvailable: state.aiUndoAvailable });
       }
       const status: CampaignStatus = feedStatusForCampaign(
         state,

@@ -39,7 +39,7 @@ export function resolveSuggestions(scope: Scope): SuggestionItem[] {
     case "campaign-select":
       return resolveCampaignSelect();
     case "workflow-scenario":
-      return resolveWorkflowScenario();
+      return resolveWorkflowScenario(scope.aiUndoAvailable);
     case "campaign-feed":
       return resolveCampaignFeed(scope.status as CampaignStatus);
   }

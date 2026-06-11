@@ -245,6 +245,50 @@ describe("selectPromptSuggestions — campaign-feed status-aware", () => {
   });
 });
 
+describe("selectPromptSuggestions — ai-undo suggestion", () => {
+  it("aiUndoAvailable=true + редактируемый workflow → подсказка ai-undo первая", () => {
+    const r = selectPromptSuggestions(
+      withView(
+        { kind: "workflow", campaign: { id: "c1", name: "X" }, launched: false },
+        { aiUndoAvailable: true }
+      ),
+      ctx()
+    );
+    if (r.kind !== "items") throw new Error("expected items");
+    expect(r.items[0].id).toBe("ai-undo");
+    expect(r.items[0].label).toBe("↩ Откатить");
+    expect(r.items[0].action.kind).toBe("dispatch");
+    if (r.items[0].action.kind === "dispatch") {
+      expect(r.items[0].action.action.type).toBe("workflow_ai_undo_request");
+    }
+  });
+
+  it("aiUndoAvailable=false + редактируемый workflow → подсказка ai-undo отсутствует", () => {
+    const r = selectPromptSuggestions(
+      withView(
+        { kind: "workflow", campaign: { id: "c1", name: "X" }, launched: false },
+        { aiUndoAvailable: false }
+      ),
+      ctx()
+    );
+    if (r.kind !== "items") throw new Error("expected items");
+    expect(r.items.some((i) => i.id === "ai-undo")).toBe(false);
+  });
+
+  it("aiUndoAvailable=true + запущенный (launched) workflow → ai-undo не появляется", () => {
+    const r = selectPromptSuggestions(
+      withView(
+        { kind: "workflow", campaign: { id: "c1", name: "X" }, launched: true },
+        { aiUndoAvailable: true, campaigns: [mkCampaign("c1", "active")] }
+      ),
+      ctx()
+    );
+    // launched=true → campaign-feed, не workflow-scenario → нет ai-undo
+    if (r.kind !== "items") throw new Error("expected items");
+    expect(r.items.some((i) => i.id === "ai-undo")).toBe(false);
+  });
+});
+
 describe("selectPromptSuggestions — welcome / awaiting / select", () => {
   it("welcome без чипов → hidden", () => {
     expect(
