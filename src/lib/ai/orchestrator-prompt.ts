@@ -38,6 +38,12 @@ export function buildSystemPrompt(context: AssistContext): string {
           `Выбрана нода: [${context.selectedNode.id}] "${context.selectedNode.label}" (${context.selectedNode.nodeType})`,
         ]
       : []),
+    ...(context.wizardStep
+      ? [`Пользователь в визарде сигнала, шаг ${context.wizardStep.step}: ${context.wizardStep.title}.`]
+      : []),
+    ...(context.activeTrigger
+      ? [`Активный триггер для правок доменов: «${context.activeTrigger.label}».`]
+      : []),
   ].join("\n\n");
 }
 

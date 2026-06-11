@@ -18,6 +18,8 @@ import {
 } from "@/lib/ai/orchestrator-prompt";
 import { rebuildGraphSchema } from "@/lib/ai/rebuild-schema";
 import { wireOpSchema, toStructuralOps } from "@/lib/ai/ops-wire-schema";
+import { statsPatchSchema } from "@/lib/ai/stats-patch-schema";
+import { wireNavigateSchema, toNavigateTarget } from "@/lib/ai/navigate-schema";
 
 export function GET() {
   return Response.json({
@@ -43,9 +45,9 @@ export async function POST(request: Request) {
   }
   const { text, history, context } = parsed.data;
 
-  // Результат заполняет execute вызванного инструмента. Модель Gemini Flash
-  // вызывает максимум один инструмент за ход; составные действия — план 006.
-  let result: AssistResult = { kind: "none" };
+  // Результаты: execute вызванных инструментов пушат в массив; максимум 2.
+  // Пост-обработчик добавит {kind:"none"} если ни один инструмент не был вызван.
+  const results: AssistResult[] = [];
 
   // Флаг: инструменты графа регистрируются только на экране workflow с графом.
   const onWorkflow = context.screen === "workflow" && Boolean(context.graph);
@@ -62,7 +64,7 @@ export async function POST(request: Request) {
         text: z.string().describe("Ответ, 1–3 предложения, в голосе продукта"),
       }),
       execute: ({ text: answerText }) => {
-        result = { kind: "answer", text: answerText };
+        results.push({ kind: "answer", text: answerText });
         return "ok" as const;
       },
     }),
@@ -74,7 +76,35 @@ export async function POST(request: Request) {
         questions: z.array(z.string()).min(1).max(2),
       }),
       execute: ({ questions }) => {
-        result = { kind: "clarify", questions };
+        results.push({ kind: "clarify", questions });
+        return "ok" as const;
+      },
+    }),
+    // configure_stats — перенастройка таблицы статистики (план 006)
+    configure_stats: tool({
+      description:
+        "Перенастроить таблицу статистики: группировка строк (rows), сортировка, " +
+        "период, число строк. Используй для просьб «покажи/разбей/отсортируй/за <период>» " +
+        "про статистику. Передавай только меняемые поля (минимум одно). " +
+        "confirmation — короткая фраза, что сделал («Разбил по каналам за май»).",
+      inputSchema: z.object({ patch: statsPatchSchema, confirmation: z.string() }),
+      execute: ({ patch, confirmation }) => {
+        results.push({ kind: "stats", patch, confirmation });
+        return "ok" as const;
+      },
+    }),
+    // navigate — переход к разделу/кампании/сигналу (план 006)
+    navigate: tool({
+      description:
+        "Перейти к разделу, кампании или сигналу («покажи кампании», «открой статистику»). " +
+        "Кампанию/сигнал адресуй по id из данных аккаунта. Если просят И открыть, И " +
+        "настроить статистику — вызови navigate, затем configure_stats (в этом порядке). " +
+        "Менять граф воркфлоу другой кампании нельзя: вызови navigate и скажи в answer, " +
+        "что правку нужно повторить на открывшемся экране.",
+      inputSchema: z.object({ target: wireNavigateSchema, confirmation: z.string() }),
+      execute: ({ target, confirmation }) => {
+        const strict = toNavigateTarget(target);
+        if (strict) results.push({ kind: "navigate", target: strict, confirmation });
         return "ok" as const;
       },
     }),
@@ -89,10 +119,11 @@ export async function POST(request: Request) {
             inputSchema: z.object({ ops: z.array(wireOpSchema).min(1) }),
             execute: ({ ops }) => {
               const structural = toStructuralOps(ops);
-              result =
-                structural.length > 0
-                  ? { kind: "workflow-ops", ops: structural }
-                  : { kind: "none" };
+              // Пушим только если есть валидные структурные операции;
+              // пустой результат не пушим — общий пост-обработчик добавит none.
+              if (structural.length > 0) {
+                results.push({ kind: "workflow-ops", ops: structural });
+              }
               return "ok" as const;
             },
           }),
@@ -104,7 +135,7 @@ export async function POST(request: Request) {
               "В assumptions перечисли принятые допущения одним-двумя предложениями.",
             inputSchema: rebuildGraphSchema,
             execute: (spec) => {
-              result = { kind: "rebuild", spec };
+              results.push({ kind: "rebuild", spec });
               return "ok" as const;
             },
           }),
@@ -123,12 +154,12 @@ export async function POST(request: Request) {
               confirmation: z.string(),
             }),
             execute: ({ patch, confirmation }) => {
-              result = {
+              results.push({
                 kind: "node-params",
                 nodeId: context.selectedNode!.id,
                 patch,
                 confirmation,
-              };
+              });
               return "ok" as const;
             },
           }),
@@ -142,7 +173,29 @@ export async function POST(request: Request) {
               "Откатить последнее AI-изменение графа («откати», «верни как было»).",
             inputSchema: z.object({}),
             execute: () => {
-              result = { kind: "undo" };
+              results.push({ kind: "undo" });
+              return "ok" as const;
+            },
+          }),
+        }
+      : {}),
+    // edit_triggers — только если есть активный триггер (план 006)
+    ...(context.activeTrigger
+      ? {
+          edit_triggers: tool({
+            description:
+              `Изменить домены триггера «${context.activeTrigger.label}»: add — добавить ` +
+              "домены, exclude — исключить; clearAdded/clearExcluded — снять все ручные " +
+              "добавления/исключения. Понимай любые формулировки («убери всё что я добавлял»).",
+            inputSchema: z.object({
+              add: z.array(z.string()),
+              exclude: z.array(z.string()),
+              clearAdded: z.boolean().optional(),
+              clearExcluded: z.boolean().optional(),
+              confirmation: z.string(),
+            }),
+            execute: (args) => {
+              results.push({ kind: "triggers", ...args });
               return "ok" as const;
             },
           }),
@@ -163,7 +216,8 @@ export async function POST(request: Request) {
       toolChoice: "required",
     });
     // Текст запроса и ответ модели не логируем — privacy-граница
-    return Response.json(result, { status: 200 });
+    if (results.length === 0) results.push({ kind: "none" });
+    return Response.json({ results: results.slice(0, 2) }, { status: 200 });
   } catch (err) {
     const s = String(err).toLowerCase();
     const rateLimited =

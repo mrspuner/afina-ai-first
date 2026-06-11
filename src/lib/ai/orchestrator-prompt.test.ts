@@ -47,6 +47,37 @@ describe("buildSystemPrompt", () => {
     const p = buildSystemPrompt({ screen: "workflow", dataSummary: "" });
     expect(p).not.toContain("Текущий граф");
   });
+
+  it("с wizardStep включает шаг и заголовок", () => {
+    const p = buildSystemPrompt({
+      screen: "guided-signal:2",
+      dataSummary: "",
+      wizardStep: { step: 2, title: "Настройка триггеров" },
+    });
+    expect(p).toContain("визарде сигнала");
+    expect(p).toContain("шаг 2");
+    expect(p).toContain("Настройка триггеров");
+  });
+
+  it("без wizardStep не упоминает визард", () => {
+    const p = buildSystemPrompt({ screen: "workflow", dataSummary: "" });
+    expect(p).not.toContain("визарде сигнала");
+  });
+
+  it("с activeTrigger включает label триггера", () => {
+    const p = buildSystemPrompt({
+      screen: "guided-signal:3",
+      dataSummary: "",
+      activeTrigger: { id: "t1", label: "Ипотека 2026" },
+    });
+    expect(p).toContain("Активный триггер");
+    expect(p).toContain("Ипотека 2026");
+  });
+
+  it("без activeTrigger не упоминает активный триггер", () => {
+    const p = buildSystemPrompt({ screen: "workflow", dataSummary: "" });
+    expect(p).not.toContain("Активный триггер");
+  });
 });
 
 describe("buildMessages", () => {
