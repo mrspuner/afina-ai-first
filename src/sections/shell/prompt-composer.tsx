@@ -35,7 +35,7 @@ import { useAppState, useAppDispatch } from "@/state/app-state-context";
 import { isOnWelcome } from "@/state/app-state";
 import { parseStructuralCommands } from "@/state/structural-commands";
 import { isAiParserEnabled } from "@/state/dev-config";
-import { fetchAiStructuralOps } from "@/lib/ai-workflow-client";
+import { fetchAiStructuralOps, fetchAiAvailability } from "@/lib/ai-workflow-client";
 import { parseCampaignQuery } from "@/state/parse-campaign-filter";
 import { decideEnterAction, APPLY_ALL_COMMAND } from "@/state/prompt-bar-enter";
 import { selectPromptSuggestions } from "@/state/select-prompt-suggestions";
@@ -115,6 +115,9 @@ export const PromptComposer = forwardRef<PromptComposerHandle, PromptComposerPro
 
     const [activeTag, setActiveTag] = useState<ChipSegment["chip"] | null>(null);
     const [hasTypedText, setHasTypedText] = useState(false);
+    // Результат пробы доступности AI: false до завершения запроса (страховка
+    // от гонки — пока ключ неизвестен, поведение идентично "нет ключа").
+    const [aiAvailable, setAiAvailable] = useState(false);
 
     // Mirror editor's active segment into local flags (for the SuggestionBar)
     // and keep prevActiveRef fresh. Source is imperative DOM, so this runs in
@@ -126,6 +129,20 @@ export const PromptComposer = forwardRef<PromptComposerHandle, PromptComposerPro
       setHasTypedText(seg ? seg.text.trim().length > 0 : false);
       if (seg) prevActiveRef.current = seg;
     }, [chipsApi.chips, textInput.value]);
+
+    // Проба доступности AI при монтировании: запрашиваем один раз безусловно,
+    // чтобы значение было готово до первого сабмита — даже если пользователь
+    // успеет переключить флаг в дев-панели. Флаг alive защищает от setState
+    // после размонтирования компонента.
+    useEffect(() => {
+      let alive = true;
+      void fetchAiAvailability().then((ok) => {
+        if (alive) setAiAvailable(ok);
+      });
+      return () => {
+        alive = false;
+      };
+    }, []);
 
     function resetEditor() {
       editorRef.current?.clear();
@@ -321,12 +338,14 @@ export const PromptComposer = forwardRef<PromptComposerHandle, PromptComposerPro
         dispatch({ type: "workflow_node_command_submit", commands: nodeCommands });
       }
       if (structural.ops.length === 0 && nodeCommands.length === 0 && rawText.trim()) {
-        // Флаг-гейтная AI-ветка (спайк 002): при включённом флаге пробуем
-        // разобрать команду через реальный LLM вместо немедленного диспатча.
-        // Сообщение пользователя в чат не эхируется в этой ветке ни до, ни
-        // после — такова текущая легаси-механика (workflow_command_submit /
-        // workflow_view обрабатывают её самостоятельно). Поведение сохранено.
-        if (isAiParserEnabled()) {
+        // Авто-гейт AI (спайк 002, auto-on): AI используется если:
+        //   1) флаг явно не выключен (isAiParserEnabled() = true, дефолт),
+        //   2) И ключ реально есть на сервере (aiAvailable = true, проверено при монтировании).
+        // Когда ключа нет (e2e/CI, staging без ключа): aiAvailable = false,
+        // useAi = false → синхронный dispatch без единого await — поведение
+        // бит-в-бит как до спайка, никаких асинхронных побочных эффектов.
+        const useAi = isAiParserEnabled() && aiAvailable;
+        if (useAi) {
           // Асинхронная AI-попытка запускается без блокировки сабмита.
           // nodes: [] — граф в composer недоступен (живёт только в workflow-view),
           // это принятое ограничение спайка (зафиксировано в дизайн-доке).
@@ -338,12 +357,13 @@ export const PromptComposer = forwardRef<PromptComposerHandle, PromptComposerPro
               dispatch({ type: "workflow_structural_commands_submit", ops });
             } else {
               // AI вернул null / пустой список (таймаут, ошибка, квота) →
-              // fallback на легаси-диспатч, как если бы флаг был выключен.
+              // fallback на легаси-диспатч.
               dispatch({ type: "workflow_command_submit", text: rawText });
             }
           })();
         } else {
-          // Флаг выключен (дефолт) — поведение бит-в-бит как до спайка.
+          // Нет ключа (aiAvailable=false) ИЛИ флаг принудительно выключен →
+          // синхронный путь, поведение бит-в-бит как до спайка.
           dispatch({ type: "workflow_command_submit", text: rawText });
         }
       }

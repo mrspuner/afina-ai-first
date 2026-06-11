@@ -45,23 +45,34 @@ export function setProcessingDuration(ms: number): void {
   window.localStorage.setItem(DEV_PROCESSING_KEY, String(ms));
 }
 
-// ── AI-парсер (спайк 002) ─────────────────────────────────────────────────────
-// Флаг переключает обработку свободного текста в prompt-composer:
-//   off (дефолт) → только regex-парсер, поведение как до спайка.
-//   on            → сначала вызывается /api/ai/workflow-ops; при ошибке,
-//                   таймауте или пустом ответе — fallback на тот же regex.
-// Флаг выключен по умолчанию, чтобы спайк не ломал штатный путь
-// и все e2e-тесты проходили без ключа API.
+// ── AI-парсер (спайк 002, auto-on) ───────────────────────────────────────────
+// Флаг управляет режимом обработки свободного текста в prompt-composer.
+//
+// Дефолт теперь AUTO-ON: приложение пробует AI всегда, когда ключ API
+// присутствует на сервере (проверяется через GET /api/ai/workflow-ops).
+// При ошибке / таймауте / пустом ответе — fallback на regex (как раньше).
+//
+// Безопасность e2e/CI обеспечивается через пробу доступности:
+//   нет ключа → fetchAiAvailability() = false → prompt-composer идёт
+//   напрямую в синхронный dispatch без await — поведение бит-в-бит как до спайка.
+//
+// Переключатель в дев-панели позволяет ПРИНУДИТЕЛЬНО отключить AI
+// (записывает "off") — например, чтобы убедиться, что regex-путь ещё работает.
+// "on" / null (не задан) → auto-режим (AI когда есть ключ).
 
 export const DEV_AI_PARSER_KEY = "afina.dev.aiParser";
 
 /**
  * Включён ли реальный AI-парсер структурных команд.
- * SSR-safe: возвращает false на сервере (нет localStorage).
+ * Дефолт — ON (auto): возвращает true, если флаг не задан или задан явно "on".
+ * Возвращает false только если явно записано "off" (принудительный regex-режим).
+ * SSR-safe: на сервере возвращает true (концептуальный дефолт auto-on;
+ * composer читает это только на клиенте — в обработчиках/эффектах, без риска
+ * гидрационного рассогласования).
  */
 export function isAiParserEnabled(): boolean {
-  if (typeof window === "undefined") return false;
-  return window.localStorage.getItem(DEV_AI_PARSER_KEY) === "on";
+  if (typeof window === "undefined") return true;
+  return window.localStorage.getItem(DEV_AI_PARSER_KEY) !== "off";
 }
 
 export function setAiParserEnabled(enabled: boolean): void {

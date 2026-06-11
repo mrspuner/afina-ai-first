@@ -93,6 +93,17 @@ JSON-объект: { "ops": [ ... ] }
 
 // ── Route handler ─────────────────────────────────────────────────────────────
 
+/**
+ * GET /api/ai/workflow-ops — проба доступности: сообщает клиенту, есть ли
+ * ключ API, чтобы тот решил, стоит ли запускать AI-ветку вообще.
+ * Никогда не возвращает и не логирует сам ключ — только булево.
+ */
+export function GET() {
+  return Response.json({
+    available: Boolean(process.env.GOOGLE_GENERATIVE_AI_API_KEY),
+  });
+}
+
 export async function POST(request: Request) {
   // Проверяем наличие ключа до разбора тела — быстрый путь к fallback
   if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) {

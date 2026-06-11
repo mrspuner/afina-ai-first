@@ -12,6 +12,51 @@
 import type { StructuralOp } from "@/state/structural-commands";
 import { workflowOpsResultSchema } from "@/lib/ai-workflow-schema";
 
+// ── Проба доступности AI ──────────────────────────────────────────────────────
+
+/**
+ * Кэш результата пробы: храним промис, а не само значение, чтобы повторные
+ * вызовы до завершения запроса тоже получали один общий промис (без дублирующих
+ * fetch'ей). При ошибке кэш не сохраняется — следующий вызов повторит попытку.
+ */
+let _availabilityCache: Promise<boolean> | null = null;
+
+/**
+ * Проверить, доступен ли AI-парсер (есть ли ключ API на сервере).
+ * Результат кэшируется на время жизни страницы — повторные вызовы возвращают
+ * тот же промис без повторного запроса к серверу.
+ * При любой ошибке (сеть, не-2xx, невалидный JSON) → false (AI недоступен).
+ */
+export function fetchAiAvailability(): Promise<boolean> {
+  if (_availabilityCache !== null) return _availabilityCache;
+
+  // Запускаем единственный запрос; при ошибке кэш сбрасывается, чтобы
+  // следующий вызов мог повторить попытку.
+  const req = fetch("/api/ai/workflow-ops", { method: "GET" })
+    .then(async (res) => {
+      if (!res.ok) return false;
+      const json = (await res.json()) as unknown;
+      if (
+        typeof json === "object" &&
+        json !== null &&
+        "available" in json &&
+        typeof (json as Record<string, unknown>).available === "boolean"
+      ) {
+        return (json as { available: boolean }).available;
+      }
+      return false;
+    })
+    .catch(() => false)
+    .then((result) => {
+      // Не кэшируем false — разрешаем повторную попытку при следующем вызове.
+      if (!result) _availabilityCache = null;
+      return result;
+    });
+
+  _availabilityCache = req;
+  return req;
+}
+
 /** Описание ноды, уходящее на сервер. Только id + метка + тип — никакого стейта. */
 export interface WorkflowNodeSummary {
   id: string;

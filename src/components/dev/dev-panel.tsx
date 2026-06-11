@@ -11,7 +11,10 @@ import {
   PROCESSING_PRESETS,
   getProcessingDuration,
   setProcessingDuration,
+  isAiParserEnabled,
+  setAiParserEnabled,
 } from "@/state/dev-config";
+import { fetchAiAvailability } from "@/lib/ai-workflow-client";
 
 const STORAGE_KEY = "afina.dev.preset";
 const DIRECTION_KEY = "afina.dev.direction";
@@ -21,6 +24,10 @@ export function DevPanel() {
   const [open, setOpen] = useState(false);
   const [activeKey, setActiveKey] = useState<PresetKey>("empty");
   const [processingMs, setProcessingMs] = useState<number>(6000);
+  // AI-парсер: локальное состояние переключателя + статус пробы ключа
+  const [aiEnabled, setAiEnabled] = useState(true);
+  // null = проверка ещё не завершена; true/false = результат пробы
+  const [aiAvailableStatus, setAiAvailableStatus] = useState<boolean | null>(null);
   const { signals, campaigns, clientDirection, balance, surveyStatus } =
     useAppState();
   const dispatch = useAppDispatch();
@@ -46,6 +53,10 @@ export function DevPanel() {
       dispatch({ type: "client_direction_set", direction: savedDirection });
     }
     setProcessingMs(getProcessingDuration());
+    setAiEnabled(isAiParserEnabled());
+    void fetchAiAvailability().then((ok) => {
+      setAiAvailableStatus(ok);
+    });
   }, [dispatch]);
 
   // Mirror clientDirection → localStorage so survey completion (which writes
@@ -80,6 +91,11 @@ export function DevPanel() {
   function applyProcessingMs(ms: number) {
     setProcessingDuration(ms);
     setProcessingMs(ms);
+  }
+
+  function handleAiEnabledChange(checked: boolean) {
+    setAiParserEnabled(checked);
+    setAiEnabled(checked);
   }
 
   function setSurveyCompleted(checked: boolean) {
@@ -236,6 +252,31 @@ export function DevPanel() {
               </button>
             );
           })}
+        </div>
+      </div>
+
+      <div className="mt-3 border-t border-[#1f1f1f] pt-3">
+        <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-0.5">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.04em] text-[#888]">
+              AI-парсер команд
+            </div>
+            <div className="text-[11px] text-[#666]">
+              {aiEnabled ? "авто — AI когда есть ключ" : "только regex"}
+            </div>
+            <div className="mt-0.5 text-[10px] text-[#555]">
+              {aiAvailableStatus === null
+                ? "проверка ключа…"
+                : aiAvailableStatus
+                  ? "ключ найден — AI активен"
+                  : "нет ключа — regex-fallback"}
+            </div>
+          </div>
+          <Switch
+            checked={aiEnabled}
+            onCheckedChange={handleAiEnabledChange}
+            aria-label="Переключить AI-парсер команд"
+          />
         </div>
       </div>
 
