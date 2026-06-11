@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { structuralOpSchema } from "@/lib/ai-workflow-schema";
+import { rebuildGraphSchema } from "./rebuild-schema";
 
 /** Сообщение истории сессии (последние N из chat-context). */
 export const historyMessageSchema = z.object({
@@ -56,5 +57,7 @@ export const assistResultSchema = z.discriminatedUnion("kind", [
   }),
   /** Откат последнего действия (план 005). */
   z.object({ kind: z.literal("undo") }),
+  /** Полная пересборка графа по спецификации модели (план 005). */
+  z.object({ kind: z.literal("rebuild"), spec: rebuildGraphSchema }),
 ]);
 export type AssistResult = z.infer<typeof assistResultSchema>;
