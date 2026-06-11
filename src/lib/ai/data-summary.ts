@@ -1,5 +1,6 @@
 import type { Campaign, Signal } from "@/state/app-state";
 import type { FunnelNumbers } from "@/state/metrics";
+import { buildFacts, aggregate } from "@/sections/statistics/fact-cube";
 
 /**
  * Компактная текстовая сводка реального стейта для промпта оркестратора.
@@ -42,4 +43,20 @@ export function statsLinesFromFunnel(total: FunnelNumbers): string[] {
     `- всего: отправок ${total.sends}, кликов ${total.clicks}, конверсий ${total.approves}`,
     `- деньги: доход $${Math.round(total.incomeUsd)}, расход $${Math.round(total.expensesUsd)}`,
   ];
+}
+
+/**
+ * Строит строки статистики из fact-cube для заданных кампаний.
+ * Период: с начала текущего года по now.
+ * Используется в buildDataSummary чтобы не дублировать логику в потребителях.
+ */
+export function buildStatsLines(campaigns: Campaign[], now: Date): string[] {
+  const signals = campaigns.map((c) => ({ id: c.signalId, count: 0 }));
+  const period = {
+    from: new Date(now.getFullYear(), 0, 1),
+    to: new Date(now.getFullYear(), 11, 31),
+  };
+  const facts = buildFacts({ campaigns, signals }, period, { now });
+  const total = aggregate(facts);
+  return statsLinesFromFunnel(total);
 }

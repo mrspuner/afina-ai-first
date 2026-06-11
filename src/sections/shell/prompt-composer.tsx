@@ -38,7 +38,7 @@ import { isAiParserEnabled } from "@/state/dev-config";
 import { fetchAssist, fetchAssistAvailability } from "@/lib/ai/assist-client";
 import { summarizeGraph } from "@/lib/ai/graph-summary";
 import { getCachedGraph } from "@/sections/campaigns/workflow-graph-cache";
-import { buildDataSummary } from "@/lib/ai/data-summary";
+import { buildDataSummary, buildStatsLines } from "@/lib/ai/data-summary";
 import { validateAiGraph } from "@/state/ai-graph-validation";
 import { buildGraphFromSpec } from "@/lib/ai/rebuild-schema";
 import type { NodeParams } from "@/types/workflow";
@@ -372,7 +372,7 @@ export const PromptComposer = forwardRef<PromptComposerHandle, PromptComposerPro
               history,
               context: {
                 screen: "workflow",
-                dataSummary: buildDataSummary({ campaigns: state.campaigns, signals: state.signals }),
+                dataSummary: buildDataSummary({ campaigns: state.campaigns, signals: state.signals, statsLines: buildStatsLines(state.campaigns, new Date()) }),
                 graph,
                 selectedNode: selected,
                 undoAvailable: state.aiUndoAvailable,

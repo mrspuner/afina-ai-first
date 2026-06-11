@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildDataSummary, statsLinesFromFunnel } from "./data-summary";
+import { buildDataSummary, statsLinesFromFunnel, buildStatsLines } from "./data-summary";
 
 const campaign = {
   id: "c1", name: "Ипотека-лето", signalId: "s1", status: "active" as const,
@@ -34,5 +34,46 @@ describe("buildDataSummary", () => {
       }),
     });
     expect(s).toContain("доход $300");
+  });
+});
+
+describe("buildStatsLines", () => {
+  const now = new Date(2026, 5, 15); // 15 Jun 2026
+
+  const campaigns = [
+    {
+      id: "c1", name: "Ипотека-лето", signalId: "s1", status: "active" as const,
+      createdAt: "2026-01-10", launchedAt: "2026-01-12",
+    },
+    {
+      id: "c2", name: "Автокредит", signalId: "s2", status: "completed" as const,
+      createdAt: "2026-02-01", launchedAt: "2026-02-05", completedAt: "2026-03-20",
+    },
+  ];
+
+  it("возвращает ровно 2 строки", () => {
+    const lines = buildStatsLines(campaigns, now);
+    expect(lines).toHaveLength(2);
+  });
+
+  it("обе строки содержат числа", () => {
+    const lines = buildStatsLines(campaigns, now);
+    expect(lines[0]).toMatch(/\d+/);
+    expect(lines[1]).toMatch(/\d+/);
+  });
+
+  it("первая строка упоминает отправки", () => {
+    const lines = buildStatsLines(campaigns, now);
+    expect(lines[0]).toContain("отправок");
+  });
+
+  it("вторая строка упоминает деньги", () => {
+    const lines = buildStatsLines(campaigns, now);
+    expect(lines[1]).toContain("доход");
+  });
+
+  it("пустой список кампаний — нули в строках", () => {
+    const lines = buildStatsLines([], now);
+    expect(lines[0]).toContain("отправок 0");
   });
 });

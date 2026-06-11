@@ -27,7 +27,7 @@ import {
 } from "@/lib/stats-query-matcher";
 import type { ChipSegment } from "@/state/prompt-chips-context";
 import { fetchAssist, fetchAssistAvailability } from "@/lib/ai/assist-client";
-import { buildDataSummary } from "@/lib/ai/data-summary";
+import { buildDataSummary, buildStatsLines } from "@/lib/ai/data-summary";
 import { isAiParserEnabled } from "@/state/dev-config";
 
 /** Текст + сегменты (тег + текст после него), отправляемые в чат. */
@@ -365,7 +365,7 @@ export function useChatSubmit(): { submit: (payload: ChatSubmitPayload) => void 
       const { view, campaigns, signals } = appState;
       const screen =
         view.kind === "section" ? `section:${view.name}` : view.kind;
-      const dataSummary = buildDataSummary({ campaigns, signals });
+      const dataSummary = buildDataSummary({ campaigns, signals, statsLines: buildStatsLines(campaigns, new Date()) });
       void fetchAssist({ text, history, context: { screen, dataSummary } }).then(
         (result) => {
           if (result?.kind === "answer") {
