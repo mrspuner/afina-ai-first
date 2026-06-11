@@ -13,6 +13,10 @@ import {
   setProcessingDuration,
   isAiParserEnabled,
   setAiParserEnabled,
+  isAiLogEnabled,
+  setAiLogEnabled,
+  readAiLogEntries,
+  clearAiLog,
 } from "@/state/dev-config";
 import { fetchAiAvailability } from "@/lib/ai-workflow-client";
 
@@ -28,6 +32,8 @@ export function DevPanel() {
   const [aiEnabled, setAiEnabled] = useState(true);
   // null = проверка ещё не завершена; true/false = результат пробы
   const [aiAvailableStatus, setAiAvailableStatus] = useState<boolean | null>(null);
+  // Журнал AI-обменов (план 007)
+  const [aiLogOn, setAiLogOn] = useState(false);
   const { signals, campaigns, clientDirection, balance, surveyStatus } =
     useAppState();
   const dispatch = useAppDispatch();
@@ -54,6 +60,7 @@ export function DevPanel() {
     }
     setProcessingMs(getProcessingDuration());
     setAiEnabled(isAiParserEnabled());
+    setAiLogOn(isAiLogEnabled());
     void fetchAiAvailability().then((ok) => {
       setAiAvailableStatus(ok);
     });
@@ -96,6 +103,26 @@ export function DevPanel() {
   function handleAiEnabledChange(checked: boolean) {
     setAiParserEnabled(checked);
     setAiEnabled(checked);
+  }
+
+  function handleAiLogChange(checked: boolean) {
+    setAiLogEnabled(checked);
+    setAiLogOn(checked);
+  }
+
+  function downloadAiLog() {
+    const entries = readAiLogEntries();
+    const blob = new Blob([JSON.stringify(entries, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    // ISO до секунд, filesystem-safe (заменяем : на -)
+    const ts = new Date().toISOString().slice(0, 19).replace(/:/g, "-");
+    a.download = `afina-ai-log-${ts}.json`;
+    a.href = url;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   function setSurveyCompleted(checked: boolean) {
@@ -277,6 +304,40 @@ export function DevPanel() {
             onCheckedChange={handleAiEnabledChange}
             aria-label="Переключить AI-парсер команд"
           />
+        </div>
+      </div>
+
+      <div className="mt-3 border-t border-[#1f1f1f] pt-3">
+        <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-0.5">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.04em] text-[#888]">
+              Журнал AI-обменов
+            </div>
+            <div className="text-[11px] text-[#666]">
+              {aiLogOn ? "пишется в localStorage" : "выключен"}
+            </div>
+          </div>
+          <Switch
+            checked={aiLogOn}
+            onCheckedChange={handleAiLogChange}
+            aria-label="Переключить журнал AI-обменов"
+          />
+        </div>
+        <div className="mt-2 flex gap-1.5">
+          <button
+            type="button"
+            onClick={downloadAiLog}
+            className="flex-1 rounded-md border border-[#2a2a2a] bg-[#1e1e1e] px-2 py-1.5 text-[11px] transition-colors hover:bg-[#242424]"
+          >
+            Выгрузить журнал
+          </button>
+          <button
+            type="button"
+            onClick={clearAiLog}
+            className="flex-1 rounded-md border border-[#2a2a2a] bg-[#1e1e1e] px-2 py-1.5 text-[11px] transition-colors hover:bg-[#242424]"
+          >
+            Очистить
+          </button>
         </div>
       </div>
 

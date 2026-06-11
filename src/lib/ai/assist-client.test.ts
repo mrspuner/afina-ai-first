@@ -3,9 +3,6 @@ import { setAiLogEnabled, readAiLogEntries } from "@/state/dev-config";
 import { fetchAssistMulti } from "./assist-client";
 import type { AssistRequest } from "./assist-contract";
 
-const AI_LOG_KEY = "afina.dev.aiLog";
-const AI_LOG_ENTRIES_KEY = "afina.dev.aiLog.entries";
-
 const MINIMAL_REQUEST: AssistRequest = {
   text: "тестовый запрос",
   history: [],
