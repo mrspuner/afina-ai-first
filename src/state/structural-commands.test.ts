@@ -3,6 +3,7 @@ import {
   parseStructuralCommands,
   applyOps,
   normalizeNodeRef,
+  diffChangedNodeIds,
 } from "./structural-commands";
 import type { WorkflowNode, WorkflowEdge } from "@/types/workflow";
 
@@ -406,5 +407,46 @@ describe("applyOps — ref normalization", () => {
     expect(r.applied).toHaveLength(1);
     const replaced = r.graph.nodes.find((n) => n.id === "sms1")!;
     expect(replaced.data.nodeType).toBe("email");
+  });
+});
+
+describe("diffChangedNodeIds", () => {
+  it("добавленная нода попадает в diff", () => {
+    const old = makeGraph();
+    // Добавляем email через applyOps, чтобы получить корректный новый граф.
+    const { graph: newGraph } = applyOps(old, [
+      { kind: "add", nodeType: "email", placement: { mode: "after", ref: "СМС" } },
+    ]);
+    const diff = diffChangedNodeIds(old, newGraph);
+    const emailNode = newGraph.nodes.find((n) => n.data.nodeType === "email")!;
+    expect(diff.has(emailNode.id)).toBe(true);
+  });
+
+  it("нода с изменённым nodeType (replace) попадает в diff", () => {
+    const old = makeGraph();
+    const { graph: newGraph } = applyOps(old, [
+      { kind: "replace", ref: "СМС", newType: "email" },
+    ]);
+    const diff = diffChangedNodeIds(old, newGraph);
+    // sms1 теперь стал email — nodeType изменился, должен быть в diff.
+    expect(diff.has("sms1")).toBe(true);
+  });
+
+  it("неизменённые ноды не попадают в diff", () => {
+    const old = makeGraph();
+    const { graph: newGraph } = applyOps(old, [
+      { kind: "add", nodeType: "email", placement: { mode: "after", ref: "СМС" } },
+    ]);
+    const diff = diffChangedNodeIds(old, newGraph);
+    // signal, sms1, success не изменились.
+    expect(diff.has("signal")).toBe(false);
+    expect(diff.has("sms1")).toBe(false);
+    expect(diff.has("success")).toBe(false);
+  });
+
+  it("пустой diff при идентичных графах", () => {
+    const g = makeGraph();
+    const diff = diffChangedNodeIds(g, g);
+    expect(diff.size).toBe(0);
   });
 });

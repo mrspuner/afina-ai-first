@@ -775,3 +775,33 @@ export function applyOps(
     skipped,
   };
 }
+
+/**
+ * Вычисляет множество id нод, которые изменились между двумя снапшотами графа.
+ * «Изменилась» = нода добавлена (новый id) ИЛИ её nodeType сменился (replace).
+ * Используется в apply(prev) цикла — чтобы зелёная подсветка отражала реальное
+ * состояние на момент применения, а не снапшот при получении команды.
+ */
+export function diffChangedNodeIds(
+  oldGraph: GraphState,
+  newGraph: GraphState
+): Set<string> {
+  const oldIds = new Set(oldGraph.nodes.map((n) => n.id));
+  const oldKindById = new Map(
+    oldGraph.nodes.map(
+      (n) => [n.id, (n.data as { nodeType: WorkflowNodeType }).nodeType] as const
+    )
+  );
+  const changedIds = new Set<string>();
+  for (const n of newGraph.nodes) {
+    if (!oldIds.has(n.id)) {
+      changedIds.add(n.id);
+    } else if (
+      oldKindById.get(n.id) !==
+      (n.data as { nodeType: WorkflowNodeType }).nodeType
+    ) {
+      changedIds.add(n.id);
+    }
+  }
+  return changedIds;
+}

@@ -14,13 +14,13 @@ import type {
   NodeParams,
   WorkflowNode,
   WorkflowEdge,
-  WorkflowNodeType,
 } from "@/types/workflow";
 import type { Signal, SignalType } from "@/state/app-state";
 import { createTemplate } from "@/state/workflow-templates";
 import { matchActions } from "@/state/node-actions";
 import {
   applyOps,
+  diffChangedNodeIds,
   type StructuralOp,
 } from "@/state/structural-commands";
 import { useChat } from "@/state/chat-context";
@@ -304,6 +304,10 @@ export function WorkflowView({
   const [cyclePhase, setCyclePhase] = useState<CyclePhase>("idle");
   const thinkDurationMsRef = useRef(3000);
   const cycleTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  // Хранит id последнего pending-сообщения чата, чтобы закрыть его при
+  // прерывании цикла новой командой (иначе «печатающие точки» остаются
+  // в чате навсегда).
+  const pendingReplyIdRef = useRef<string | null>(null);
   const REVEAL_MS = 600;
   const FLASH_MS = 1500;
 
@@ -312,7 +316,9 @@ export function WorkflowView({
   // and flashes changed nodes green, (3) returns to idle.
   function runCycle(opts: {
     durationMs: number;
-    apply: (prev: GraphState) => { graph: GraphState; changedIds: Set<string> };
+    // apply может вернуть finalReply — тогда он перекрывает верхнеуровневый
+    // параметр; полезно, когда текст ответа зависит от актуального prev.
+    apply: (prev: GraphState) => { graph: GraphState; changedIds: Set<string>; finalReply?: string | null };
     finalReply: string | null;
   }) {
     const { durationMs, apply, finalReply } = opts;
@@ -320,11 +326,18 @@ export function WorkflowView({
     cycleTimersRef.current.forEach(clearTimeout);
     cycleTimersRef.current = [];
 
+    // Если предыдущий цикл был прерван — закрываем его pending-сообщение,
+    // иначе оно зависнет в состоянии «печатает...» навсегда.
+    if (pendingReplyIdRef.current !== null) {
+      chat.updatePending(pendingReplyIdRef.current, "Прервано — выполняю новую команду.");
+    }
+
     setCyclePhase("thinking");
     // Ответ идёт обычным сообщением ассистента в общий чат (pending-точки →
     // текст), как любой другой ответ ИИ — не отдельной плашкой. История правок
     // остаётся в drawer, inline-подсказку показывает TransientReply.
     const replyId = chat.append({ role: "assistant", text: "", pending: true });
+    pendingReplyIdRef.current = replyId;
 
     let changedIdsAfter: Set<string> = new Set();
     const t1 = setTimeout(() => {
@@ -340,7 +353,10 @@ export function WorkflowView({
         return { ...result.graph, nodes: flashed };
       });
       setCyclePhase("reveal");
+      // finalReply из apply(prev) приоритетнее — он мог быть вычислен от
+      // актуального состояния графа в момент применения.
       chat.updatePending(replyId, finalReply ?? "Готово.");
+      pendingReplyIdRef.current = null;
     }, durationMs);
 
     const t2 = setTimeout(() => {
@@ -364,22 +380,12 @@ export function WorkflowView({
   useEffect(() => {
     if (!nodeCommand || nodeCommand.length === 0) return;
 
-    // Pre-compute patches against the current graph snapshot so the apply
-    // phase has a stable plan.
-    const plans = nodeCommand.map(({ nodeId, text }) => {
-      const currentNode = graph.nodes.find((x) => x.id === nodeId);
-      const { sublabel, paramsPatch } = deriveParamsPatch(
-        text,
-        currentNode?.data.params
-      );
-      return { nodeId, sublabel, paramsPatch };
-    });
-
-    const opCount = plans.length;
-    // 1 node = 3s, 2-3 = 4s, 4+ = 5s.
+    const opCount = nodeCommand.length;
+    // 1 node = 3s, 2-3 = 4s, 4+ = 5s. Зависит только от количества команд,
+    // не от содержимого графа — безопасно считать снаружи apply.
     const duration = opCount === 1 ? 3000 : opCount <= 3 ? 4000 : 5000;
 
-    const ids = plans.map((p) => p.nodeId).join(", ");
+    const ids = nodeCommand.map((c) => c.nodeId).join(", ");
     const finalReply =
       opCount === 1
         ? `Готово, обновил ноду`
@@ -388,6 +394,17 @@ export function WorkflowView({
     runCycle({
       durationMs: duration,
       apply: (prev) => {
+        // Патчи считаем от prev — чтобы не перезаписать более свежие params,
+        // которые пользователь мог изменить вручную пока цикл «думал».
+        const plans = nodeCommand.map(({ nodeId, text }) => {
+          const currentNode = prev.nodes.find((x) => x.id === nodeId);
+          const { sublabel, paramsPatch } = deriveParamsPatch(
+            text,
+            currentNode?.data.params
+          );
+          return { nodeId, sublabel, paramsPatch };
+        });
+
         let nodes = prev.nodes;
         const changedIds = new Set<string>();
         for (const p of plans) {
@@ -445,30 +462,32 @@ export function WorkflowView({
   useEffect(() => {
     if (!structuralOps || structuralOps.length === 0) return;
 
-    // Pre-compute the resulting graph + diff to know what to flash green.
-    const result = applyOps(graph, structuralOps);
-    const opCount = result.applied.length;
+    // Предварительный вызов applyOps нужен только для ранней ветки «все ops
+    // пропущены» и расчёта duration. Реальное применение — внутри apply(prev),
+    // чтобы не затереть ручные правки, сделанные за время «Думаю...».
+    const earlyResult = applyOps(graph, structuralOps);
+    const opCount = earlyResult.applied.length;
 
-    function buildReply(): string {
+    function buildReplyFrom(r: typeof earlyResult): string {
       const lines: string[] = [];
-      if (result.applied.length > 0) {
-        if (result.applied.length === 1) {
-          lines.push(result.applied[0].description);
+      if (r.applied.length > 0) {
+        if (r.applied.length === 1) {
+          lines.push(r.applied[0].description);
         } else {
           lines.push("Готово:");
-          for (const a of result.applied) lines.push(`• ${a.description}`);
+          for (const a of r.applied) lines.push(`• ${a.description}`);
         }
       }
-      if (result.skipped.length > 0) {
+      if (r.skipped.length > 0) {
         lines.push("Не выполнено:");
-        for (const s of result.skipped) lines.push(`• ${s.reason}`);
+        for (const s of r.skipped) lines.push(`• ${s.reason}`);
       }
       return lines.join("\n");
     }
 
     if (opCount === 0) {
       // All skipped — no cycle, just the explanation (обычное сообщение в чат).
-      const reply = buildReply();
+      const reply = buildReplyFrom(earlyResult);
       if (reply) chat.append({ role: "assistant", text: reply });
       onStructuralOpsHandled?.();
       return;
@@ -476,29 +495,20 @@ export function WorkflowView({
 
     const duration = opCount === 1 ? 3000 : opCount <= 3 ? 4000 : 5000;
 
-    // Diff old → new graph for green flash targets.
-    const oldIds = new Set(graph.nodes.map((n) => n.id));
-    const oldKindById = new Map(
-      graph.nodes.map(
-        (n) => [n.id, (n.data as { nodeType: WorkflowNodeType }).nodeType] as const
-      )
-    );
-    const changedIds = new Set<string>();
-    for (const n of result.graph.nodes) {
-      if (!oldIds.has(n.id)) {
-        changedIds.add(n.id);
-      } else if (
-        oldKindById.get(n.id) !==
-        (n.data as { nodeType: WorkflowNodeType }).nodeType
-      ) {
-        changedIds.add(n.id);
-      }
-    }
-
     runCycle({
       durationMs: duration,
-      apply: () => ({ graph: result.graph, changedIds }),
-      finalReply: buildReply() || null,
+      // apply получает актуальный prev — граф, который мог измениться за
+      // время «Думаю...» (например, пользователь отредактировал поле ноды).
+      // Пересчитываем ops от prev, чтобы не затереть эти правки.
+      apply: (prev) => {
+        const live = applyOps(prev, structuralOps);
+        return {
+          graph: live.graph,
+          changedIds: diffChangedNodeIds(prev, live.graph),
+          finalReply: buildReplyFrom(live) || null,
+        };
+      },
+      finalReply: buildReplyFrom(earlyResult) || null,
     });
 
     onStructuralOpsHandled?.();
