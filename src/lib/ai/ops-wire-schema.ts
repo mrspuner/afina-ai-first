@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { StructuralOp, Placement } from "@/state/structural-commands";
+import { rebuildNodeTypeSchema } from "./rebuild-schema";
 
 /**
  * Плоская wire-схема операции для function calling.
@@ -9,21 +10,7 @@ import type { StructuralOp, Placement } from "@/state/structural-commands";
  */
 export const wireOpSchema = z.object({
   kind: z.enum(["add", "remove", "replace"]),
-  nodeType: z
-    .enum([
-      "sms",
-      "email",
-      "push",
-      "ivr",
-      "wait",
-      "condition",
-      "split",
-      "merge",
-      "storefront",
-      "landing",
-      "success",
-      "end",
-    ])
+  nodeType: rebuildNodeTypeSchema
     .optional()
     .describe("Для add/replace: тип ноды"),
   ref: z
@@ -44,7 +31,10 @@ export const wireOpSchema = z.object({
     .string()
     .optional()
     .describe("Для placement between: вторая опорная нода"),
-  inlineParams: z.string().optional(),
+  inlineParams: z
+    .string()
+    .optional()
+    .describe("Краткие параметры ноды свободным текстом, например «через 2 дня»"),
 });
 export type WireOp = z.infer<typeof wireOpSchema>;
 
@@ -91,5 +81,6 @@ export function toStructuralOp(w: WireOp): StructuralOp | null {
 }
 
 export function toStructuralOps(wires: WireOp[]): StructuralOp[] {
+  // Невалидные wire-операции отбрасываются молча: частичное применение лучше отказа — модель часто портит одну операцию из списка. Отброшенное не попадает в skipped-репорт applyOps.
   return wires.map(toStructuralOp).filter((op): op is StructuralOp => op !== null);
 }
