@@ -35,7 +35,13 @@ import { useAppState, useAppDispatch } from "@/state/app-state-context";
 import { isOnWelcome } from "@/state/app-state";
 import { parseStructuralCommands } from "@/state/structural-commands";
 import { isAiParserEnabled } from "@/state/dev-config";
-import { fetchAiStructuralOps, fetchAiAvailability } from "@/lib/ai-workflow-client";
+import { fetchAssist, fetchAssistAvailability } from "@/lib/ai/assist-client";
+import { summarizeGraph } from "@/lib/ai/graph-summary";
+import { getCachedGraph } from "@/sections/campaigns/workflow-graph-cache";
+import { buildDataSummary } from "@/lib/ai/data-summary";
+import { validateAiGraph } from "@/state/ai-graph-validation";
+import { buildGraphFromSpec } from "@/lib/ai/rebuild-schema";
+import type { NodeParams } from "@/types/workflow";
 import { parseCampaignQuery } from "@/state/parse-campaign-filter";
 import { decideEnterAction, APPLY_ALL_COMMAND } from "@/state/prompt-bar-enter";
 import { selectPromptSuggestions } from "@/state/select-prompt-suggestions";
@@ -136,7 +142,7 @@ export const PromptComposer = forwardRef<PromptComposerHandle, PromptComposerPro
     // после размонтирования компонента.
     useEffect(() => {
       let alive = true;
-      void fetchAiAvailability().then((ok) => {
+      void fetchAssistAvailability().then((ok) => {
         if (alive) setAiAvailable(ok);
       });
       return () => {
@@ -346,18 +352,56 @@ export const PromptComposer = forwardRef<PromptComposerHandle, PromptComposerPro
         // бит-в-бит как до спайка, никаких асинхронных побочных эффектов.
         const useAi = isAiParserEnabled() && aiAvailable;
         if (useAi) {
-          // Асинхронная AI-попытка запускается без блокировки сабмита.
-          // nodes: [] — граф в composer недоступен (живёт только в workflow-view),
-          // это принятое ограничение спайка (зафиксировано в дизайн-доке).
+          // Асинхронная AI-попытка через оркестратор (план 005): граф и
+          // выбранная нода передаются в контексте — модель видит текущее
+          // состояние сценария и может сделать точечную правку.
+          const cached = view.kind === "workflow" ? getCachedGraph(view.campaign.id) : undefined;
+          const graph = cached ? summarizeGraph(cached) : undefined;
+          const selected = selectedWorkflowNode
+            ? {
+                id: selectedWorkflowNode.id,
+                label: selectedWorkflowNode.label,
+                nodeType: selectedWorkflowNode.nodeType ?? "default",
+              }
+            : undefined;
+          const history = chat.messages.filter((m) => !m.pending).slice(-8)
+            .map((m) => ({ role: m.role as "user" | "assistant", text: m.text }));
           void (async () => {
-            const ops = await fetchAiStructuralOps(rawText, []);
-            if (ops && ops.length > 0) {
-              // AI распознал структурные операции → применяем через тот же путь,
-              // что и regex (workflow_structural_commands_submit).
-              dispatch({ type: "workflow_structural_commands_submit", ops });
+            const result = await fetchAssist({
+              text: rawText,
+              history,
+              context: {
+                screen: "workflow",
+                dataSummary: buildDataSummary({ campaigns: state.campaigns, signals: state.signals }),
+                graph,
+                selectedNode: selected,
+                undoAvailable: state.aiUndoAvailable,
+              },
+            });
+            if (result?.kind === "workflow-ops" && result.ops.length > 0) {
+              dispatch({ type: "workflow_structural_commands_submit", ops: result.ops });
+            } else if (result?.kind === "rebuild") {
+              const signalLabel = cached?.nodes.find((n) => n.data.nodeType === "signal")?.data.label ?? "Сигнал";
+              const built = buildGraphFromSpec(result.spec, { label: signalLabel });
+              const check = validateAiGraph(built);
+              if (check.ok) {
+                dispatch({ type: "workflow_rebuild_submit", ...built, assumptions: result.spec.assumptions });
+              } else {
+                chat.append({ role: "assistant", text: "Не получилось собрать корректную цепочку — попробуйте описать иначе." });
+              }
+            } else if (result?.kind === "node-params") {
+              // Сервер не может строго типизировать union по kind ноды; редьюсер
+              // мерджит patch поверх существующих params, невалидные ключи безвредны.
+              dispatch({ type: "workflow_node_field_set", nodeId: result.nodeId, patch: result.patch as Partial<NodeParams> });
+              chat.append({ role: "assistant", text: result.confirmation });
+            } else if (result?.kind === "undo") {
+              dispatch({ type: "workflow_ai_undo_request" });
+            } else if (result?.kind === "answer") {
+              chat.append({ role: "assistant", text: result.text });
+            } else if (result?.kind === "clarify") {
+              chat.append({ role: "assistant", text: result.questions.join(" ") });
             } else {
-              // AI вернул null / пустой список (таймаут, ошибка, квота) →
-              // fallback на легаси-диспатч.
+              // Легаси-фоллбек: null / none / неожиданный kind
               dispatch({ type: "workflow_command_submit", text: rawText });
             }
           })();
