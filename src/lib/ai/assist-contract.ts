@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { structuralOpSchema } from "@/lib/ai-workflow-schema";
 
 /** Сообщение истории сессии (последние N из chat-context). */
 export const historyMessageSchema = z.object({
@@ -7,10 +8,28 @@ export const historyMessageSchema = z.object({
 });
 export type HistoryMessage = z.infer<typeof historyMessageSchema>;
 
+/** Краткое описание ноды графа — без params (privacy-граница и токен-бюджет). */
+export const graphNodeSummarySchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  nodeType: z.string(),
+  sublabel: z.string().optional(),
+});
+export type GraphNodeSummary = z.infer<typeof graphNodeSummarySchema>;
+
 /** Контекст момента — собирает клиент, расширяется планами 005/006. */
 export const assistContextSchema = z.object({
   screen: z.string(), // "section:Статистика" | "workflow" | "guided-signal:2" | ...
   dataSummary: z.string(), // компактный текст из data-summary.ts
+  /** Компактная сводка текущего графа воркфлоу (план 005). */
+  graph: z.object({
+    nodes: z.array(graphNodeSummarySchema),
+    edges: z.array(z.object({ from: z.string(), to: z.string() })),
+  }).optional(),
+  /** Выбранная нода (если пользователь кликнул на ноду). */
+  selectedNode: graphNodeSummarySchema.optional(),
+  /** Есть ли доступное действие undo. */
+  undoAvailable: z.boolean().optional(),
 });
 export type AssistContext = z.infer<typeof assistContextSchema>;
 
@@ -26,5 +45,16 @@ export const assistResultSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("answer"), text: z.string() }),
   z.object({ kind: z.literal("clarify"), questions: z.array(z.string()).min(1).max(2) }),
   z.object({ kind: z.literal("none") }), // модель не вызвала инструмент
+  /** Структурные операции над графом (план 005). */
+  z.object({ kind: z.literal("workflow-ops"), ops: z.array(structuralOpSchema) }),
+  /** Патч параметров конкретной ноды (план 005). */
+  z.object({
+    kind: z.literal("node-params"),
+    nodeId: z.string(),
+    patch: z.record(z.string(), z.unknown()), // Partial<NodeParams>; точную форму гарантирует сервер
+    confirmation: z.string(),
+  }),
+  /** Откат последнего действия (план 005). */
+  z.object({ kind: z.literal("undo") }),
 ]);
 export type AssistResult = z.infer<typeof assistResultSchema>;
