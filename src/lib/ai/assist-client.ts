@@ -4,17 +4,47 @@ import {
   type AssistResult,
 } from "./assist-contract";
 
+/**
+ * Кэш результата пробы: храним промис, а не само значение, чтобы повторные
+ * вызовы до завершения запроса тоже получали один общий промис (без дублирующих
+ * fetch'ей). При ошибке кэш не сохраняется — следующий вызов повторит попытку.
+ */
 let availabilityCache: Promise<boolean> | null = null;
 
-/** GET-проба ключа; кэш на page lifetime (как fetchAiAvailability спайка). */
+/**
+ * Проверить, доступен ли AI-оркестратор (есть ли ключ API на сервере).
+ * Результат кэшируется на время жизни страницы — повторные вызовы возвращают
+ * тот же промис без повторного запроса к серверу.
+ * При любой ошибке (сеть, не-2xx, невалидный JSON) → false (AI недоступен).
+ */
 export function fetchAssistAvailability(): Promise<boolean> {
-  if (!availabilityCache) {
-    availabilityCache = fetch("/api/ai/assist")
-      .then((r) => (r.ok ? r.json() : { available: false }))
-      .then((j: { available?: boolean }) => Boolean(j.available))
-      .catch(() => false);
-  }
-  return availabilityCache;
+  if (availabilityCache !== null) return availabilityCache;
+
+  // Запускаем единственный запрос; при ошибке кэш сбрасывается, чтобы
+  // следующий вызов мог повторить попытку.
+  const req = fetch("/api/ai/assist")
+    .then(async (r) => {
+      if (!r.ok) return false;
+      const json = (await r.json()) as unknown;
+      if (
+        typeof json === "object" &&
+        json !== null &&
+        "available" in json &&
+        typeof (json as Record<string, unknown>).available === "boolean"
+      ) {
+        return (json as { available: boolean }).available;
+      }
+      return false;
+    })
+    .catch(() => false)
+    .then((result) => {
+      // Не кэшируем false — разрешаем повторную попытку при следующем вызове.
+      if (!result) availabilityCache = null;
+      return result;
+    });
+
+  availabilityCache = req;
+  return req;
 }
 
 /**
