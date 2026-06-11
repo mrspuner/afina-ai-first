@@ -44,3 +44,27 @@ export function setProcessingDuration(ms: number): void {
   }
   window.localStorage.setItem(DEV_PROCESSING_KEY, String(ms));
 }
+
+// ── AI-парсер (спайк 002) ─────────────────────────────────────────────────────
+// Флаг переключает обработку свободного текста в prompt-composer:
+//   off (дефолт) → только regex-парсер, поведение как до спайка.
+//   on            → сначала вызывается /api/ai/workflow-ops; при ошибке,
+//                   таймауте или пустом ответе — fallback на тот же regex.
+// Флаг выключен по умолчанию, чтобы спайк не ломал штатный путь
+// и все e2e-тесты проходили без ключа API.
+
+export const DEV_AI_PARSER_KEY = "afina.dev.aiParser";
+
+/**
+ * Включён ли реальный AI-парсер структурных команд.
+ * SSR-safe: возвращает false на сервере (нет localStorage).
+ */
+export function isAiParserEnabled(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.localStorage.getItem(DEV_AI_PARSER_KEY) === "on";
+}
+
+export function setAiParserEnabled(enabled: boolean): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(DEV_AI_PARSER_KEY, enabled ? "on" : "off");
+}

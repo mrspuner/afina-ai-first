@@ -34,6 +34,8 @@ import { useWelcomeChat } from "@/sections/welcome/welcome-chat-context";
 import { useAppState, useAppDispatch } from "@/state/app-state-context";
 import { isOnWelcome } from "@/state/app-state";
 import { parseStructuralCommands } from "@/state/structural-commands";
+import { isAiParserEnabled } from "@/state/dev-config";
+import { fetchAiStructuralOps } from "@/lib/ai-workflow-client";
 import { parseCampaignQuery } from "@/state/parse-campaign-filter";
 import { decideEnterAction, APPLY_ALL_COMMAND } from "@/state/prompt-bar-enter";
 import { selectPromptSuggestions } from "@/state/select-prompt-suggestions";
@@ -319,7 +321,31 @@ export const PromptComposer = forwardRef<PromptComposerHandle, PromptComposerPro
         dispatch({ type: "workflow_node_command_submit", commands: nodeCommands });
       }
       if (structural.ops.length === 0 && nodeCommands.length === 0 && rawText.trim()) {
-        dispatch({ type: "workflow_command_submit", text: rawText });
+        // Флаг-гейтная AI-ветка (спайк 002): при включённом флаге пробуем
+        // разобрать команду через реальный LLM вместо немедленного диспатча.
+        // Сообщение пользователя в чат не эхируется в этой ветке ни до, ни
+        // после — такова текущая легаси-механика (workflow_command_submit /
+        // workflow_view обрабатывают её самостоятельно). Поведение сохранено.
+        if (isAiParserEnabled()) {
+          // Асинхронная AI-попытка запускается без блокировки сабмита.
+          // nodes: [] — граф в composer недоступен (живёт только в workflow-view),
+          // это принятое ограничение спайка (зафиксировано в дизайн-доке).
+          void (async () => {
+            const ops = await fetchAiStructuralOps(rawText, []);
+            if (ops && ops.length > 0) {
+              // AI распознал структурные операции → применяем через тот же путь,
+              // что и regex (workflow_structural_commands_submit).
+              dispatch({ type: "workflow_structural_commands_submit", ops });
+            } else {
+              // AI вернул null / пустой список (таймаут, ошибка, квота) →
+              // fallback на легаси-диспатч, как если бы флаг был выключен.
+              dispatch({ type: "workflow_command_submit", text: rawText });
+            }
+          })();
+        } else {
+          // Флаг выключен (дефолт) — поведение бит-в-бит как до спайка.
+          dispatch({ type: "workflow_command_submit", text: rawText });
+        }
       }
       resetEditor();
     }
