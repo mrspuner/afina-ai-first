@@ -4,6 +4,7 @@ import {
   type AssistRequest,
   type AssistResult,
 } from "./assist-contract";
+import { appendAiLogEntry, type AiLogEntry } from "@/state/dev-config";
 
 /**
  * Кэш результата пробы: храним промис, а не само значение, чтобы повторные
@@ -48,6 +49,24 @@ export function fetchAssistAvailability(): Promise<boolean> {
   return req;
 }
 
+// ── Журнал AI-обменов (план 007) ─────────────────────────────────────────────
+
+function outcomeOf(results: AssistResult[]): AiLogEntry["outcome"] {
+  if (results.some((r) => !["answer", "clarify", "none"].includes(r.kind))) return "applied";
+  if (results.some((r) => r.kind === "clarify")) return "clarify";
+  if (results.some((r) => r.kind === "answer")) return "answer";
+  return "fallback";
+}
+
+function logExchange(text: string, results: AssistResult[] | null): void {
+  appendAiLogEntry({
+    at: new Date().toISOString(),
+    text,
+    resultKinds: results ? results.map((r) => r.kind) : [],
+    outcome: results ? outcomeOf(results) : "fallback",
+  });
+}
+
 /**
  * Общий хелпер: POST /api/ai/assist и вернуть сырой JSON или null при сбое.
  */
@@ -88,18 +107,29 @@ export async function fetchAssist(req: AssistRequest): Promise<AssistResult | nu
 export async function fetchAssistMulti(req: AssistRequest): Promise<AssistResult[] | null> {
   try {
     const json = await postAssist(req);
-    if (json === null) return null;
+    if (json === null) {
+      logExchange(req.text, null);
+      return null;
+    }
 
     // Новый формат: { results: [...] }
     const multi = assistResponseSchema.safeParse(json);
-    if (multi.success) return multi.data.results;
+    if (multi.success) {
+      logExchange(req.text, multi.data.results);
+      return multi.data.results;
+    }
 
     // Старый формат: одиночный AssistResult
     const single = assistResultSchema.safeParse(json);
-    if (single.success) return [single.data];
+    if (single.success) {
+      logExchange(req.text, [single.data]);
+      return [single.data];
+    }
 
+    logExchange(req.text, null);
     return null;
   } catch {
+    logExchange(req.text, null);
     return null;
   }
 }
