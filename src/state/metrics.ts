@@ -215,6 +215,28 @@ export function computeFunnel(rng: () => number, baseSends: number): FunnelNumbe
   return { sends, clicks, actions, holds, approves, rejects, expensesUsd, incomeUsd };
 }
 
+/** Масштабирует воронку долей прошедшего дня (0..1). Аддитивные целочисленные
+ *  поля округляются вниз — чтобы рост по мере увеличения доли был монотонным.
+ *  rejects пересчитывается из actions/holds/approves после округления, чтобы
+ *  не разъезжался внутренний баланс (actions === holds + approves + rejects). */
+export function scaleFunnel(n: FunnelNumbers, fraction: number): FunnelNumbers {
+  const f = Math.max(0, Math.min(1, fraction));
+  const actions = Math.floor(n.actions * f);
+  const holds = Math.floor(n.holds * f);
+  const approves = Math.floor(n.approves * f);
+  return {
+    sends: Math.floor(n.sends * f),
+    clicks: Math.floor(n.clicks * f),
+    actions,
+    holds,
+    approves,
+    // Пересчитываем rejects из остатка — так же, как computeFunnel строит их.
+    rejects: Math.max(0, actions - holds - approves),
+    expensesUsd: n.expensesUsd * f,
+    incomeUsd: n.incomeUsd * f,
+  };
+}
+
 /** Sums two funnels field-by-field. Additive metrics roll up; rates are
  *  derived later from the aggregate, never summed. */
 export function addFunnel(a: FunnelNumbers, b: FunnelNumbers): FunnelNumbers {

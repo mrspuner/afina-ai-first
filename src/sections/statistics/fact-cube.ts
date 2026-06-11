@@ -20,6 +20,7 @@ import {
   computeFunnel,
   EMPTY_FUNNEL,
   rngFor,
+  scaleFunnel,
   seededInt,
   type FunnelNumbers,
 } from "@/state/metrics";
@@ -265,10 +266,27 @@ function distribute(total: number, weights: number[]): number[] {
 // Fact construction
 // ---------------------------------------------------------------------------
 
+/** Доля прошедшего дня (0..1) на момент `now`. Нижний порог 0.02 — чтобы
+ *  утреннее демо не показывало нули; верхний порог 1 — в конце дня.
+ *  Используем dateOnly (midnight local) для начала дня — тот же паттерн,
+ *  что и в campaignWindow и eachDay. */
+function intradayFraction(now: Date): number {
+  const startOfDay = dateOnly(now); // midnight local
+  const fraction = (now.getTime() - startOfDay.getTime()) / 86_400_000;
+  return Math.max(0.02, Math.min(1, fraction));
+}
+
+/** Ключ «сегодняшнего» дня — строим через dateOnly, чтобы совпадал
+ *  с ключами ячеек куба (те тоже создаются через dateOnly → midnight local). */
+function todayKey(now: Date): string {
+  return dateOnly(now).toISOString().slice(0, 10);
+}
+
 function buildCampaignFacts(
   c: CampaignLike,
   signalCount: number | undefined,
   days: Date[],
+  now: Date,
 ): Fact[] {
   const base = campaignBaseSends(c.id, signalCount);
   if (base <= 0 || days.length === 0) return [];
@@ -305,6 +323,11 @@ function buildCampaignFacts(
   }
   const sends = distribute(base, cells.map((x) => x.weight));
 
+  // Ключ «сегодня» и доля прошедшего дня — используем для масштабирования
+  // фактов текущего дня; прошлые дни остаются полными и неизменными.
+  const today = todayKey(now);
+  const fraction = intradayFraction(now);
+
   const facts: Fact[] = [];
   cells.forEach((cell, i) => {
     const s = sends[i];
@@ -314,9 +337,13 @@ function buildCampaignFacts(
     const pickRng = rngFor("fact-dims", c.id, dayKey, cell.channel.key);
     const pick = (arr: DimValue[]): DimValue =>
       arr[Math.floor(pickRng() * arr.length)];
+    // Сегодняшние факты масштабируем долей прошедшего дня — числа монотонно
+    // растут в течение сессии. Прошлые дни детерминированы и не меняются.
+    const rawMetrics = computeFunnel(metricRng, s);
+    const metrics = dayKey === today ? scaleFunnel(rawMetrics, fraction) : rawMetrics;
     facts.push({
       date: cell.day,
-      metrics: computeFunnel(metricRng, s),
+      metrics,
       dims: {
         campaigns: campaignDim,
         scenarios: scenarioDim,
@@ -374,7 +401,7 @@ export function buildFacts(
     const span = intersect(window, period);
     if (!span) continue; // campaign not active during this period → no rows
     const days = eachDay(span);
-    facts.push(...buildCampaignFacts(c, countById.get(c.signalId), days));
+    facts.push(...buildCampaignFacts(c, countById.get(c.signalId), days, now));
   }
   factCache = { key, facts };
   return facts;

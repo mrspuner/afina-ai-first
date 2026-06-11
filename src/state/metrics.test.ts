@@ -8,6 +8,7 @@ import {
   formatFunnel,
   makeRng,
   recommendBudget,
+  scaleFunnel,
   segmentsForSignal,
   signalCountRange,
 } from "./metrics";
@@ -71,6 +72,51 @@ describe("campaignBaseSends", () => {
   it("is 0 without a signal count", () => {
     expect(campaignBaseSends("cmp_1", 0)).toBe(0);
     expect(campaignBaseSends("cmp_1", undefined)).toBe(0);
+  });
+});
+
+describe("scaleFunnel", () => {
+  // Базовая воронка для всех кейсов (фиксированный seed).
+  const base = computeFunnel(makeRng(42), 5000);
+
+  it("f=1 возвращает воронку без изменений (целочисленные поля)", () => {
+    const scaled = scaleFunnel(base, 1);
+    expect(scaled.sends).toBe(base.sends);
+    expect(scaled.clicks).toBe(base.clicks);
+    expect(scaled.actions).toBe(base.actions);
+    expect(scaled.holds).toBe(base.holds);
+    expect(scaled.approves).toBe(base.approves);
+  });
+
+  it("f=0 обнуляет все поля воронки", () => {
+    const scaled = scaleFunnel(base, 0);
+    expect(scaled.sends).toBe(0);
+    expect(scaled.clicks).toBe(0);
+    expect(scaled.actions).toBe(0);
+    expect(scaled.expensesUsd).toBe(0);
+    expect(scaled.incomeUsd).toBe(0);
+  });
+
+  it("монотонность: каждое поле при f1 ≤ каждому полю при f2 (f1 < f2)", () => {
+    const f1 = scaleFunnel(base, 0.3);
+    const f2 = scaleFunnel(base, 0.7);
+    expect(f2.sends).toBeGreaterThanOrEqual(f1.sends);
+    expect(f2.clicks).toBeGreaterThanOrEqual(f1.clicks);
+    expect(f2.actions).toBeGreaterThanOrEqual(f1.actions);
+    expect(f2.expensesUsd).toBeGreaterThanOrEqual(f1.expensesUsd);
+    expect(f2.incomeUsd).toBeGreaterThanOrEqual(f1.incomeUsd);
+  });
+
+  it("инвариант: rejects === actions - holds - approves после масштабирования", () => {
+    for (const f of [0, 0.25, 0.5, 0.75, 1]) {
+      const s = scaleFunnel(base, f);
+      expect(s.rejects).toBe(Math.max(0, s.actions - s.holds - s.approves));
+    }
+  });
+
+  it("кламп: f>1 эквивалентен f=1; f<0 эквивалентен f=0", () => {
+    expect(scaleFunnel(base, 2)).toEqual(scaleFunnel(base, 1));
+    expect(scaleFunnel(base, -5)).toEqual(scaleFunnel(base, 0));
   });
 });
 

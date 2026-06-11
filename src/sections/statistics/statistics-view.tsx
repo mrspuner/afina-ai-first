@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 import { Fragment, useEffect, useMemo, useReducer, useState } from "react";
 
+import { useNowTick } from "@/hooks/use-now-tick";
+
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -141,6 +143,11 @@ export function StatisticsView({ campaignId }: { campaignId?: string } = {}) {
   );
   const noData = !hasLaunchedCampaign;
 
+  // Тик обновляет now каждые 15 с — куб пересчитывает сегодняшние факты
+  // по доле прошедшего дня; числа монотонно растут в течение сессии.
+  // Хук вызывается безусловно (до ранних return) — правило rules-of-hooks.
+  const now = useNowTick();
+
   const [templates, setTemplates] = useState<ReportTemplate[]>(
     () => BUILTIN_TEMPLATES,
   );
@@ -178,9 +185,11 @@ export function StatisticsView({ campaignId }: { campaignId?: string } = {}) {
   // Строки — group-by по кубу фактов реальных кампаний/сигналов. Фильтрация (в
   // т.ч. скоуп на одну кампанию из карточки) идёт через живые условия поиска
   // (applied.conditions), которые применяет generateRows.
+  // now тикает раз в 15 с → куб пересчитывает сегодняшние факты по
+  // внутридневной доле; прошлые дни не меняются.
   const rows = useMemo(
-    () => generateRows(applied, { campaigns, signals }),
-    [applied, campaigns, signals],
+    () => generateRows(applied, { campaigns, signals }, { now }),
+    [applied, campaigns, signals, now],
   );
   const resolvedRange = useMemo(
     () => resolvePeriod(applied.period),
