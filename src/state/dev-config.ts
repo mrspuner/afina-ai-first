@@ -49,11 +49,11 @@ export function setProcessingDuration(ms: number): void {
 // Флаг управляет режимом обработки свободного текста в prompt-composer.
 //
 // Дефолт теперь AUTO-ON: приложение пробует AI всегда, когда ключ API
-// присутствует на сервере (проверяется через GET /api/ai/workflow-ops).
+// присутствует на сервере (проверяется через GET /api/ai/assist).
 // При ошибке / таймауте / пустом ответе — fallback на regex (как раньше).
 //
 // Безопасность e2e/CI обеспечивается через пробу доступности:
-//   нет ключа → fetchAiAvailability() = false → prompt-composer идёт
+//   нет ключа → fetchAssistAvailability() = false → prompt-composer идёт
 //   напрямую в синхронный dispatch без await — поведение бит-в-бит как до спайка.
 //
 // Переключатель в дев-панели позволяет ПРИНУДИТЕЛЬНО отключить AI

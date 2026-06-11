@@ -18,7 +18,7 @@ import {
   readAiLogEntries,
   clearAiLog,
 } from "@/state/dev-config";
-import { fetchAiAvailability } from "@/lib/ai-workflow-client";
+import { fetchAssistAvailability } from "@/lib/ai/assist-client";
 
 const STORAGE_KEY = "afina.dev.preset";
 const DIRECTION_KEY = "afina.dev.direction";
@@ -61,7 +61,7 @@ export function DevPanel() {
     setProcessingMs(getProcessingDuration());
     setAiEnabled(isAiParserEnabled());
     setAiLogOn(isAiLogEnabled());
-    void fetchAiAvailability().then((ok) => {
+    void fetchAssistAvailability().then((ok) => {
       setAiAvailableStatus(ok);
     });
   }, [dispatch]);
