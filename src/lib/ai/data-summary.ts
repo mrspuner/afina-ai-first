@@ -1,6 +1,6 @@
 import type { Campaign, Signal } from "@/state/app-state";
 import type { FunnelNumbers } from "@/state/metrics";
-import { buildFacts, aggregate } from "@/sections/statistics/fact-cube";
+import { buildFacts, aggregate, groupFacts } from "@/sections/statistics/fact-cube";
 
 /**
  * Компактная текстовая сводка реального стейта для промпта оркестратора.
@@ -50,6 +50,8 @@ export function statsLinesFromFunnel(total: FunnelNumbers): string[] {
  * Период: с начала текущего года по now.
  * Использует реальные count сигналов — campaignBaseSends опирается на них;
  * без count > 0 fact-cube даёт нулевые агрегаты.
+ * Включает до 5 строк топ-кампаний по доходу — чтобы оркестратор мог
+ * ответить «какая кампания принесла больше всего?» без галлюцинаций.
  * Используется в buildDataSummary чтобы не дублировать логику в потребителях.
  */
 export function buildStatsLines(campaigns: Campaign[], signals: Signal[], now: Date): string[] {
@@ -61,5 +63,22 @@ export function buildStatsLines(campaigns: Campaign[], signals: Signal[], now: D
   };
   const facts = buildFacts({ campaigns, signals: signalStubs }, period, { now });
   const total = aggregate(facts);
-  return statsLinesFromFunnel(total);
+  const lines = statsLinesFromFunnel(total);
+
+  // Per-campaign breakdown: top-5 by income so the model can answer
+  // «какая кампания принесла больше всего?» with real numbers.
+  const campaignGroups = groupFacts(facts, "campaigns");
+  const top5 = campaignGroups
+    .map((g) => ({ label: g.label, metrics: aggregate(g.facts) }))
+    .sort((a, b) => b.metrics.incomeUsd - a.metrics.incomeUsd)
+    .slice(0, 5);
+  for (const { label, metrics } of top5) {
+    if (metrics.incomeUsd > 0 || metrics.expensesUsd > 0) {
+      lines.push(
+        `- кампания "${label}": доход $${Math.round(metrics.incomeUsd)}, расход $${Math.round(metrics.expensesUsd)}`
+      );
+    }
+  }
+
+  return lines;
 }

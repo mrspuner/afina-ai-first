@@ -64,9 +64,9 @@ describe("buildStatsLines", () => {
     },
   ];
 
-  it("возвращает ровно 2 строки", () => {
+  it("возвращает не менее 2 строк (общие агрегаты + per-campaign)", () => {
     const lines = buildStatsLines(campaigns, signals, now);
-    expect(lines).toHaveLength(2);
+    expect(lines.length).toBeGreaterThanOrEqual(2);
   });
 
   it("обе строки содержат числа", () => {
@@ -97,5 +97,18 @@ describe("buildStatsLines", () => {
   it("пустой список кампаний — нули в строках", () => {
     const lines = buildStatsLines([], [], now);
     expect(lines[0]).toContain("отправок 0");
+  });
+
+  it("при активной кампании с ненулевым сигналом есть строка с именем кампании и доходом > 0", () => {
+    const lines = buildStatsLines(campaigns, signals, now);
+    // Строки после первых двух — per-campaign breakdown
+    const campaignLines = lines.slice(2);
+    expect(campaignLines.length).toBeGreaterThan(0);
+    // Хотя бы одна строка содержит «Ипотека-лето» с доходом > 0
+    const ipotekaLine = campaignLines.find((l) => l.includes("Ипотека-лето"));
+    expect(ipotekaLine).toBeDefined();
+    const match = ipotekaLine!.match(/доход \$(\d+)/);
+    expect(match).not.toBeNull();
+    expect(Number(match![1])).toBeGreaterThan(0);
   });
 });
