@@ -24,6 +24,7 @@ import {
   type StructuralOp,
 } from "@/state/structural-commands";
 import { useChat } from "@/state/chat-context";
+import { useAppState, useAppDispatch } from "@/state/app-state-context";
 import { getCachedGraph, setCachedGraph } from "./workflow-graph-cache";
 
 interface GraphState {
@@ -267,6 +268,8 @@ export function WorkflowView({
   onPaneClick,
 }: WorkflowViewProps) {
   const chat = useChat();
+  const state = useAppState();
+  const dispatch = useAppDispatch();
   // Rehydrate from the durable cache so manual edits survive the unmount on
   // launch (workflow → campaign) and navigation; fall back to the template.
   const [graph, setGraph] = useState<GraphState>(
@@ -280,6 +283,8 @@ export function WorkflowView({
   const [unknownCmd, setUnknownCmd] = useState<string | null>(null);
   const unknownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const graphRef = useRef<HTMLDivElement>(null);
+  // Снапшот графа до последней AI-операции — для отката одним шагом (спека §8).
+  const aiSnapshotRef = useRef<GraphState | null>(null);
 
   useEffect(() => {
     if (!pendingCommand) return;
@@ -501,6 +506,7 @@ export function WorkflowView({
       // время «Думаю...» (например, пользователь отредактировал поле ноды).
       // Пересчитываем ops от prev, чтобы не затереть эти правки.
       apply: (prev) => {
+        aiSnapshotRef.current = prev;
         const live = applyOps(prev, structuralOps);
         return {
           graph: live.graph,
@@ -512,8 +518,44 @@ export function WorkflowView({
     });
 
     onStructuralOpsHandled?.();
+    dispatch({ type: "workflow_ai_undo_availability", available: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [structuralOps]);
+
+  useEffect(() => {
+    const rebuild = state.workflowRebuild;
+    if (!rebuild) return;
+
+    dispatch({ type: "workflow_rebuild_handled" });
+
+    runCycle({
+      durationMs: 5000,
+      apply: (prev) => {
+        aiSnapshotRef.current = prev;
+        return {
+          graph: { nodes: rebuild.nodes, edges: rebuild.edges },
+          changedIds: new Set(rebuild.nodes.map((n) => n.id)),
+          finalReply: `Собрал заново. ${rebuild.assumptions}`,
+        };
+      },
+      finalReply: `Собрал заново. ${rebuild.assumptions}`,
+    });
+
+    dispatch({ type: "workflow_ai_undo_availability", available: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.workflowRebuild]);
+
+  useEffect(() => {
+    if (!state.workflowAiUndoRequested) return;
+    dispatch({ type: "workflow_ai_undo_handled" });
+    const snapshot = aiSnapshotRef.current;
+    if (!snapshot) return;
+    aiSnapshotRef.current = null;
+    setGraph(snapshot);
+    dispatch({ type: "workflow_ai_undo_availability", available: false });
+    chat.append({ role: "assistant", text: "Вернул граф к состоянию до последней правки." });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.workflowAiUndoRequested]);
 
   useEffect(() => {
     const timers = cycleTimersRef;
@@ -527,6 +569,13 @@ export function WorkflowView({
     return () => {
       if (unknownTimerRef.current) clearTimeout(unknownTimerRef.current);
     };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      dispatch({ type: "workflow_ai_undo_availability", available: false });
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
