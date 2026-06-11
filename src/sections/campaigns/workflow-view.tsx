@@ -507,6 +507,7 @@ export function WorkflowView({
       // Пересчитываем ops от prev, чтобы не затереть эти правки.
       apply: (prev) => {
         aiSnapshotRef.current = prev;
+        dispatch({ type: "workflow_ai_undo_availability", available: true });
         const live = applyOps(prev, structuralOps);
         return {
           graph: live.graph,
@@ -518,7 +519,6 @@ export function WorkflowView({
     });
 
     onStructuralOpsHandled?.();
-    dispatch({ type: "workflow_ai_undo_availability", available: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [structuralOps]);
 
@@ -532,6 +532,7 @@ export function WorkflowView({
       durationMs: 5000,
       apply: (prev) => {
         aiSnapshotRef.current = prev;
+        dispatch({ type: "workflow_ai_undo_availability", available: true });
         return {
           graph: { nodes: rebuild.nodes, edges: rebuild.edges },
           changedIds: new Set(rebuild.nodes.map((n) => n.id)),
@@ -540,8 +541,6 @@ export function WorkflowView({
       },
       finalReply: `Собрал заново. ${rebuild.assumptions}`,
     });
-
-    dispatch({ type: "workflow_ai_undo_availability", available: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.workflowRebuild]);
 
@@ -549,7 +548,10 @@ export function WorkflowView({
     if (!state.workflowAiUndoRequested) return;
     dispatch({ type: "workflow_ai_undo_handled" });
     const snapshot = aiSnapshotRef.current;
-    if (!snapshot) return;
+    if (!snapshot) {
+      dispatch({ type: "workflow_ai_undo_availability", available: false });
+      return;
+    }
     aiSnapshotRef.current = null;
     setGraph(snapshot);
     dispatch({ type: "workflow_ai_undo_availability", available: false });
