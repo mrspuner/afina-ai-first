@@ -51,29 +51,51 @@ describe("buildStatsLines", () => {
     },
   ];
 
+  const signals = [
+    {
+      id: "s1", type: "Первая сделка" as const, name: "Ипотека",
+      count: 1200, segments: { max: 100, high: 300, mid: 500, low: 300 },
+      createdAt: "2026-01-01", updatedAt: "2026-01-01",
+    },
+    {
+      id: "s2", type: "Апсейл" as const, name: "Автокредит",
+      count: 800, segments: { max: 80, high: 200, mid: 320, low: 200 },
+      createdAt: "2026-02-01", updatedAt: "2026-02-01",
+    },
+  ];
+
   it("возвращает ровно 2 строки", () => {
-    const lines = buildStatsLines(campaigns, now);
+    const lines = buildStatsLines(campaigns, signals, now);
     expect(lines).toHaveLength(2);
   });
 
   it("обе строки содержат числа", () => {
-    const lines = buildStatsLines(campaigns, now);
+    const lines = buildStatsLines(campaigns, signals, now);
     expect(lines[0]).toMatch(/\d+/);
     expect(lines[1]).toMatch(/\d+/);
   });
 
   it("первая строка упоминает отправки", () => {
-    const lines = buildStatsLines(campaigns, now);
+    const lines = buildStatsLines(campaigns, signals, now);
     expect(lines[0]).toContain("отправок");
   });
 
   it("вторая строка упоминает деньги", () => {
-    const lines = buildStatsLines(campaigns, now);
+    const lines = buildStatsLines(campaigns, signals, now);
     expect(lines[1]).toContain("доход");
   });
 
+  it("ненулевые сигналы дают ненулевые отправки в запущенных кампаниях", () => {
+    // count=1200 → campaignBaseSends > 0 → sends > 0
+    const lines = buildStatsLines(campaigns, signals, now);
+    // первая строка: "- всего: отправок N, ..."
+    const match = lines[0].match(/отправок (\d+)/);
+    expect(match).not.toBeNull();
+    expect(Number(match![1])).toBeGreaterThan(0);
+  });
+
   it("пустой список кампаний — нули в строках", () => {
-    const lines = buildStatsLines([], now);
+    const lines = buildStatsLines([], [], now);
     expect(lines[0]).toContain("отправок 0");
   });
 });

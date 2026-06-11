@@ -365,7 +365,7 @@ export function useChatSubmit(): { submit: (payload: ChatSubmitPayload) => void 
       const { view, campaigns, signals } = appState;
       const screen =
         view.kind === "section" ? `section:${view.name}` : view.kind;
-      const dataSummary = buildDataSummary({ campaigns, signals, statsLines: buildStatsLines(campaigns, new Date()) });
+      const dataSummary = buildDataSummary({ campaigns, signals, statsLines: buildStatsLines(campaigns, signals, new Date()) });
       void fetchAssist({ text, history, context: { screen, dataSummary } }).then(
         (result) => {
           if (result?.kind === "answer") {

@@ -372,7 +372,7 @@ export const PromptComposer = forwardRef<PromptComposerHandle, PromptComposerPro
               history,
               context: {
                 screen: "workflow",
-                dataSummary: buildDataSummary({ campaigns: state.campaigns, signals: state.signals, statsLines: buildStatsLines(state.campaigns, new Date()) }),
+                dataSummary: buildDataSummary({ campaigns: state.campaigns, signals: state.signals, statsLines: buildStatsLines(state.campaigns, state.signals, new Date()) }),
                 graph,
                 selectedNode: selected,
                 undoAvailable: state.aiUndoAvailable,

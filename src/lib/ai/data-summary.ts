@@ -46,17 +46,20 @@ export function statsLinesFromFunnel(total: FunnelNumbers): string[] {
 }
 
 /**
- * Строит строки статистики из fact-cube для заданных кампаний.
+ * Строит строки статистики из fact-cube для заданных кампаний и сигналов.
  * Период: с начала текущего года по now.
+ * Использует реальные count сигналов — campaignBaseSends опирается на них;
+ * без count > 0 fact-cube даёт нулевые агрегаты.
  * Используется в buildDataSummary чтобы не дублировать логику в потребителях.
  */
-export function buildStatsLines(campaigns: Campaign[], now: Date): string[] {
-  const signals = campaigns.map((c) => ({ id: c.signalId, count: 0 }));
+export function buildStatsLines(campaigns: Campaign[], signals: Signal[], now: Date): string[] {
+  // Маппим только нужные поля: id + count — именно их читает fact-cube.
+  const signalStubs = signals.map((s) => ({ id: s.id, count: s.count }));
   const period = {
     from: new Date(now.getFullYear(), 0, 1),
     to: new Date(now.getFullYear(), 11, 31),
   };
-  const facts = buildFacts({ campaigns, signals }, period, { now });
+  const facts = buildFacts({ campaigns, signals: signalStubs }, period, { now });
   const total = aggregate(facts);
   return statsLinesFromFunnel(total);
 }
