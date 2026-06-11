@@ -35,13 +35,16 @@ import { useAppState, useAppDispatch } from "@/state/app-state-context";
 import { isOnWelcome } from "@/state/app-state";
 import { parseStructuralCommands } from "@/state/structural-commands";
 import { isAiParserEnabled } from "@/state/dev-config";
-import { fetchAssist, fetchAssistAvailability } from "@/lib/ai/assist-client";
+import { fetchAssistMulti, fetchAssistAvailability } from "@/lib/ai/assist-client";
 import { summarizeGraph } from "@/lib/ai/graph-summary";
 import { getCachedGraph } from "@/sections/campaigns/workflow-graph-cache";
 import { buildDataSummary, buildStatsLines } from "@/lib/ai/data-summary";
 import { validateAiGraph } from "@/state/ai-graph-validation";
 import { buildGraphFromSpec } from "@/lib/ai/rebuild-schema";
 import type { NodeParams } from "@/types/workflow";
+import { toFiltersPatch } from "@/lib/ai/stats-patch-schema";
+// NOTE: результаты navigate/stats/answer/clarify обрабатываются аналогично
+// use-chat-submit.ts (осознанное дублирование — разные чат-паттерны).
 import { parseCampaignQuery } from "@/state/parse-campaign-filter";
 import { decideEnterAction, APPLY_ALL_COMMAND } from "@/state/prompt-bar-enter";
 import { selectPromptSuggestions } from "@/state/select-prompt-suggestions";
@@ -352,7 +355,7 @@ export const PromptComposer = forwardRef<PromptComposerHandle, PromptComposerPro
         // бит-в-бит как до спайка, никаких асинхронных побочных эффектов.
         const useAi = isAiParserEnabled() && aiAvailable;
         if (useAi) {
-          // Асинхронная AI-попытка через оркестратор (план 005): граф и
+          // Асинхронная AI-попытка через оркестратор (план 005/006): граф и
           // выбранная нода передаются в контексте — модель видит текущее
           // состояние сценария и может сделать точечную правку.
           const cached = view.kind === "workflow" ? getCachedGraph(view.campaign.id) : undefined;
@@ -367,7 +370,7 @@ export const PromptComposer = forwardRef<PromptComposerHandle, PromptComposerPro
           const history = chat.messages.filter((m) => !m.pending).slice(-8)
             .map((m) => ({ role: m.role as "user" | "assistant", text: m.text }));
           void (async () => {
-            const result = await fetchAssist({
+            const results = await fetchAssistMulti({
               text: rawText,
               history,
               context: {
@@ -378,30 +381,100 @@ export const PromptComposer = forwardRef<PromptComposerHandle, PromptComposerPro
                 undoAvailable: state.aiUndoAvailable,
               },
             });
-            if (result?.kind === "workflow-ops" && result.ops.length > 0) {
-              dispatch({ type: "workflow_structural_commands_submit", ops: result.ops });
-            } else if (result?.kind === "rebuild") {
-              const signalLabel = cached?.nodes.find((n) => n.data.nodeType === "signal")?.data.label ?? "Сигнал";
-              const built = buildGraphFromSpec(result.spec, { label: signalLabel });
-              const check = validateAiGraph(built);
-              if (check.ok) {
-                dispatch({ type: "workflow_rebuild_submit", ...built, assumptions: result.spec.assumptions });
-              } else {
-                chat.append({ role: "assistant", text: "Не получилось собрать корректную цепочку — попробуйте описать иначе." });
+            if (!results) {
+              // null → легаси-фоллбек
+              dispatch({ type: "workflow_command_submit", text: rawText });
+              return;
+            }
+
+            let graphOpApplied = false; // защита от двойной графовой правки
+            let anyExecuted = false;
+
+            for (const result of results) {
+              switch (result.kind) {
+                case "workflow-ops":
+                  if (!graphOpApplied && result.ops.length > 0) {
+                    dispatch({ type: "workflow_structural_commands_submit", ops: result.ops });
+                    graphOpApplied = true;
+                    anyExecuted = true;
+                  }
+                  break;
+                case "rebuild":
+                  if (!graphOpApplied) {
+                    const signalLabel = cached?.nodes.find((n) => n.data.nodeType === "signal")?.data.label ?? "Сигнал";
+                    const built = buildGraphFromSpec(result.spec, { label: signalLabel });
+                    const check = validateAiGraph(built);
+                    if (check.ok) {
+                      dispatch({ type: "workflow_rebuild_submit", ...built, assumptions: result.spec.assumptions });
+                      graphOpApplied = true;
+                      anyExecuted = true;
+                    } else {
+                      chat.append({ role: "assistant", text: "Не получилось собрать корректную цепочку — попробуйте описать иначе." });
+                      anyExecuted = true;
+                    }
+                  }
+                  break;
+                case "node-params":
+                  if (!graphOpApplied) {
+                    // Сервер не может строго типизировать union по kind ноды; редьюсер
+                    // мерджит patch поверх существующих params, невалидные ключи безвредны.
+                    dispatch({ type: "workflow_node_field_set", nodeId: result.nodeId, patch: result.patch as Partial<NodeParams> });
+                    chat.append({ role: "assistant", text: result.confirmation });
+                    graphOpApplied = true;
+                    anyExecuted = true;
+                  }
+                  break;
+                case "undo":
+                  if (!graphOpApplied) {
+                    dispatch({ type: "workflow_ai_undo_request" });
+                    graphOpApplied = true;
+                    anyExecuted = true;
+                  }
+                  break;
+                case "stats":
+                  dispatch({ type: "stats_apply_patch", patch: toFiltersPatch(result.patch) });
+                  chat.append({ role: "assistant", text: result.confirmation });
+                  anyExecuted = true;
+                  break;
+                case "navigate": {
+                  const navTarget = result.target;
+                  if (navTarget.kind === "section") {
+                    dispatch({ type: "sidebar_nav", section: navTarget.name });
+                    chat.append({ role: "assistant", text: result.confirmation });
+                    anyExecuted = true;
+                  } else if (navTarget.kind === "campaign-workflow") {
+                    const c = state.campaigns.find((cc) => cc.id === navTarget.campaignId);
+                    if (c) {
+                      dispatch({ type: "open_workflow", campaign: { id: c.id, name: c.name }, launched: c.status !== "draft" });
+                      chat.append({ role: "assistant", text: result.confirmation });
+                      anyExecuted = true;
+                    }
+                  } else if (navTarget.kind === "signal") {
+                    const s = state.signals.find((ss) => ss.id === navTarget.signalId);
+                    if (s) {
+                      dispatch({ type: "signal_opened", id: s.id });
+                      chat.append({ role: "assistant", text: result.confirmation });
+                      anyExecuted = true;
+                    }
+                  }
+                  break;
+                }
+                case "answer":
+                  chat.append({ role: "assistant", text: result.text });
+                  anyExecuted = true;
+                  break;
+                case "clarify":
+                  chat.append({ role: "assistant", text: result.questions.join(" ") });
+                  anyExecuted = true;
+                  break;
+                default:
+                  // none — игнорируем
+                  break;
               }
-            } else if (result?.kind === "node-params") {
-              // Сервер не может строго типизировать union по kind ноды; редьюсер
-              // мерджит patch поверх существующих params, невалидные ключи безвредны.
-              dispatch({ type: "workflow_node_field_set", nodeId: result.nodeId, patch: result.patch as Partial<NodeParams> });
-              chat.append({ role: "assistant", text: result.confirmation });
-            } else if (result?.kind === "undo") {
-              dispatch({ type: "workflow_ai_undo_request" });
-            } else if (result?.kind === "answer") {
-              chat.append({ role: "assistant", text: result.text });
-            } else if (result?.kind === "clarify") {
-              chat.append({ role: "assistant", text: result.questions.join(" ") });
-            } else {
-              // Легаси-фоллбек: null / none / неожиданный kind
+            }
+
+            if (!anyExecuted) {
+              // НИ один результат не исполнился → легаси workflow_command_submit
               dispatch({ type: "workflow_command_submit", text: rawText });
             }
           })();

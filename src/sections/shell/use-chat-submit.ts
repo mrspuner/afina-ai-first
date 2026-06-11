@@ -26,8 +26,11 @@ import {
   type StatsQueryId,
 } from "@/lib/stats-query-matcher";
 import type { ChipSegment } from "@/state/prompt-chips-context";
-import { fetchAssist, fetchAssistAvailability } from "@/lib/ai/assist-client";
+import { fetchAssistMulti, fetchAssistAvailability } from "@/lib/ai/assist-client";
 import { buildDataSummary, buildStatsLines } from "@/lib/ai/data-summary";
+import type { AssistResult } from "@/lib/ai/assist-contract";
+import { toFiltersPatch } from "@/lib/ai/stats-patch-schema";
+import { STEPPER_ITEMS } from "@/sections/signals/campaign-stepper";
 import { isAiParserEnabled } from "@/state/dev-config";
 
 /** Текст + сегменты (тег + текст после него), отправляемые в чат. */
@@ -280,7 +283,11 @@ export function useChatSubmit(): { submit: (payload: ChatSubmitPayload) => void 
     // Statistics-only hard-coded queries (looser matching). Скоупинг по
     // секции — фразы не должны срабатывать вне Статистики, даже если их
     // случайно ввели в drawer-композиторе.
-    if (isOnStatisticsSection(appState)) {
+    // ВАЖНО: канированные запросы выполняются ТОЛЬКО при !useAi (офлайн-режим).
+    // При useAi=true ввод со Статистики уходит в AI-оркестратор (который
+    // умеет configure_stats), так что канированный путь становится недостижимым.
+    const useAi = isAiParserEnabled() && assistAvailable;
+    if (!useAi && isOnStatisticsSection(appState)) {
       const match = matchStatsQuery(text);
       if (match) {
         runStatsQuery(match.id, text);
@@ -354,8 +361,7 @@ export function useChatSubmit(): { submit: (payload: ChatSubmitPayload) => void 
 
     // Финальный фоллбек: AI-оркестратор (когда есть ключ), иначе — как раньше.
     chat.append({ role: "user", text });
-    const id = chat.append({ role: "assistant", text: "", pending: true });
-    const useAi = isAiParserEnabled() && assistAvailable;
+    const pendingId = chat.append({ role: "assistant", text: "", pending: true });
     if (useAi) {
       // История — до текущего сообщения; последние 8, без pending.
       const history = chat.messages
@@ -366,24 +372,126 @@ export function useChatSubmit(): { submit: (payload: ChatSubmitPayload) => void 
       const screen =
         view.kind === "section" ? `section:${view.name}` : view.kind;
       const dataSummary = buildDataSummary({ campaigns, signals, statsLines: buildStatsLines(campaigns, signals, new Date()) });
-      void fetchAssist({ text, history, context: { screen, dataSummary } }).then(
-        (result) => {
-          if (result?.kind === "answer") {
-            chat.updatePending(id, result.text);
-          } else if (result?.kind === "clarify") {
-            chat.updatePending(id, result.questions.join(" "));
-          } else {
-            // null или none → офлайн-каталог, затем тёплый фоллбек
-            chat.updatePending(
-              id,
-              lookupInformationalReply(text) ?? warmFallbackReply()
-            );
-          }
+
+      // Контекст визарда (шаг + название)
+      const wizardStep = appState.wizardCurrentStep;
+      const stepTitle = wizardStep !== null
+        ? (STEPPER_ITEMS.find((i) => i.step === wizardStep)?.label ?? String(wizardStep))
+        : undefined;
+
+      // Контекст активного триггера из сегмента
+      const activeTriggerId = triggerSegment
+        ? (triggerSegment.chip.payload as string)
+        : undefined;
+      const activeTriggerLabel = triggerSegment?.chip.label;
+
+      void fetchAssistMulti({
+        text,
+        history,
+        context: {
+          screen,
+          dataSummary,
+          ...(wizardStep !== null && stepTitle
+            ? { wizardStep: { step: wizardStep, title: stepTitle } }
+            : {}),
+          ...(activeTriggerId
+            ? { activeTrigger: { id: activeTriggerId, label: activeTriggerLabel ?? "" } }
+            : {}),
+        },
+      }).then((results) => {
+        if (!results) {
+          chat.updatePending(pendingId, lookupInformationalReply(text) ?? warmFallbackReply());
+          return;
         }
-      );
+        executeAssistResults(results, pendingId, text, activeTriggerId);
+      });
     } else {
       const reply = lookupInformationalReply(text) ?? warmFallbackReply();
-      schedule(() => chat.updatePending(id, reply), 350);
+      schedule(() => chat.updatePending(pendingId, reply), 350);
+    }
+  }
+
+  /**
+   * Исполняет массив AssistResult из оркестратора (план 006).
+   * Поддерживает kinds: answer, clarify, stats, navigate, triggers.
+   * Kinds workflow-ops/rebuild/node-params/undo сюда не приходят —
+   * воркфлоу-сабмиты идут через prompt-composer.tsx.
+   */
+  function executeAssistResults(
+    results: AssistResult[],
+    pendingId: string,
+    originalText: string,
+    activeTriggerId?: string,
+  ) {
+    const { campaigns, signals } = appState;
+    const confirmations: string[] = [];
+
+    for (const r of results) {
+      switch (r.kind) {
+        case "answer":
+          confirmations.push(r.text);
+          break;
+        case "clarify":
+          confirmations.push(r.questions.join(" "));
+          break;
+        case "stats":
+          appDispatch({ type: "stats_apply_patch", patch: toFiltersPatch(r.patch) });
+          confirmations.push(r.confirmation);
+          break;
+        case "navigate": {
+          const target = r.target;
+          if (target.kind === "section") {
+            appDispatch({ type: "sidebar_nav", section: target.name });
+            confirmations.push(r.confirmation);
+          } else if (target.kind === "campaign-workflow") {
+            const c = campaigns.find((cc) => cc.id === target.campaignId);
+            if (c) {
+              appDispatch({
+                type: "open_workflow",
+                campaign: { id: c.id, name: c.name },
+                launched: c.status !== "draft",
+              });
+              confirmations.push(r.confirmation);
+            }
+            // несуществующий campaignId: подтверждение не пушим —
+            // если confirmations пуст по итогу, сработает офлайн-фоллбек
+          } else if (target.kind === "signal") {
+            const s = signals.find((ss) => ss.id === target.signalId);
+            if (s) {
+              appDispatch({ type: "signal_opened", id: s.id });
+              confirmations.push(r.confirmation);
+            }
+          }
+          break;
+        }
+        case "triggers": {
+          if (!activeTriggerId) break;
+          if (r.clearAdded) {
+            triggerEdit.applyToTrigger(activeTriggerId, { kind: "clear-added" });
+          }
+          if (r.clearExcluded) {
+            triggerEdit.applyToTrigger(activeTriggerId, { kind: "clear-excluded" });
+          }
+          if (r.add.length > 0 || r.exclude.length > 0) {
+            triggerEdit.applyToTrigger(activeTriggerId, {
+              kind: "edit",
+              add: r.add,
+              exclude: r.exclude,
+            });
+          }
+          confirmations.push(r.confirmation);
+          break;
+        }
+        default:
+          // none; workflow-ops/rebuild/node-params/undo сюда не приходят
+          break;
+      }
+    }
+
+    if (confirmations.length > 0) {
+      chat.updatePending(pendingId, confirmations.join(" "));
+    } else {
+      chat.updatePending(pendingId, lookupInformationalReply(originalText) ?? warmFallbackReply());
     }
   }
 
