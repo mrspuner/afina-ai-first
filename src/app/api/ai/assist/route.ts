@@ -16,6 +16,8 @@ import {
   buildSystemPrompt,
   buildMessages,
 } from "@/lib/ai/orchestrator-prompt";
+import { structuralOpSchema } from "@/lib/ai-workflow-schema";
+import { rebuildGraphSchema } from "@/lib/ai/rebuild-schema";
 
 export function GET() {
   return Response.json({
@@ -45,6 +47,9 @@ export async function POST(request: Request) {
   // вызывает максимум один инструмент за ход; составные действия — план 006.
   let result: AssistResult = { kind: "none" };
 
+  // Флаг: инструменты графа регистрируются только на экране workflow с графом.
+  const onWorkflow = context.screen === "workflow" && Boolean(context.graph);
+
   // Сигнатура tool() в ai@6 / @ai-sdk/provider-utils: поле схемы — inputSchema
   // (не parameters). toolChoice: "required" поддержан типом ToolChoice<TOOLS>.
   // execute может быть синхронным (возвращает OUTPUT напрямую).
@@ -73,6 +78,71 @@ export async function POST(request: Request) {
         return "ok" as const;
       },
     }),
+    // Инструменты графа — только на экране workflow с заполненным graph (план 005)
+    ...(onWorkflow
+      ? {
+          edit_workflow: tool({
+            description:
+              "Изменить текущий граф воркфлоу операциями add/remove/replace. " +
+              "ref — точный label ноды из контекста графа. Используй для точечных правок.",
+            inputSchema: z.object({ ops: z.array(structuralOpSchema).min(1) }),
+            execute: ({ ops }) => {
+              result = { kind: "workflow-ops", ops };
+              return "ok" as const;
+            },
+          }),
+          rebuild_workflow: tool({
+            description:
+              "Пересобрать граф ЦЕЛИКОМ по описанию пользователя. Используй только " +
+              "когда просят собрать заново/с нуля. Форма: вход-сигнал уже есть, ты " +
+              "описываешь середину (каналы, паузы, условия) и два исхода: success и end. " +
+              "В assumptions перечисли принятые допущения одним-двумя предложениями.",
+            inputSchema: rebuildGraphSchema,
+            execute: (spec) => {
+              result = { kind: "rebuild", spec };
+              return "ok" as const;
+            },
+          }),
+        }
+      : {}),
+    // edit_node_params — дополнительно, если выбрана нода
+    ...(onWorkflow && context.selectedNode
+      ? {
+          edit_node_params: tool({
+            description:
+              `Изменить параметры выбранной ноды «${context.selectedNode.label}» ` +
+              `(тип ${context.selectedNode.nodeType}). patch — только изменяемые поля ` +
+              "параметров этого типа ноды; confirmation — короткая фраза, что поменял.",
+            inputSchema: z.object({
+              patch: z.record(z.string(), z.unknown()),
+              confirmation: z.string(),
+            }),
+            execute: ({ patch, confirmation }) => {
+              result = {
+                kind: "node-params",
+                nodeId: context.selectedNode!.id,
+                patch,
+                confirmation,
+              };
+              return "ok" as const;
+            },
+          }),
+        }
+      : {}),
+    // undo_last — только если есть доступный откат
+    ...(onWorkflow && context.undoAvailable
+      ? {
+          undo_last: tool({
+            description:
+              "Откатить последнее AI-изменение графа («откати», «верни как было»).",
+            inputSchema: z.object({}),
+            execute: () => {
+              result = { kind: "undo" };
+              return "ok" as const;
+            },
+          }),
+        }
+      : {}),
   };
 
   // "gemini-2.5-flash" — id актуальной Flash-модели на момент написания (2026-06-11)

@@ -13,6 +13,40 @@ describe("buildSystemPrompt", () => {
     expect(p).toContain("Кампаний: 2");
     expect(p).toContain("workflow");
   });
+
+  it("с graph включает label ноды и рёбра", () => {
+    const p = buildSystemPrompt({
+      screen: "workflow",
+      dataSummary: "",
+      graph: {
+        nodes: [
+          { id: "signal", label: "Сигнал", nodeType: "signal" },
+          { id: "n1", label: "СМС", nodeType: "sms" },
+        ],
+        edges: [{ from: "signal", to: "n1" }],
+      },
+    });
+    expect(p).toContain("СМС");
+    expect(p).toContain("signal → n1");
+  });
+
+  it("с selectedNode включает строку 'Выбрана нода'", () => {
+    const p = buildSystemPrompt({
+      screen: "workflow",
+      dataSummary: "",
+      graph: {
+        nodes: [{ id: "n1", label: "СМС", nodeType: "sms" }],
+        edges: [],
+      },
+      selectedNode: { id: "n1", label: "СМС", nodeType: "sms" },
+    });
+    expect(p).toContain("Выбрана нода");
+  });
+
+  it("без graph не содержит 'Текущий граф'", () => {
+    const p = buildSystemPrompt({ screen: "workflow", dataSummary: "" });
+    expect(p).not.toContain("Текущий граф");
+  });
 });
 
 describe("buildMessages", () => {

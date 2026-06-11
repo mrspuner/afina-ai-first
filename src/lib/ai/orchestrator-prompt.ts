@@ -21,6 +21,23 @@ export function buildSystemPrompt(context: AssistContext): string {
     `Пользователь сейчас на экране: ${context.screen}`,
     "Данные аккаунта (моки прототипа):",
     context.dataSummary,
+    ...(context.graph
+      ? [
+          "Текущий граф воркфлоу (ноды и связи):",
+          context.graph.nodes
+            .map(
+              (n) =>
+                `- [${n.id}] "${n.label}" (${n.nodeType}${n.sublabel ? `, ${n.sublabel}` : ""})`
+            )
+            .join("\n"),
+          context.graph.edges.map((e) => `${e.from} → ${e.to}`).join("; "),
+        ]
+      : []),
+    ...(context.selectedNode
+      ? [
+          `Выбрана нода: [${context.selectedNode.id}] "${context.selectedNode.label}" (${context.selectedNode.nodeType})`,
+        ]
+      : []),
   ].join("\n\n");
 }
 
