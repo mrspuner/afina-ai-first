@@ -3,7 +3,6 @@ import type { WorkflowNode, WorkflowEdge } from "@/types/workflow";
 export type AiGraphError =
   | "no-signal-entry"      // нет ноды типа signal
   | "no-success-terminal"  // нет ноды success
-  | "no-end-terminal"      // нет ноды end
   | "dangling-edge"        // ребро ссылается на несуществующую ноду
   | "unreachable-node"     // нода недостижима из signal
   | "condition-degree";    // у condition не ровно 2 исходящих ребра
@@ -12,9 +11,10 @@ export type AiGraphError =
  * Валидирует граф воркфлоу, собранный AI или билдером.
  *
  * Намеренные ослабления (подтверждены шаблонами):
- * 1. "no-end-terminal" — НЕ проверяется. Шаблон "Удержание" не содержит ноды
- *    типа end: граф с единственным happy-path (только success) допустим.
+ * 1. end-нода опциональна. Шаблон "Удержание" не содержит ноды типа end:
+ *    граф с единственным happy-path (только success) допустим.
  *    Причина: end-нода опциональна в закрытых потоках без ветки «без конверсии».
+ *    Проверка сознательно не выполняется (нет ошибки "no-end-terminal").
  *
  * 2. "unreachable-node" — исключает terminal-ноды (success/end) без входящих
  *    рёбер. Шаблон "Регистрация" содержит end-ноду как визуальный placeholder

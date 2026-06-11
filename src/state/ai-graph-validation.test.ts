@@ -51,21 +51,6 @@ describe("validateAiGraph", () => {
     });
   });
 
-  describe("no-end-terminal", () => {
-    it("граф без end-ноды НЕ даёт ошибку (проверка намеренно ослаблена)", () => {
-      const graph = {
-        nodes: [
-          makeNode("signal", "signal"),
-          makeNode("push", "push"),
-          makeNode("success", "success"),
-        ],
-        edges: [makeEdge("signal", "push"), makeEdge("push", "success")],
-      };
-      const result = validateAiGraph(graph);
-      expect(result.errors).not.toContain("no-end-terminal");
-    });
-  });
-
   describe("no-success-terminal", () => {
     it("граф без success-ноды → ошибка no-success-terminal", () => {
       const graph = {
