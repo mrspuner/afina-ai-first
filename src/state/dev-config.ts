@@ -79,3 +79,57 @@ export function setAiParserEnabled(enabled: boolean): void {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(DEV_AI_PARSER_KEY, enabled ? "on" : "off");
 }
+
+// ── Журнал AI-обменов (план 007) ─────────────────────────────────────────────
+// Клиентский журнал для коридорных тестов. По умолчанию ВЫКЛЮЧЕН — приватность.
+// Сервер тексты НЕ логирует; весь журнал живёт в localStorage на клиенте.
+
+const DEV_AI_LOG_KEY = "afina.dev.aiLog";
+const AI_LOG_ENTRIES_KEY = "afina.dev.aiLog.entries";
+const AI_LOG_CAP = 200;
+
+/** Журнал AI-обменов для коридорных тестов. Default OFF — приватность. */
+export function isAiLogEnabled(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.localStorage.getItem(DEV_AI_LOG_KEY) === "on";
+}
+
+export function setAiLogEnabled(enabled: boolean): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(DEV_AI_LOG_KEY, enabled ? "on" : "off");
+}
+
+export interface AiLogEntry {
+  at: string; // ISO
+  text: string;
+  resultKinds: string[];
+  outcome: "applied" | "clarify" | "answer" | "fallback";
+}
+
+export function appendAiLogEntry(entry: AiLogEntry): void {
+  if (typeof window === "undefined" || !isAiLogEnabled()) return;
+  const raw = window.localStorage.getItem(AI_LOG_ENTRIES_KEY);
+  let entries: AiLogEntry[] = [];
+  try {
+    entries = raw ? (JSON.parse(raw) as AiLogEntry[]) : [];
+  } catch {
+    entries = [];
+  }
+  entries.push(entry);
+  if (entries.length > AI_LOG_CAP) entries = entries.slice(-AI_LOG_CAP);
+  window.localStorage.setItem(AI_LOG_ENTRIES_KEY, JSON.stringify(entries));
+}
+
+export function readAiLogEntries(): AiLogEntry[] {
+  if (typeof window === "undefined") return [];
+  try {
+    return JSON.parse(window.localStorage.getItem(AI_LOG_ENTRIES_KEY) ?? "[]") as AiLogEntry[];
+  } catch {
+    return [];
+  }
+}
+
+export function clearAiLog(): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(AI_LOG_ENTRIES_KEY);
+}
