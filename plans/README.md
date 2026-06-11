@@ -9,7 +9,7 @@
 | 001 | Устранить гонки в AI-цикле графа воркфлоу | P1 | S–M | — | DONE (commit `1486294`, ветка `feat/plans-001-003`; unit ✓, e2e и ручной чек — pending, env) |
 | 002 | Спайк: реальный AI парсит команды графа (вертикальный срез) | P1 | L | 001 | DONE (commit `29d739b`; `gemini-2.5-flash` через `@ai-sdk/google`, флаг off; no-key→503 ✓; live-вызов — pending, нужен ключ) |
 | 003 | Живая статистика — метрики растут в течение сессии | P2 | M | — | DONE (commit `0294f4e`; unit ✓, +9 тестов; ручной чек — pending, env) |
-| 004 | Оркестратор `/api/ai/assist`: знания, answer, clarify | P1 | L | 001–003 | TODO |
+| 004 | Оркестратор `/api/ai/assist`: знания, answer, clarify | P1 | L | 001–003 | DONE (commit `cba1651`; unit ✓ (12 новых тестов в 004-T1..T2: afina-knowledge 3 + assist-contract 4 + data-summary 3 + orchestrator-prompt 2), live-проверка ✓ через curl (ключ оператора); e2e — pending, port 3000 held by main checkout) |
 | 005 | Инструменты графа: ops с контекстом, rebuild, params, откат | P1 | L | 004 | TODO |
 | 006 | configure_stats, navigate, edit_triggers, составные просьбы | P1 | M–L | 005 | TODO |
 | 007 | Экзамен (evals), журнал aiLog, доки, поглощение спайка | P1 | M–L | 006 | TODO |
