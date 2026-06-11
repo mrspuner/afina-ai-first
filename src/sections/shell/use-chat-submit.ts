@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState, useEffect } from "react";
 import { useChat } from "@/state/chat-context";
 import { useTriggerEdit } from "@/state/trigger-edit-context";
 import { useAppState, useAppDispatch } from "@/state/app-state-context";
@@ -26,6 +26,9 @@ import {
   type StatsQueryId,
 } from "@/lib/stats-query-matcher";
 import type { ChipSegment } from "@/state/prompt-chips-context";
+import { fetchAssist, fetchAssistAvailability } from "@/lib/ai/assist-client";
+import { buildDataSummary } from "@/lib/ai/data-summary";
+import { isAiParserEnabled } from "@/state/dev-config";
 
 /** Текст + сегменты (тег + текст после него), отправляемые в чат. */
 export interface ChatSubmitPayload {
@@ -50,6 +53,20 @@ export function useChatSubmit(): { submit: (payload: ChatSubmitPayload) => void 
   const appState = useAppState();
   const appDispatch = useAppDispatch();
   const timersRef = useRef<number[]>([]);
+
+  // Проба доступности AI-оркестратора при монтировании (по образцу prompt-composer.tsx).
+  // false до завершения запроса — страховка от гонки: пока ключ неизвестен,
+  // поведение идентично «нет ключа».
+  const [assistAvailable, setAssistAvailable] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    void fetchAssistAvailability().then((ok) => {
+      if (alive) setAssistAvailable(ok);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   // NB: intentionally NO unmount cleanup of these timers. The "сложный запрос"
   // flow calls chat.openSidebar(), which unmounts the collapsed bottom-bar
@@ -335,13 +352,39 @@ export function useChatSubmit(): { submit: (payload: ChatSubmitPayload) => void 
       }
     }
 
+    // Финальный фоллбек: AI-оркестратор (когда есть ключ), иначе — как раньше.
     chat.append({ role: "user", text });
     const id = chat.append({ role: "assistant", text: "", pending: true });
-    // Информационные вопросы (разделы/визард/переходные view) получают
-    // содержательный ответ из каталога; нераспознанное — тёплый fallback
-    // вместо сухой заглушки.
-    const reply = lookupInformationalReply(text) ?? warmFallbackReply();
-    schedule(() => chat.updatePending(id, reply), 350);
+    const useAi = isAiParserEnabled() && assistAvailable;
+    if (useAi) {
+      // История — до текущего сообщения; последние 8, без pending.
+      const history = chat.messages
+        .filter((m) => !m.pending)
+        .slice(-8)
+        .map((m) => ({ role: m.role, text: m.text }));
+      const { view, campaigns, signals } = appState;
+      const screen =
+        view.kind === "section" ? `section:${view.name}` : view.kind;
+      const dataSummary = buildDataSummary({ campaigns, signals });
+      void fetchAssist({ text, history, context: { screen, dataSummary } }).then(
+        (result) => {
+          if (result?.kind === "answer") {
+            chat.updatePending(id, result.text);
+          } else if (result?.kind === "clarify") {
+            chat.updatePending(id, result.questions.join(" "));
+          } else {
+            // null или none → офлайн-каталог, затем тёплый фоллбек
+            chat.updatePending(
+              id,
+              lookupInformationalReply(text) ?? warmFallbackReply()
+            );
+          }
+        }
+      );
+    } else {
+      const reply = lookupInformationalReply(text) ?? warmFallbackReply();
+      schedule(() => chat.updatePending(id, reply), 350);
+    }
   }
 
   return { submit };
