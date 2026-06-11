@@ -54,15 +54,37 @@ AssistResult: { kind: "answer" | "clarify" | "none" }
 |------------|------|----------|--------|
 | `answer` | `"answer"` | Ответить текстом (1–3 предложения в голосе продукта) | Реализован (план 004) |
 | `clarify` | `"clarify"` | Задать 1–2 уточняющих вопроса (один раунд) | Реализован (план 004) |
-| `edit_workflow` | _(план 005)_ | Редактировать граф воркфлоу через NL-команду | Плейсхолдер |
-| `rebuild_workflow` | _(план 005)_ | Пересобрать граф полностью по описанию | Плейсхолдер |
-| `edit_node_params` | _(план 005)_ | Изменить параметры конкретной ноды | Плейсхолдер |
-| `undo_last` | _(план 005)_ | Откатить последнюю операцию | Плейсхолдер |
+| `edit_workflow` | `"workflow-ops"` | Редактировать граф воркфлоу через NL-команду | Реализован (план 005) |
+| `rebuild_workflow` | `"rebuild"` | Пересобрать граф полностью по описанию | Реализован (план 005) |
+| `edit_node_params` | `"node-params"` | Изменить параметры конкретной ноды | Реализован (план 005) |
+| `undo_last` | `"undo"` | Откатить последнюю AI-правку графа | Реализован (план 005) |
 | `configure_stats` | _(план 006)_ | Применить фильтры/группировку в разделе Статистика | Плейсхолдер |
 | `navigate` | _(план 006)_ | Перейти в раздел/экран | Плейсхолдер |
 | `edit_triggers` | _(план 006)_ | Добавить/исключить домены в триггере | Плейсхолдер |
 
-Инструменты фильтруются по `context.screen` — на экране воркфлоу подключаются граф-инструменты, на секции статистики — `configure_stats`, и т.д. (будет введено в планах 005/006).
+Инструменты фильтруются по `context.screen` (и `selectedNode`, `undoAvailable`) — на экране воркфлоу подключаются граф-инструменты (`edit_workflow`, `rebuild_workflow`, `edit_node_params`, `undo_last`), на секции статистики — `configure_stats`, и т.д.
+
+### Аргументы граф-инструментов
+
+**`edit_workflow`** — принимает плоский массив `ops` (тип `StructuralOp[]` из `ops-wire-schema.ts`). Схема намеренно **не discriminated-union** — плоская форма `{ kind, ...payload }` позволяет Gemini генерировать корректный JSON без подсказки о разрешённых discriminant-значениях. Discriminated union в одном Zod-объекте требует от модели знания всех вариантов kind заранее, что приводило к генерации `{}` при незнакомых операциях (баг, выявленный live-вызовом серии 005, зафиксирован в `docs/plans/005-ai-workflow-tools.md §17`).
+
+**`rebuild_workflow`** — принимает `{ nodes, edges, assumptions }` (тип `RebuildGraphSpec` из `rebuild-schema.ts`). После получения клиент прогоняет граф через `validateAiGraph()` из `ai-graph-validation.ts`: если валидация не прошла — ошибка отображается в чате без применения. Условие регистрации: `screen === "workflow"`.
+
+**`edit_node_params`** — принимает `{ nodeId, patch, confirmation }`. `patch` — `Record<string, unknown>` (сервер не может строго типизировать union по kind ноды); редьюсер мерджит patch поверх существующих params, невалидные ключи безвредны. Условие регистрации: `screen === "workflow" && selectedNode != null`.
+
+**`undo_last`** — принимает пустой объект `{}`. Условие регистрации: `screen === "workflow" && undoAvailable === true`.
+
+---
+
+## 2a. Откат (undo)
+
+Механика отката — глубина 1, хранение в памяти компонента:
+
+1. **Снапшот** — перед применением каждой структурной AI-операции (`structuralOps`) или rebuild в `workflow-view.tsx` внутри `apply(prev)` колбэка `runCycle` записывается `aiSnapshotRef.current = prev`. Флаг `workflow_ai_undo_availability: true` ставится сразу же — гарантируя, что снапшот уже записан в момент активации флага.
+2. **Подсказка** — когда `state.aiUndoAvailable === true` и workflow не запущен (`!v.launched`), `selectPromptSuggestions` добавляет item `{ id: "ai-undo", label: "↩ Откатить" }` первым в список подсказок воркфлоу.
+3. **Применение** — клик по подсказке или `result.kind === "undo"` от оркестратора диспатчит `workflow_ai_undo_request`; undo-эффект в `workflow-view.tsx` восстанавливает `aiSnapshotRef.current` и очищает флаг.
+4. **Сброс при анмаунте** — cleanup-эффект в `workflow-view.tsx` диспатчит `workflow_ai_undo_availability: false` при размонтировании компонента (например, при запуске кампании).
+5. **Страховка** — если `workflow_ai_undo_request` пришёл при `null`-снапшоте (edge case: размонтирование между событиями), флаг принудительно сбрасывается перед `return`.
 
 ---
 
@@ -140,3 +162,9 @@ fetchAssist({ text, history, context }) — AbortSignal.timeout(6000)
 | `src/lib/ai/afina-knowledge.ts` | `AFINA_KNOWLEDGE` — база знаний о продукте (~3–4K токенов) |
 | `src/lib/ai/data-summary.ts` | `buildDataSummary()` — сводка стейта для промпта |
 | `src/sections/shell/use-chat-submit.ts` | Точка интеграции: финальный фоллбек → оркестратор |
+| `src/sections/shell/prompt-composer.tsx` | Воркфлоу-ветка: граф-инструменты через оркестратор (план 005) |
+| `src/lib/ai/graph-summary.ts` | `summarizeGraph()` — компактная сводка нод/рёбер для контекста |
+| `src/lib/ai/rebuild-schema.ts` | `rebuildGraphSchema`, `buildGraphFromSpec()` — спека и билдер пересборки |
+| `src/state/ai-graph-validation.ts` | `validateAiGraph()` — валидация графа перед применением rebuild |
+| `src/sections/campaigns/workflow-graph-cache.ts` | `getCachedGraph()` / `setCachedGraph()` — персистентный кэш текущего графа |
+| `src/state/suggestion-registry/views.ts` | `resolveWorkflowScenario(aiUndoAvailable)` — подсказка «↩ Откатить» |
