@@ -1,5 +1,6 @@
 import {
   assistResultSchema,
+  assistResponseSchema,
   type AssistRequest,
   type AssistResult,
 } from "./assist-contract";
@@ -48,20 +49,56 @@ export function fetchAssistAvailability(): Promise<boolean> {
 }
 
 /**
+ * Общий хелпер: POST /api/ai/assist и вернуть сырой JSON или null при сбое.
+ */
+async function postAssist(req: AssistRequest): Promise<unknown> {
+  const res = await fetch("/api/ai/assist", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(req),
+    signal: AbortSignal.timeout(6000),
+  });
+  if (!res.ok) return null;
+  return res.json();
+}
+
+/**
  * Вызов оркестратора. null = любой сбой (таймаут 6с, не-2xx, невалидный
  * ответ) — вызывающий уходит в офлайн-fallback.
+ *
+ * @deprecated Мигрируйте на fetchAssistMulti (план 006)
  */
 export async function fetchAssist(req: AssistRequest): Promise<AssistResult | null> {
   try {
-    const res = await fetch("/api/ai/assist", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(req),
-      signal: AbortSignal.timeout(6000),
-    });
-    if (!res.ok) return null;
-    const parsed = assistResultSchema.safeParse(await res.json());
+    const json = await postAssist(req);
+    if (json === null) return null;
+    const parsed = assistResultSchema.safeParse(json);
     return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Вызов оркестратора с поддержкой multi-tool ответа (план 006).
+ * Сначала пробует assistResponseSchema ({results:[...]}); при провале —
+ * пробует assistResultSchema (старый одиночный формат, оборачивает в массив).
+ * null = любой сбой.
+ */
+export async function fetchAssistMulti(req: AssistRequest): Promise<AssistResult[] | null> {
+  try {
+    const json = await postAssist(req);
+    if (json === null) return null;
+
+    // Новый формат: { results: [...] }
+    const multi = assistResponseSchema.safeParse(json);
+    if (multi.success) return multi.data.results;
+
+    // Старый формат: одиночный AssistResult
+    const single = assistResultSchema.safeParse(json);
+    if (single.success) return [single.data];
+
+    return null;
   } catch {
     return null;
   }

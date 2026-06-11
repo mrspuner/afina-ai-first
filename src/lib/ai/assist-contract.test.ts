@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assistRequestSchema, assistResultSchema, assistContextSchema } from "./assist-contract";
+import { assistRequestSchema, assistResultSchema, assistContextSchema, assistResponseSchema } from "./assist-contract";
 
 describe("assist-contract", () => {
   it("валидный запрос проходит", () => {
@@ -81,5 +81,120 @@ describe("assist-contract", () => {
       dataSummary: "кампаний: 3",
     });
     expect(r.success).toBe(true);
+  });
+
+  it("контекст с wizardStep и activeTrigger (план 006) проходит", () => {
+    const r = assistContextSchema.safeParse({
+      screen: "guided-signal:3",
+      dataSummary: "",
+      wizardStep: { step: 3, title: "Интересы" },
+      activeTrigger: { id: "tr_1", label: "Ипотека" },
+    });
+    expect(r.success).toBe(true);
+  });
+});
+
+// ── план 006: новые kinds + multi-tool ─────────────────────────────────────────
+
+describe("assist-contract plan-006", () => {
+  it("stats kind с патчем и confirmation проходит", () => {
+    const r = assistResultSchema.safeParse({
+      kind: "stats",
+      patch: { rows: "campaigns", rowCount: 10 },
+      confirmation: "Показываю топ-10 кампаний",
+    });
+    expect(r.success).toBe(true);
+  });
+
+  it("navigate с target section Статистика проходит", () => {
+    const r = assistResultSchema.safeParse({
+      kind: "navigate",
+      target: { kind: "section", name: "Статистика" },
+      confirmation: "Перехожу в Статистику",
+    });
+    expect(r.success).toBe(true);
+  });
+
+  it("navigate с target section Лендинги отклоняется", () => {
+    const r = assistResultSchema.safeParse({
+      kind: "navigate",
+      target: { kind: "section", name: "Лендинги" },
+      confirmation: "...",
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it("navigate с campaign-workflow target проходит", () => {
+    const r = assistResultSchema.safeParse({
+      kind: "navigate",
+      target: { kind: "campaign-workflow", campaignId: "cmp_abc" },
+      confirmation: "Открываю кампанию",
+    });
+    expect(r.success).toBe(true);
+  });
+
+  it("triggers с пустыми add/exclude без clear-флагов валиден (инвариант держит промпт)", () => {
+    // Схема не запрещает пустые массивы — инвариант (хотя бы что-то непусто) держит промпт
+    const r = assistResultSchema.safeParse({
+      kind: "triggers",
+      add: [],
+      exclude: [],
+      confirmation: "...",
+    });
+    expect(r.success).toBe(true);
+  });
+
+  it("triggers с clearAdded:true проходит", () => {
+    const r = assistResultSchema.safeParse({
+      kind: "triggers",
+      add: [],
+      exclude: [],
+      clearAdded: true,
+      confirmation: "Сбрасываю добавленные триггеры",
+    });
+    expect(r.success).toBe(true);
+  });
+
+  // ── assistResponseSchema ───────────────────────────────────────────────────
+
+  it("assistResponseSchema: ответ {results:[navigate, stats]} проходит", () => {
+    const r = assistResponseSchema.safeParse({
+      results: [
+        {
+          kind: "navigate",
+          target: { kind: "section", name: "Статистика" },
+          confirmation: "Перехожу в Статистику",
+        },
+        {
+          kind: "stats",
+          patch: { rows: "campaigns" },
+          confirmation: "Показываю кампании",
+        },
+      ],
+    });
+    expect(r.success).toBe(true);
+  });
+
+  it("assistResponseSchema: 3 результата отклоняются (max 2)", () => {
+    const r = assistResponseSchema.safeParse({
+      results: [
+        { kind: "answer", text: "1" },
+        { kind: "answer", text: "2" },
+        { kind: "answer", text: "3" },
+      ],
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it("assistResponseSchema: 1 результат проходит", () => {
+    const r = assistResponseSchema.safeParse({
+      results: [{ kind: "answer", text: "ok" }],
+    });
+    expect(r.success).toBe(true);
+  });
+
+  it("assistResponseSchema: пустой массив отклоняется (min 1)", () => {
+    const r = assistResponseSchema.safeParse({ results: [] });
+    expect(r.success).toBe(false);
   });
 });

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { structuralOpSchema } from "@/lib/ai-workflow-schema";
 import { rebuildGraphSchema } from "./rebuild-schema";
+import { statsPatchSchema } from "./stats-patch-schema";
 
 /** Сообщение истории сессии (последние N из chat-context). */
 export const historyMessageSchema = z.object({
@@ -31,6 +32,10 @@ export const assistContextSchema = z.object({
   selectedNode: graphNodeSummarySchema.optional(),
   /** Есть ли доступное действие undo. */
   undoAvailable: z.boolean().optional(),
+  /** Текущий шаг визарда (план 006). */
+  wizardStep: z.object({ step: z.number(), title: z.string() }).optional(),
+  /** Активный триггер (план 006). */
+  activeTrigger: z.object({ id: z.string(), label: z.string() }).optional(),
 });
 export type AssistContext = z.infer<typeof assistContextSchema>;
 
@@ -59,5 +64,43 @@ export const assistResultSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("undo") }),
   /** Полная пересборка графа по спецификации модели (план 005). */
   z.object({ kind: z.literal("rebuild"), spec: rebuildGraphSchema }),
+  /** Патч фильтров таблицы статистики (план 006). */
+  z.object({ kind: z.literal("stats"), patch: statsPatchSchema, confirmation: z.string() }),
+  /**
+   * Навигация к разделу/кампании/сигналу (план 006).
+   * В контракте используем discriminatedUnion — его парсит наш клиент, не Gemini.
+   * Wire-форма для Gemini описана в navigate-schema.ts (wireNavigateSchema).
+   */
+  z.object({
+    kind: z.literal("navigate"),
+    target: z.discriminatedUnion("kind", [
+      z.object({ kind: z.literal("section"), name: z.enum(["Статистика", "Сигналы", "Кампании", "Настройки"]) }),
+      z.object({ kind: z.literal("campaign-workflow"), campaignId: z.string() }),
+      z.object({ kind: z.literal("signal"), signalId: z.string() }),
+    ]),
+    confirmation: z.string(),
+  }),
+  /**
+   * Редактирование триггеров сигнала (план 006).
+   * Инвариант: хотя бы одно поле add/exclude непусто или установлен clear-флаг.
+   * Держит промпт, а не схема (empty arrays are valid — schema doesn't enforce the invariant).
+   */
+  z.object({
+    kind: z.literal("triggers"),
+    add: z.array(z.string()),
+    exclude: z.array(z.string()),
+    clearAdded: z.boolean().optional(),
+    clearExcluded: z.boolean().optional(),
+    confirmation: z.string(),
+  }),
 ]);
 export type AssistResult = z.infer<typeof assistResultSchema>;
+
+/**
+ * Multi-tool ответ оркестратора (план 006).
+ * Максимум 2 результата в одном ответе (например: navigate + stats).
+ */
+export const assistResponseSchema = z.object({
+  results: z.array(assistResultSchema).min(1).max(2),
+});
+export type AssistResponse = z.infer<typeof assistResponseSchema>;
