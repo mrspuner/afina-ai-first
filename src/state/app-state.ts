@@ -5,7 +5,7 @@ import type { Survey, SurveyStatus } from "@/types/survey";
 import { EMPTY_SURVEY, DEMO_SURVEY } from "@/types/survey";
 import type { SignalStatus } from "@/types/signal-status";
 import type { StepData } from "@/types/campaign";
-import type { NodeParams } from "@/types/workflow";
+import type { NodeParams, WorkflowNode, WorkflowEdge } from "@/types/workflow";
 import { scenarioNameForSignal, defaultCampaignName } from "./scenario-display";
 import {
   DEFAULT_DIRECTION_ID,
@@ -198,6 +198,12 @@ export type AppState = {
    * so a fresh load re-shows the overlay — acceptable per the spec.
    */
   introSeen: boolean;
+  /** Pending full-graph rebuild dispatched by the AI orchestrator (kind: rebuild). */
+  workflowRebuild: { nodes: WorkflowNode[]; edges: WorkflowEdge[]; assumptions: string } | null;
+  /** Set when the user requests AI undo; cleared by workflow-view after applying the snapshot. */
+  workflowAiUndoRequested: boolean;
+  /** True once a rebuild/structural command has been applied — enables the undo action. */
+  aiUndoAvailable: boolean;
 };
 
 export type Action =
@@ -270,7 +276,12 @@ export type Action =
   | { type: "stats_set_sort"; sort: SortState | null }
   | { type: "stats_reset"; filters: StatisticsFilters }
   | { type: "stats_apply_patch"; patch: Partial<StatisticsFilters> }
-  | { type: "intro_dismissed" };
+  | { type: "intro_dismissed" }
+  | { type: "workflow_rebuild_submit"; nodes: WorkflowNode[]; edges: WorkflowEdge[]; assumptions: string }
+  | { type: "workflow_rebuild_handled" }
+  | { type: "workflow_ai_undo_request" }
+  | { type: "workflow_ai_undo_handled" }
+  | { type: "workflow_ai_undo_availability"; available: boolean };
 // PARALLEL-WORKTREE INSERTION POINT — survey actions (B), billing/signal-status actions (E).
 // Each worktree appends its own action variants to the union above; resolve merges by
 // keeping every appended line and adding the matching reducer case at the end of appReducer.
@@ -301,6 +312,9 @@ export const initialState: AppState = {
   workflowNodeFieldPatch: null,
   stats: DEFAULT_FILTERS,
   introSeen: false,
+  workflowRebuild: null,
+  workflowAiUndoRequested: false,
+  aiUndoAvailable: false,
 };
 
 export function appReducer(state: AppState, action: Action): AppState {
@@ -984,6 +998,17 @@ export function appReducer(state: AppState, action: Action): AppState {
 
     case "intro_dismissed":
       return { ...state, introSeen: true };
+
+    case "workflow_rebuild_submit":
+      return { ...state, workflowRebuild: { nodes: action.nodes, edges: action.edges, assumptions: action.assumptions } };
+    case "workflow_rebuild_handled":
+      return { ...state, workflowRebuild: null };
+    case "workflow_ai_undo_request":
+      return { ...state, workflowAiUndoRequested: true };
+    case "workflow_ai_undo_handled":
+      return { ...state, workflowAiUndoRequested: false };
+    case "workflow_ai_undo_availability":
+      return { ...state, aiUndoAvailable: action.available };
     // PARALLEL-WORTREE INSERTION POINT — append survey/billing/signal-status cases
     // immediately above this comment to keep merges trivial.
   }
