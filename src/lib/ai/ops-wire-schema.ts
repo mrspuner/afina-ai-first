@@ -1,0 +1,95 @@
+import { z } from "zod";
+import type { StructuralOp, Placement } from "@/state/structural-commands";
+
+/**
+ * Плоская wire-схема операции для function calling.
+ * Gemini ненадёжно генерирует discriminated unions (oneOf) в аргументах
+ * инструментов — поэтому на проводе один плоский объект с enum kind и
+ * опциональными полями, а строгий StructuralOp собирает сервер (toStructuralOp).
+ */
+export const wireOpSchema = z.object({
+  kind: z.enum(["add", "remove", "replace"]),
+  nodeType: z
+    .enum([
+      "sms",
+      "email",
+      "push",
+      "ivr",
+      "wait",
+      "condition",
+      "split",
+      "merge",
+      "storefront",
+      "landing",
+      "success",
+      "end",
+    ])
+    .optional()
+    .describe("Для add/replace: тип ноды"),
+  ref: z
+    .string()
+    .optional()
+    .describe(
+      "Для remove/replace: label существующей ноды; для add с placement after/before: опорная нода"
+    ),
+  placementMode: z
+    .enum(["after", "before", "between", "auto"])
+    .optional()
+    .describe("Для add: куда вставить (default auto)"),
+  refA: z
+    .string()
+    .optional()
+    .describe("Для placement between: первая опорная нода"),
+  refB: z
+    .string()
+    .optional()
+    .describe("Для placement between: вторая опорная нода"),
+  inlineParams: z.string().optional(),
+});
+export type WireOp = z.infer<typeof wireOpSchema>;
+
+/** wire → строгий StructuralOp; null если поля не складываются в валидную операцию. */
+export function toStructuralOp(w: WireOp): StructuralOp | null {
+  if (w.kind === "remove") {
+    return w.ref ? { kind: "remove", ref: w.ref } : null;
+  }
+  if (w.kind === "replace") {
+    return w.ref && w.nodeType
+      ? {
+          kind: "replace",
+          ref: w.ref,
+          newType: w.nodeType,
+          ...(w.inlineParams ? { inlineParams: w.inlineParams } : {}),
+        }
+      : null;
+  }
+  // add
+  if (!w.nodeType) return null;
+  let placement: Placement;
+  switch (w.placementMode) {
+    case "after":
+      if (!w.ref) return null;
+      placement = { mode: "after", ref: w.ref };
+      break;
+    case "before":
+      if (!w.ref) return null;
+      placement = { mode: "before", ref: w.ref };
+      break;
+    case "between":
+      if (!w.refA || !w.refB) return null;
+      placement = { mode: "between", refA: w.refA, refB: w.refB };
+      break;
+    default:
+      placement = { mode: "auto" };
+  }
+  return {
+    kind: "add",
+    nodeType: w.nodeType,
+    placement,
+    ...(w.inlineParams ? { inlineParams: w.inlineParams } : {}),
+  };
+}
+
+export function toStructuralOps(wires: WireOp[]): StructuralOp[] {
+  return wires.map(toStructuralOp).filter((op): op is StructuralOp => op !== null);
+}

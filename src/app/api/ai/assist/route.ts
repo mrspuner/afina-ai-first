@@ -16,8 +16,8 @@ import {
   buildSystemPrompt,
   buildMessages,
 } from "@/lib/ai/orchestrator-prompt";
-import { structuralOpSchema } from "@/lib/ai-workflow-schema";
 import { rebuildGraphSchema } from "@/lib/ai/rebuild-schema";
+import { wireOpSchema, toStructuralOps } from "@/lib/ai/ops-wire-schema";
 
 export function GET() {
   return Response.json({
@@ -84,10 +84,15 @@ export async function POST(request: Request) {
           edit_workflow: tool({
             description:
               "Изменить текущий граф воркфлоу операциями add/remove/replace. " +
-              "ref — точный label ноды из контекста графа. Используй для точечных правок.",
-            inputSchema: z.object({ ops: z.array(structuralOpSchema).min(1) }),
+              "ref — точный label ноды из контекста графа. Используй для точечных правок. " +
+              'Пример: убрать СМС и добавить пуш после письма → ops: [{"kind":"remove","ref":"СМС"},{"kind":"add","nodeType":"push","placementMode":"after","ref":"Email"}]',
+            inputSchema: z.object({ ops: z.array(wireOpSchema).min(1) }),
             execute: ({ ops }) => {
-              result = { kind: "workflow-ops", ops };
+              const structural = toStructuralOps(ops);
+              result =
+                structural.length > 0
+                  ? { kind: "workflow-ops", ops: structural }
+                  : { kind: "none" };
               return "ok" as const;
             },
           }),
