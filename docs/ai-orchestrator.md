@@ -62,7 +62,7 @@ AssistResult: { kind: "answer" | "clarify" | "none" }
 | `navigate` | `"navigate"` | Перейти в раздел / открыть кампанию / открыть сигнал | Реализован (план 006) |
 | `edit_triggers` | `"triggers"` | Добавить/исключить домены в триггере | Реализован (план 006) |
 
-Инструменты фильтруются по `context.screen` (и `selectedNode`, `undoAvailable`) — на экране воркфлоу подключаются граф-инструменты (`edit_workflow`, `rebuild_workflow`, `edit_node_params`, `undo_last`), на секции статистики — `configure_stats`, и т.д.
+Инструменты фильтруются по `context.screen` (и `selectedNode`, `undoAvailable`) — на экране воркфлоу подключаются граф-инструменты (`edit_workflow`, `rebuild_workflow`, `edit_node_params`, `undo_last`). `configure_stats` зарегистрирован **безусловно** — доступен с любого экрана. Остальные инструменты регистрируются по условию экрана/контекста.
 
 ### Аргументы граф-инструментов
 
@@ -76,7 +76,7 @@ AssistResult: { kind: "answer" | "clarify" | "none" }
 
 ### Аргументы инструментов план 006
 
-**`configure_stats`** — принимает `{ patch: StatsPatch, confirmation: string }`. `StatsPatch` (`stats-patch-schema.ts`) охватывает rows/subRows/rowCount/sort/clearSort/period. `toFiltersPatch(patch)` нормирует wire-форму в `Partial<StatisticsFilters>` (clearSort:true → sort:null). Клиент диспатчит `stats_apply_patch`. Условие регистрации: сервер передаёт схему безусловно (инструмент работает с любого экрана).
+**`configure_stats`** — принимает `{ patch: StatsPatch, confirmation: string }`. `StatsPatch` (`stats-patch-schema.ts`) охватывает rows/subRows/rowCount/sort/clearSort/period. `toFiltersPatch(patch)` нормирует wire-форму в `Partial<StatisticsFilters>` (clearSort:true → sort:null). Клиент диспатчит `stats_apply_patch`. Инструмент зарегистрирован **безусловно** — доступен с любого экрана, не только из раздела Статистика.
 
 **`navigate`** — принимает `{ target: { kind } }`, где target — discriminated union трёх форм:
 - `{ kind: "section", name: SectionName }` — переход в раздел: `sidebar_nav`.
@@ -209,3 +209,41 @@ fetchAssistMulti({ text, history, context }) — AbortSignal.timeout(6000)
 | `src/state/ai-graph-validation.ts` | `validateAiGraph()` — валидация графа перед применением rebuild |
 | `src/sections/campaigns/workflow-graph-cache.ts` | `getCachedGraph()` / `setCachedGraph()` — персистентный кэш текущего графа |
 | `src/state/suggestion-registry/views.ts` | `resolveWorkflowScenario(aiUndoAvailable)` — подсказка «↩ Откатить» |
+| `evals/cases.mjs` | 40 тест-кейсов экзамена оркестратора |
+| `scripts/run-evals.mjs` | Runner экзамена: `npm run eval` |
+
+---
+
+## 7. Экзамен (evals)
+
+Оркестратор покрыт автоматическими поведенческими тестами (`evals/cases.mjs`, 40 кейсов). Подробная документация: [`evals/README.md`](../evals/README.md).
+
+**5 моментов для запуска:**
+
+1. При разработке AI-слоя (основной цикл: провал → правка знаний/промпта → точечный перегон → полный прогон).
+2. Перед коммитом правок AI-файлов (`afina-knowledge.ts`, `orchestrator-prompt.ts`, схемы инструментов, `route.ts`).
+3. Перед демо или коридорным тестом.
+4. После коридорного теста — для новых кейсов из журнала.
+5. При смене модели (`AFINA_AI_MODEL`).
+
+```bash
+npm run dev -- -p 3001   # dev-сервер с ключом
+npm run eval              # полный прогон
+npm run eval -- <имя>    # фильтр по имени кейса
+```
+
+---
+
+## 8. Журнал (aiLog)
+
+Клиентский журнал AI-обменов для коридорных тестов. Реализован в `src/state/dev-config.ts`.
+
+- **Флаг:** `isAiLogEnabled()` — по умолчанию `false` (приватность). Включается в дев-панели переключателем «Журнал AI».
+- **Cap:** 200 последних записей (FIFO), хранятся в `localStorage`.
+- **Выгрузка:** кнопка «Выгрузить журнал» в дев-панели — скачивает JSON-файл.
+- **Формат записи:** `{ at: ISO, text: string, resultKinds: string[], outcome: "applied"|"clarify"|"answer"|"fallback" }`.
+- **Очистка:** кнопка «Очистить» в дев-панели.
+
+Журнал — главный источник новых кейсов экзамена. Кандидаты: `outcome: "fallback"` (AI не справился) и `outcome: "applied"` при подозрительных результатах.
+
+Памятка фасилитатора коридорного теста: [`docs/ai-corridor-testing.md`](./ai-corridor-testing.md).

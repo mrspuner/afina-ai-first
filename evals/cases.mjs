@@ -17,22 +17,22 @@
 
 /** Типичный workflowCtx: экран кампании, граф Сигнал→СМС→Задержка(1д)→Email→Успех + Конец */
 const workflowCtx = {
-  screen: "campaign-workflow",
+  screen: "workflow",
   graph: {
     nodes: [
-      { id: "signal", data: { label: "Сигнал", nodeType: "signal" } },
-      { id: "sms1",   data: { label: "СМС",     nodeType: "sms" } },
-      { id: "wait1",  data: { label: "Задержка", nodeType: "wait",  params: { duration: "1 день" } } },
-      { id: "email1", data: { label: "Email",    nodeType: "email" } },
-      { id: "succ",   data: { label: "Успех",    nodeType: "success", isSuccess: true } },
-      { id: "end1",   data: { label: "Конец",    nodeType: "end" } },
+      { id: "signal", label: "Сигнал", nodeType: "signal" },
+      { id: "sms1",   label: "СМС",     nodeType: "sms" },
+      { id: "wait1",  label: "Задержка", nodeType: "wait",  sublabel: "1 день" },
+      { id: "email1", label: "Email",    nodeType: "email" },
+      { id: "succ",   label: "Успех",    nodeType: "success" },
+      { id: "end1",   label: "Конец",    nodeType: "end" },
     ],
     edges: [
-      { id: "e1", source: "signal", target: "sms1" },
-      { id: "e2", source: "sms1",   target: "wait1" },
-      { id: "e3", source: "wait1",  target: "email1" },
-      { id: "e4", source: "email1", target: "succ" },
-      { id: "e5", source: "email1", target: "end1" },
+      { from: "signal", to: "sms1" },
+      { from: "sms1",   to: "wait1" },
+      { from: "wait1",  to: "email1" },
+      { from: "email1", to: "succ" },
+      { from: "email1", to: "end1" },
     ],
   },
   dataSummary:
@@ -200,12 +200,11 @@ export const cases = [
       history: [
         {
           role: "user",
-          content: "собери прогрев холодной базы",
+          text: "собери прогрев холодной базы",
         },
         {
           role: "assistant",
-          content:
-            "Уточните: какая цель конверсии и какие каналы предпочтительны?",
+          text: "Уточните: какая цель конверсии и какие каналы предпочтительны?",
         },
       ],
       context: workflowCtx,
@@ -283,10 +282,10 @@ export const cases = [
     request: {
       text: "а какой у неё бюджет?",
       history: [
-        { role: "user", content: "какая кампания принесла больше всего?" },
+        { role: "user", text: "какая кампания принесла больше всего?" },
         {
           role: "assistant",
-          content: "Наибольший доход принесла кампания «Ипотека-лето» — $2800.",
+          text: "Наибольший доход принесла кампания «Ипотека-лето» — $2800.",
         },
       ],
       context: statsCtx,
