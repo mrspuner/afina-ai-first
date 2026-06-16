@@ -1,10 +1,11 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
   isAiLogEnabled,
   setAiLogEnabled,
   appendAiLogEntry,
   readAiLogEntries,
   clearAiLog,
+  AI_LOG_EVENT,
   type AiLogEntry,
 } from "./dev-config";
 
@@ -78,6 +79,29 @@ describe("appendAiLogEntry", () => {
     // The last entry (index 200) must be present; the first (index 0) must be gone
     expect(entries[entries.length - 1].text).toBe("entry-200");
     expect(entries[0].text).toBe("entry-1");
+  });
+});
+
+describe("extended AiLogEntry fields", () => {
+  it("persists route/errorReason/latencyMs/screen", () => {
+    setAiLogEnabled(true);
+    appendAiLogEntry(
+      makeEntry({ screen: "workflow", route: "ai", errorReason: null, latencyMs: 1234 })
+    );
+    const e = readAiLogEntries().at(-1)!;
+    expect(e.route).toBe("ai");
+    expect(e.errorReason).toBeNull();
+    expect(e.latencyMs).toBe(1234);
+    expect(e.screen).toBe("workflow");
+  });
+
+  it("dispatches AI_LOG_EVENT on append (when enabled)", () => {
+    setAiLogEnabled(true);
+    const spy = vi.fn();
+    window.addEventListener(AI_LOG_EVENT, spy);
+    appendAiLogEntry(makeEntry());
+    expect(spy).toHaveBeenCalledTimes(1);
+    window.removeEventListener(AI_LOG_EVENT, spy);
   });
 });
 

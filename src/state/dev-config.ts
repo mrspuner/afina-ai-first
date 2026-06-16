@@ -99,11 +99,22 @@ export function setAiLogEnabled(enabled: boolean): void {
   window.localStorage.setItem(DEV_AI_LOG_KEY, enabled ? "on" : "off");
 }
 
+/** Событие, диспатчится при каждой записи в журнал — для живого индикатора. */
+export const AI_LOG_EVENT = "afina:ai-log";
+
 export interface AiLogEntry {
   at: string; // ISO
   text: string;
   resultKinds: string[];
   outcome: "applied" | "clarify" | "answer" | "fallback";
+  /** Экран, с которого ушёл запрос ("workflow" | "section:Статистика" | ...). */
+  screen?: string;
+  /** Куда ушёл запрос: реально к ИИ или в офлайн-фоллбек. */
+  route?: "ai" | "offline";
+  /** Причина сбоя AI-вызова, если был. null — успех. */
+  errorReason?: "timeout" | "no-key" | "rate-limited" | "ai-failed" | null;
+  /** Время ответа сети, мс. */
+  latencyMs?: number;
 }
 
 export function appendAiLogEntry(entry: AiLogEntry): void {
@@ -118,6 +129,7 @@ export function appendAiLogEntry(entry: AiLogEntry): void {
   entries.push(entry);
   if (entries.length > AI_LOG_CAP) entries = entries.slice(-AI_LOG_CAP);
   window.localStorage.setItem(AI_LOG_ENTRIES_KEY, JSON.stringify(entries));
+  window.dispatchEvent(new CustomEvent(AI_LOG_EVENT));
 }
 
 export function readAiLogEntries(): AiLogEntry[] {
