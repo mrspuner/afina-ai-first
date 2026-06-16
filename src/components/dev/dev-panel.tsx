@@ -17,6 +17,8 @@ import {
   setAiLogEnabled,
   readAiLogEntries,
   clearAiLog,
+  AI_LOG_EVENT,
+  type AiLogEntry,
 } from "@/state/dev-config";
 import { fetchAssistAvailability } from "@/lib/ai/assist-client";
 
@@ -34,6 +36,8 @@ export function DevPanel() {
   const [aiAvailableStatus, setAiAvailableStatus] = useState<boolean | null>(null);
   // Журнал AI-обменов (план 007)
   const [aiLogOn, setAiLogOn] = useState(false);
+  // Последняя запись журнала — для индикатора «ушёл ли последний запрос».
+  const [lastAi, setLastAi] = useState<AiLogEntry | null>(null);
   const { signals, campaigns, clientDirection, balance, surveyStatus } =
     useAppState();
   const dispatch = useAppDispatch();
@@ -65,6 +69,14 @@ export function DevPanel() {
       setAiAvailableStatus(ok);
     });
   }, [dispatch]);
+
+  // Живой индикатор последнего запроса: пере-читаем журнал по событию append.
+  useEffect(() => {
+    const sync = () => setLastAi(readAiLogEntries().at(-1) ?? null);
+    sync();
+    window.addEventListener(AI_LOG_EVENT, sync);
+    return () => window.removeEventListener(AI_LOG_EVENT, sync);
+  }, []);
 
   // Mirror clientDirection → localStorage so survey completion (which writes
   // clientDirection from inside the reducer) persists across reloads, just
@@ -338,6 +350,24 @@ export function DevPanel() {
           >
             Очистить
           </button>
+        </div>
+        <div className="mt-2 text-[11px] text-[#888]">
+          Последний запрос:{" "}
+          {!aiLogOn ? (
+            <span className="text-[#666]">включите журнал, чтобы видеть</span>
+          ) : !lastAi ? (
+            <span className="text-[#666]">пока ничего</span>
+          ) : lastAi.route === "offline" ? (
+            <span className="text-[#c9a227]">⚠️ оффлайн (ИИ не вызывался)</span>
+          ) : lastAi.errorReason ? (
+            <span className="text-[#d66]">⛔ {lastAi.errorReason}</span>
+          ) : (
+            <span className="text-[#7ac77a]">
+              ✅ ушёл в ИИ ({lastAi.outcome}
+              {lastAi.latencyMs ? `, ${(lastAi.latencyMs / 1000).toFixed(1)}с` : ""})
+            </span>
+          )}
+          {lastAi?.screen ? <span className="text-[#666]"> · {lastAi.screen}</span> : null}
         </div>
       </div>
 
