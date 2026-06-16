@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
-import { setAiLogEnabled, readAiLogEntries } from "@/state/dev-config";
-import { fetchAssistMulti } from "./assist-client";
+import { fetchAssistMulti, readLastAssistMeta } from "./assist-client";
 import type { AssistRequest } from "./assist-contract";
 
 const MINIMAL_REQUEST: AssistRequest = {
@@ -12,7 +11,7 @@ const MINIMAL_REQUEST: AssistRequest = {
   },
 };
 
-function mockFetchSuccess(body: unknown, status = 200) {
+function mockFetch(body: unknown, status = 200) {
   vi.stubGlobal(
     "fetch",
     vi.fn().mockResolvedValue({
@@ -23,12 +22,13 @@ function mockFetchSuccess(body: unknown, status = 200) {
   );
 }
 
-function mockFetchNetworkError() {
-  vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network error")));
+function mockFetchReject(name: string) {
+  const err = new Error(name);
+  err.name = name;
+  vi.stubGlobal("fetch", vi.fn().mockRejectedValue(err));
 }
 
 beforeEach(() => {
-  localStorage.clear();
   vi.restoreAllMocks();
 });
 
@@ -36,119 +36,54 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("fetchAssistMulti — журнал при включённом флаге", () => {
-  it("записывает outcome=answer для ответа {results:[{kind:answer}]}", async () => {
-    setAiLogEnabled(true);
-    mockFetchSuccess({ results: [{ kind: "answer", text: "ответ" }] });
-
-    await fetchAssistMulti(MINIMAL_REQUEST);
-
-    const entries = readAiLogEntries();
-    expect(entries).toHaveLength(1);
-    expect(entries[0].text).toBe("тестовый запрос");
-    expect(entries[0].resultKinds).toEqual(["answer"]);
-    expect(entries[0].outcome).toBe("answer");
-  });
-
-  it("записывает outcome=applied для ответа с kind=workflow-ops", async () => {
-    setAiLogEnabled(true);
-    mockFetchSuccess({
-      results: [
-        {
-          kind: "workflow-ops",
-          ops: [],
-        },
-      ],
-    });
-
-    await fetchAssistMulti(MINIMAL_REQUEST);
-
-    const entries = readAiLogEntries();
-    expect(entries).toHaveLength(1);
-    expect(entries[0].outcome).toBe("applied");
-  });
-
-  it("записывает outcome=clarify для ответа с kind=clarify", async () => {
-    setAiLogEnabled(true);
-    mockFetchSuccess({ results: [{ kind: "clarify", questions: ["уточните?"] }] });
-
-    await fetchAssistMulti(MINIMAL_REQUEST);
-
-    const entries = readAiLogEntries();
-    expect(entries).toHaveLength(1);
-    expect(entries[0].outcome).toBe("clarify");
-  });
-
-  it("записывает outcome=fallback при сетевой ошибке", async () => {
-    setAiLogEnabled(true);
-    mockFetchNetworkError();
-
-    await fetchAssistMulti(MINIMAL_REQUEST);
-
-    const entries = readAiLogEntries();
-    expect(entries).toHaveLength(1);
-    expect(entries[0].outcome).toBe("fallback");
-    expect(entries[0].resultKinds).toEqual([]);
-  });
-
-  it("записывает outcome=fallback при не-2xx ответе сервера", async () => {
-    setAiLogEnabled(true);
-    mockFetchSuccess({}, 500);
-
-    await fetchAssistMulti(MINIMAL_REQUEST);
-
-    const entries = readAiLogEntries();
-    expect(entries).toHaveLength(1);
-    expect(entries[0].outcome).toBe("fallback");
-  });
-
-  it("записывает outcome=fallback при невалидной схеме ответа", async () => {
-    setAiLogEnabled(true);
-    mockFetchSuccess({ unexpected: "format" });
-
-    await fetchAssistMulti(MINIMAL_REQUEST);
-
-    const entries = readAiLogEntries();
-    expect(entries).toHaveLength(1);
-    expect(entries[0].outcome).toBe("fallback");
-  });
-});
-
-describe("fetchAssistMulti — нет записей при выключённом флаге", () => {
-  it("не пишет в журнал при флаге off (успешный ответ)", async () => {
-    setAiLogEnabled(false);
-    mockFetchSuccess({ results: [{ kind: "answer", text: "ответ" }] });
-
-    await fetchAssistMulti(MINIMAL_REQUEST);
-
-    expect(readAiLogEntries()).toEqual([]);
-  });
-
-  it("не пишет в журнал при флаге off (сетевая ошибка)", async () => {
-    setAiLogEnabled(false);
-    mockFetchNetworkError();
-
-    await fetchAssistMulti(MINIMAL_REQUEST);
-
-    expect(readAiLogEntries()).toEqual([]);
-  });
-});
-
-describe("fetchAssistMulti — возвращаемое значение не изменилось", () => {
+describe("fetchAssistMulti — возвращаемое значение", () => {
   it("возвращает results при успешном ответе", async () => {
-    setAiLogEnabled(true);
-    mockFetchSuccess({ results: [{ kind: "answer", text: "привет" }] });
-
+    mockFetch({ results: [{ kind: "answer", text: "привет" }] });
     const result = await fetchAssistMulti(MINIMAL_REQUEST);
     expect(result).toHaveLength(1);
     expect(result![0].kind).toBe("answer");
   });
 
-  it("возвращает null при сетевой ошибке", async () => {
-    setAiLogEnabled(true);
-    mockFetchNetworkError();
+  it("возвращает null при невалидной схеме", async () => {
+    mockFetch({ unexpected: "format" });
+    expect(await fetchAssistMulti(MINIMAL_REQUEST)).toBeNull();
+  });
 
-    const result = await fetchAssistMulti(MINIMAL_REQUEST);
-    expect(result).toBeNull();
+  it("возвращает null при сетевой ошибке", async () => {
+    mockFetchReject("TypeError");
+    expect(await fetchAssistMulti(MINIMAL_REQUEST)).toBeNull();
+  });
+});
+
+describe("readLastAssistMeta — причина сбоя и latency", () => {
+  it("успех → errorReason null, latency >= 0", async () => {
+    mockFetch({ results: [{ kind: "answer", text: "ok" }] });
+    await fetchAssistMulti(MINIMAL_REQUEST);
+    expect(readLastAssistMeta().errorReason).toBeNull();
+    expect(readLastAssistMeta().latencyMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it("503 → no-key", async () => {
+    mockFetch({ error: "no-key" }, 503);
+    await fetchAssistMulti(MINIMAL_REQUEST);
+    expect(readLastAssistMeta().errorReason).toBe("no-key");
+  });
+
+  it("502 с error=rate-limited → rate-limited", async () => {
+    mockFetch({ error: "rate-limited" }, 502);
+    await fetchAssistMulti(MINIMAL_REQUEST);
+    expect(readLastAssistMeta().errorReason).toBe("rate-limited");
+  });
+
+  it("502 прочее → ai-failed", async () => {
+    mockFetch({ error: "ai-failed" }, 502);
+    await fetchAssistMulti(MINIMAL_REQUEST);
+    expect(readLastAssistMeta().errorReason).toBe("ai-failed");
+  });
+
+  it("TimeoutError → timeout", async () => {
+    mockFetchReject("TimeoutError");
+    await fetchAssistMulti(MINIMAL_REQUEST);
+    expect(readLastAssistMeta().errorReason).toBe("timeout");
   });
 });

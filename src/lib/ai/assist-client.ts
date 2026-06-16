@@ -4,7 +4,6 @@ import {
   type AssistRequest,
   type AssistResult,
 } from "./assist-contract";
-import { appendAiLogEntry, type AiLogEntry } from "@/state/dev-config";
 
 /**
  * Кэш результата пробы: храним промис, а не само значение, чтобы повторные
@@ -49,40 +48,71 @@ export function fetchAssistAvailability(): Promise<boolean> {
   return req;
 }
 
-// ── Журнал AI-обменов (план 007) ─────────────────────────────────────────────
+// ── Метаданные последнего вызова ─────────────────────────────────────────────
+// Логирование журнала живёт в раннере (он знает screen/route/offline). Клиент
+// лишь сообщает причину сбоя и latency последнего вызова через readLastAssistMeta.
 
-function outcomeOf(results: AssistResult[]): AiLogEntry["outcome"] {
-  if (results.some((r) => !["answer", "clarify", "none"].includes(r.kind))) return "applied";
-  if (results.some((r) => r.kind === "clarify")) return "clarify";
-  if (results.some((r) => r.kind === "answer")) return "answer";
-  return "fallback";
+export const ASSIST_TIMEOUT_MS = 20000;
+
+export type AssistErrorReason = "timeout" | "no-key" | "rate-limited" | "ai-failed";
+
+interface AssistMeta {
+  errorReason: AssistErrorReason | null;
+  latencyMs: number;
 }
 
-function logExchange(text: string, results: AssistResult[] | null): void {
-  appendAiLogEntry({
-    at: new Date().toISOString(),
-    text,
-    resultKinds: results ? results.map((r) => r.kind) : [],
-    outcome: results ? outcomeOf(results) : "fallback",
-  });
+let lastMeta: AssistMeta = { errorReason: null, latencyMs: 0 };
+
+/** Причина сбоя и latency самого последнего вызова postAssist. */
+export function readLastAssistMeta(): AssistMeta {
+  return lastMeta;
 }
 
 /**
  * Общий хелпер: POST /api/ai/assist и вернуть сырой JSON или null при сбое.
+ * Заполняет lastMeta (errorReason/latencyMs) для журнала раннера.
  */
 async function postAssist(req: AssistRequest): Promise<unknown> {
-  const res = await fetch("/api/ai/assist", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(req),
-    signal: AbortSignal.timeout(6000),
-  });
-  if (!res.ok) return null;
-  return res.json();
+  const start = Date.now();
+  lastMeta = { errorReason: null, latencyMs: 0 };
+  try {
+    const res = await fetch("/api/ai/assist", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(req),
+      signal: AbortSignal.timeout(ASSIST_TIMEOUT_MS),
+    });
+    lastMeta.latencyMs = Date.now() - start;
+    if (!res.ok) {
+      lastMeta.errorReason =
+        res.status === 503
+          ? "no-key"
+          : res.status === 502
+            ? await read502Reason(res)
+            : "ai-failed";
+      return null;
+    }
+    return res.json();
+  } catch (err) {
+    lastMeta.latencyMs = Date.now() - start;
+    // AbortSignal.timeout → DOMException name "TimeoutError".
+    lastMeta.errorReason =
+      (err as Error)?.name === "TimeoutError" ? "timeout" : "ai-failed";
+    return null;
+  }
+}
+
+async function read502Reason(res: Response): Promise<AssistErrorReason> {
+  try {
+    const body = (await res.json()) as { error?: string };
+    return body?.error === "rate-limited" ? "rate-limited" : "ai-failed";
+  } catch {
+    return "ai-failed";
+  }
 }
 
 /**
- * Вызов оркестратора. null = любой сбой (таймаут 6с, не-2xx, невалидный
+ * Вызов оркестратора. null = любой сбой (таймаут, не-2xx, невалидный
  * ответ) — вызывающий уходит в офлайн-fallback.
  *
  * @deprecated Мигрируйте на fetchAssistMulti (план 006)
@@ -102,34 +132,23 @@ export async function fetchAssist(req: AssistRequest): Promise<AssistResult | nu
  * Вызов оркестратора с поддержкой multi-tool ответа (план 006).
  * Сначала пробует assistResponseSchema ({results:[...]}); при провале —
  * пробует assistResultSchema (старый одиночный формат, оборачивает в массив).
- * null = любой сбой.
+ * null = любой сбой. Журналирование — на стороне раннера.
  */
 export async function fetchAssistMulti(req: AssistRequest): Promise<AssistResult[] | null> {
   try {
     const json = await postAssist(req);
-    if (json === null) {
-      logExchange(req.text, null);
-      return null;
-    }
+    if (json === null) return null;
 
     // Новый формат: { results: [...] }
     const multi = assistResponseSchema.safeParse(json);
-    if (multi.success) {
-      logExchange(req.text, multi.data.results);
-      return multi.data.results;
-    }
+    if (multi.success) return multi.data.results;
 
     // Старый формат: одиночный AssistResult
     const single = assistResultSchema.safeParse(json);
-    if (single.success) {
-      logExchange(req.text, [single.data]);
-      return [single.data];
-    }
+    if (single.success) return [single.data];
 
-    logExchange(req.text, null);
     return null;
   } catch {
-    logExchange(req.text, null);
     return null;
   }
 }
