@@ -34,17 +34,6 @@ import { useWelcomeChat } from "@/sections/welcome/welcome-chat-context";
 import { useAppState, useAppDispatch } from "@/state/app-state-context";
 import { isOnWelcome } from "@/state/app-state";
 import { parseStructuralCommands } from "@/state/structural-commands";
-import { isAiParserEnabled } from "@/state/dev-config";
-import { fetchAssistMulti, fetchAssistAvailability } from "@/lib/ai/assist-client";
-import { summarizeGraph } from "@/lib/ai/graph-summary";
-import { getCachedGraph } from "@/sections/campaigns/workflow-graph-cache";
-import { buildDataSummary, buildStatsLines } from "@/lib/ai/data-summary";
-import { validateAiGraph } from "@/state/ai-graph-validation";
-import { buildGraphFromSpec } from "@/lib/ai/rebuild-schema";
-import type { NodeParams } from "@/types/workflow";
-import { toFiltersPatch } from "@/lib/ai/stats-patch-schema";
-// NOTE: результаты navigate/stats/answer/clarify обрабатываются аналогично
-// use-chat-submit.ts (осознанное дублирование — разные чат-паттерны).
 import { parseCampaignQuery } from "@/state/parse-campaign-filter";
 import { decideEnterAction, APPLY_ALL_COMMAND } from "@/state/prompt-bar-enter";
 import { selectPromptSuggestions } from "@/state/select-prompt-suggestions";
@@ -124,9 +113,6 @@ export const PromptComposer = forwardRef<PromptComposerHandle, PromptComposerPro
 
     const [activeTag, setActiveTag] = useState<ChipSegment["chip"] | null>(null);
     const [hasTypedText, setHasTypedText] = useState(false);
-    // Результат пробы доступности AI: false до завершения запроса (страховка
-    // от гонки — пока ключ неизвестен, поведение идентично "нет ключа").
-    const [aiAvailable, setAiAvailable] = useState(false);
 
     // Mirror editor's active segment into local flags (for the SuggestionBar)
     // and keep prevActiveRef fresh. Source is imperative DOM, so this runs in
@@ -138,20 +124,6 @@ export const PromptComposer = forwardRef<PromptComposerHandle, PromptComposerPro
       setHasTypedText(seg ? seg.text.trim().length > 0 : false);
       if (seg) prevActiveRef.current = seg;
     }, [chipsApi.chips, textInput.value]);
-
-    // Проба доступности AI при монтировании: запрашиваем один раз безусловно,
-    // чтобы значение было готово до первого сабмита — даже если пользователь
-    // успеет переключить флаг в дев-панели. Флаг alive защищает от setState
-    // после размонтирования компонента.
-    useEffect(() => {
-      let alive = true;
-      void fetchAssistAvailability().then((ok) => {
-        if (alive) setAiAvailable(ok);
-      });
-      return () => {
-        alive = false;
-      };
-    }, []);
 
     function resetEditor() {
       editorRef.current?.clear();
@@ -248,12 +220,16 @@ export const PromptComposer = forwardRef<PromptComposerHandle, PromptComposerPro
         return;
       }
 
-      // 3. Campaigns section — parse a filter/sort query.
+      // 3. Campaigns section — parse a filter/sort query; свободный текст
+      // (не фильтр) уходит в чат к ИИ, а не теряется (#3).
       if (view.kind === "section" && view.name === "Кампании") {
         const { statuses, sort } = parseCampaignQuery(rawText);
         if (statuses.length > 0 || sort !== "default") {
           dispatch({ type: "campaigns_query_set", statuses, sort });
+        } else if (rawText.trim() || segments.length > 0) {
+          chatSubmit({ text: rawText, segments });
         }
+        resetEditor();
         return;
       }
 
@@ -347,142 +323,10 @@ export const PromptComposer = forwardRef<PromptComposerHandle, PromptComposerPro
         dispatch({ type: "workflow_node_command_submit", commands: nodeCommands });
       }
       if (structural.ops.length === 0 && nodeCommands.length === 0 && rawText.trim()) {
-        // Авто-гейт AI (спайк 002, auto-on): AI используется если:
-        //   1) флаг явно не выключен (isAiParserEnabled() = true, дефолт),
-        //   2) И ключ реально есть на сервере (aiAvailable = true, проверено при монтировании).
-        // Когда ключа нет (e2e/CI, staging без ключа): aiAvailable = false,
-        // useAi = false → синхронный dispatch без единого await — поведение
-        // бит-в-бит как до спайка, никаких асинхронных побочных эффектов.
-        const useAi = isAiParserEnabled() && aiAvailable;
-        if (useAi) {
-          // Асинхронная AI-попытка через оркестратор (план 005/006): граф и
-          // выбранная нода передаются в контексте — модель видит текущее
-          // состояние сценария и может сделать точечную правку.
-          const cached = view.kind === "workflow" ? getCachedGraph(view.campaign.id) : undefined;
-          const graph = cached ? summarizeGraph(cached) : undefined;
-          const selected = selectedWorkflowNode
-            ? {
-                id: selectedWorkflowNode.id,
-                label: selectedWorkflowNode.label,
-                nodeType: selectedWorkflowNode.nodeType ?? "default",
-              }
-            : undefined;
-          const history = chat.messages.filter((m) => !m.pending).slice(-8)
-            .map((m) => ({ role: m.role as "user" | "assistant", text: m.text }));
-          void (async () => {
-            const results = await fetchAssistMulti({
-              text: rawText,
-              history,
-              context: {
-                screen: "workflow",
-                dataSummary: buildDataSummary({ campaigns: state.campaigns, signals: state.signals, statsLines: buildStatsLines(state.campaigns, state.signals, new Date()) }),
-                graph,
-                selectedNode: selected,
-                undoAvailable: state.aiUndoAvailable,
-              },
-            });
-            if (!results) {
-              // null → легаси-фоллбек
-              dispatch({ type: "workflow_command_submit", text: rawText });
-              return;
-            }
-
-            let graphOpApplied = false; // защита от двойной графовой правки
-            let anyExecuted = false;
-
-            for (const result of results) {
-              switch (result.kind) {
-                case "workflow-ops":
-                  if (!graphOpApplied && result.ops.length > 0) {
-                    dispatch({ type: "workflow_structural_commands_submit", ops: result.ops });
-                    graphOpApplied = true;
-                    anyExecuted = true;
-                  }
-                  break;
-                case "rebuild":
-                  if (!graphOpApplied) {
-                    const signalLabel = cached?.nodes.find((n) => n.data.nodeType === "signal")?.data.label ?? "Сигнал";
-                    const built = buildGraphFromSpec(result.spec, { label: signalLabel });
-                    const check = validateAiGraph(built);
-                    if (check.ok) {
-                      dispatch({ type: "workflow_rebuild_submit", ...built, assumptions: result.spec.assumptions });
-                      graphOpApplied = true;
-                      anyExecuted = true;
-                    } else {
-                      chat.append({ role: "assistant", text: "Не получилось собрать корректную цепочку — попробуйте описать иначе." });
-                      anyExecuted = true;
-                    }
-                  }
-                  break;
-                case "node-params":
-                  if (!graphOpApplied) {
-                    // Сервер не может строго типизировать union по kind ноды; редьюсер
-                    // мерджит patch поверх существующих params, невалидные ключи безвредны.
-                    dispatch({ type: "workflow_node_field_set", nodeId: result.nodeId, patch: result.patch as Partial<NodeParams> });
-                    chat.append({ role: "assistant", text: result.confirmation });
-                    graphOpApplied = true;
-                    anyExecuted = true;
-                  }
-                  break;
-                case "undo":
-                  if (!graphOpApplied) {
-                    dispatch({ type: "workflow_ai_undo_request" });
-                    graphOpApplied = true;
-                    anyExecuted = true;
-                  }
-                  break;
-                case "stats":
-                  dispatch({ type: "stats_apply_patch", patch: toFiltersPatch(result.patch) });
-                  chat.append({ role: "assistant", text: result.confirmation });
-                  anyExecuted = true;
-                  break;
-                case "navigate": {
-                  const navTarget = result.target;
-                  if (navTarget.kind === "section") {
-                    dispatch({ type: "sidebar_nav", section: navTarget.name });
-                    chat.append({ role: "assistant", text: result.confirmation });
-                    anyExecuted = true;
-                  } else if (navTarget.kind === "campaign-workflow") {
-                    const c = state.campaigns.find((cc) => cc.id === navTarget.campaignId);
-                    if (c) {
-                      dispatch({ type: "open_workflow", campaign: { id: c.id, name: c.name }, launched: c.status !== "draft" });
-                      chat.append({ role: "assistant", text: result.confirmation });
-                      anyExecuted = true;
-                    }
-                  } else if (navTarget.kind === "signal") {
-                    const s = state.signals.find((ss) => ss.id === navTarget.signalId);
-                    if (s) {
-                      dispatch({ type: "signal_opened", id: s.id });
-                      chat.append({ role: "assistant", text: result.confirmation });
-                      anyExecuted = true;
-                    }
-                  }
-                  break;
-                }
-                case "answer":
-                  chat.append({ role: "assistant", text: result.text });
-                  anyExecuted = true;
-                  break;
-                case "clarify":
-                  chat.append({ role: "assistant", text: result.questions.join(" ") });
-                  anyExecuted = true;
-                  break;
-                default:
-                  // none — игнорируем
-                  break;
-              }
-            }
-
-            if (!anyExecuted) {
-              // НИ один результат не исполнился → легаси workflow_command_submit
-              dispatch({ type: "workflow_command_submit", text: rawText });
-            }
-          })();
-        } else {
-          // Нет ключа (aiAvailable=false) ИЛИ флаг принудительно выключен →
-          // синхронный путь, поведение бит-в-бит как до спайка.
-          dispatch({ type: "workflow_command_submit", text: rawText });
-        }
+        // Свободный текст на редактируемом workflow → единый AI-путь оболочки.
+        // use-chat-submit строит граф-контекст и зовёт оркестратор; реплика,
+        // крутилка, графовые правки с анимацией (через replyId) и фоллбек — там.
+        chatSubmit({ text: rawText, segments });
       }
       resetEditor();
     }
