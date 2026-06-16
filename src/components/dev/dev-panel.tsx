@@ -367,7 +367,7 @@ export function DevPanel() {
               {lastAi.latencyMs ? `, ${(lastAi.latencyMs / 1000).toFixed(1)}с` : ""})
             </span>
           )}
-          {lastAi?.screen ? <span className="text-[#666]"> · {lastAi.screen}</span> : null}
+          {aiLogOn && lastAi?.screen ? <span className="text-[#666]"> · {lastAi.screen}</span> : null}
         </div>
       </div>
 
