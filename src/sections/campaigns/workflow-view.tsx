@@ -325,6 +325,9 @@ export function WorkflowView({
     // параметр; полезно, когда текст ответа зависит от актуального prev.
     apply: (prev: GraphState) => { graph: GraphState; changedIds: Set<string>; finalReply?: string | null };
     finalReply: string | null;
+    /** Если задан — переиспользуем существующий pending-пузырь (создал раннер),
+     *  иначе создаём свой. Так на AI-правке графа пузырь ровно один. */
+    replyId?: string;
   }) {
     const { durationMs, apply, finalReply } = opts;
     thinkDurationMsRef.current = durationMs;
@@ -341,7 +344,7 @@ export function WorkflowView({
     // Ответ идёт обычным сообщением ассистента в общий чат (pending-точки →
     // текст), как любой другой ответ ИИ — не отдельной плашкой. История правок
     // остаётся в drawer, inline-подсказку показывает TransientReply.
-    const replyId = chat.append({ role: "assistant", text: "", pending: true });
+    const replyId = opts.replyId ?? chat.append({ role: "assistant", text: "", pending: true });
     pendingReplyIdRef.current = replyId;
 
     let changedIdsAfter: Set<string> = new Set();
@@ -492,8 +495,14 @@ export function WorkflowView({
 
     if (opCount === 0) {
       // All skipped — no cycle, just the explanation (обычное сообщение в чат).
-      const reply = buildReplyFrom(earlyResult);
-      if (reply) chat.append({ role: "assistant", text: reply });
+      const reply = buildReplyFrom(earlyResult) || "Не получилось применить правку.";
+      if (state.workflowReplyId) {
+        // Переиспользуем pending-пузырь раннера, иначе он зависнет крутящимся.
+        chat.updatePending(state.workflowReplyId, reply);
+        dispatch({ type: "workflow_reply_id_clear" });
+      } else {
+        chat.append({ role: "assistant", text: reply });
+      }
       onStructuralOpsHandled?.();
       return;
     }
@@ -502,6 +511,7 @@ export function WorkflowView({
 
     runCycle({
       durationMs: duration,
+      replyId: state.workflowReplyId ?? undefined,
       // apply получает актуальный prev — граф, который мог измениться за
       // время «Думаю...» (например, пользователь отредактировал поле ноды).
       // Пересчитываем ops от prev, чтобы не затереть эти правки.
@@ -518,6 +528,7 @@ export function WorkflowView({
       finalReply: buildReplyFrom(earlyResult) || null,
     });
 
+    if (state.workflowReplyId) dispatch({ type: "workflow_reply_id_clear" });
     onStructuralOpsHandled?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [structuralOps]);
@@ -526,10 +537,12 @@ export function WorkflowView({
     const rebuild = state.workflowRebuild;
     if (!rebuild) return;
 
+    const replyId = state.workflowReplyId ?? undefined;
     dispatch({ type: "workflow_rebuild_handled" });
 
     runCycle({
       durationMs: 5000,
+      replyId,
       apply: (prev) => {
         aiSnapshotRef.current = prev;
         dispatch({ type: "workflow_ai_undo_availability", available: true });
@@ -541,21 +554,29 @@ export function WorkflowView({
       },
       finalReply: `Собрал заново. ${rebuild.assumptions}`,
     });
+    if (replyId) dispatch({ type: "workflow_reply_id_clear" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.workflowRebuild]);
 
   useEffect(() => {
     if (!state.workflowAiUndoRequested) return;
+    const replyId = state.workflowReplyId ?? undefined;
     dispatch({ type: "workflow_ai_undo_handled" });
+    if (replyId) dispatch({ type: "workflow_reply_id_clear" });
+    const say = (text: string) =>
+      replyId
+        ? chat.updatePending(replyId, text)
+        : chat.append({ role: "assistant", text });
     const snapshot = aiSnapshotRef.current;
     if (!snapshot) {
       dispatch({ type: "workflow_ai_undo_availability", available: false });
+      say("Отменять нечего — последнюю правку уже не вернуть.");
       return;
     }
     aiSnapshotRef.current = null;
     setGraph(snapshot);
     dispatch({ type: "workflow_ai_undo_availability", available: false });
-    chat.append({ role: "assistant", text: "Вернул граф к состоянию до последней правки." });
+    say("Вернул граф к состоянию до последней правки.");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.workflowAiUndoRequested]);
 

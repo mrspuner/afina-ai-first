@@ -1465,3 +1465,40 @@ describe("appReducer — intro overlay", () => {
     expect(twice.view).toEqual({ kind: "welcome" });
   });
 });
+
+describe("workflowReplyId — переиспользование pending-пузыря", () => {
+  it("structural_commands_submit с replyId кладёт workflowReplyId", () => {
+    const s = appReducer(initialState, {
+      type: "workflow_structural_commands_submit",
+      ops: [],
+      replyId: "m1",
+    });
+    expect(s.workflowReplyId).toBe("m1");
+  });
+
+  it("structural_commands_submit без replyId обнуляет workflowReplyId", () => {
+    const s = appReducer(
+      { ...initialState, workflowReplyId: "stale" },
+      { type: "workflow_structural_commands_submit", ops: [] }
+    );
+    expect(s.workflowReplyId).toBeNull();
+  });
+
+  it("rebuild_submit и ai_undo_request переносят replyId", () => {
+    const r = appReducer(initialState, {
+      type: "workflow_rebuild_submit",
+      nodes: [],
+      edges: [],
+      assumptions: "x",
+      replyId: "m2",
+    });
+    expect(r.workflowReplyId).toBe("m2");
+    const u = appReducer(initialState, { type: "workflow_ai_undo_request", replyId: "m3" });
+    expect(u.workflowReplyId).toBe("m3");
+  });
+
+  it("workflow_reply_id_clear обнуляет", () => {
+    const s = appReducer({ ...initialState, workflowReplyId: "m1" }, { type: "workflow_reply_id_clear" });
+    expect(s.workflowReplyId).toBeNull();
+  });
+});

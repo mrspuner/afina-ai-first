@@ -202,6 +202,11 @@ export type AppState = {
   workflowRebuild: { nodes: WorkflowNode[]; edges: WorkflowEdge[]; assumptions: string } | null;
   /** Set when the user requests AI undo; cleared by workflow-view after applying the snapshot. */
   workflowAiUndoRequested: boolean;
+  /**
+   * id pending-пузыря чата, который раннер просит переиспользовать для графовой
+   * анимации (вместо создания нового). null — workflow-view создаёт свой пузырь.
+   */
+  workflowReplyId: string | null;
   /** True once a rebuild/structural command has been applied — enables the undo action. */
   aiUndoAvailable: boolean;
 };
@@ -231,8 +236,9 @@ export type Action =
   | { type: "workflow_node_command_handled" }
   | { type: "workflow_node_field_set"; nodeId: string; patch: Partial<NodeParams> }
   | { type: "workflow_node_field_set_handled" }
-  | { type: "workflow_structural_commands_submit"; ops: StructuralOp[] }
+  | { type: "workflow_structural_commands_submit"; ops: StructuralOp[]; replyId?: string }
   | { type: "workflow_structural_commands_handled" }
+  | { type: "workflow_reply_id_clear" }
   | { type: "ai_reply_shown"; text: string }
   | { type: "ai_reply_dismissed" }
   | { type: "goto_stats"; campaignId?: string }
@@ -277,9 +283,9 @@ export type Action =
   | { type: "stats_reset"; filters: StatisticsFilters }
   | { type: "stats_apply_patch"; patch: Partial<StatisticsFilters> }
   | { type: "intro_dismissed" }
-  | { type: "workflow_rebuild_submit"; nodes: WorkflowNode[]; edges: WorkflowEdge[]; assumptions: string }
+  | { type: "workflow_rebuild_submit"; nodes: WorkflowNode[]; edges: WorkflowEdge[]; assumptions: string; replyId?: string }
   | { type: "workflow_rebuild_handled" }
-  | { type: "workflow_ai_undo_request" }
+  | { type: "workflow_ai_undo_request"; replyId?: string }
   | { type: "workflow_ai_undo_handled" }
   | { type: "workflow_ai_undo_availability"; available: boolean };
 // PARALLEL-WORKTREE INSERTION POINT — survey actions (B), billing/signal-status actions (E).
@@ -314,6 +320,7 @@ export const initialState: AppState = {
   introSeen: false,
   workflowRebuild: null,
   workflowAiUndoRequested: false,
+  workflowReplyId: null,
   aiUndoAvailable: false,
 };
 
@@ -682,11 +689,15 @@ export function appReducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         workflowStructuralCommands: { ops: action.ops },
+        workflowReplyId: action.replyId ?? null,
         selectedWorkflowNode: null,
       };
 
     case "workflow_structural_commands_handled":
       return { ...state, workflowStructuralCommands: null };
+
+    case "workflow_reply_id_clear":
+      return { ...state, workflowReplyId: null };
 
     case "ai_reply_shown":
       return { ...state, aiReply: action.text };
@@ -1000,11 +1011,11 @@ export function appReducer(state: AppState, action: Action): AppState {
       return { ...state, introSeen: true };
 
     case "workflow_rebuild_submit":
-      return { ...state, workflowRebuild: { nodes: action.nodes, edges: action.edges, assumptions: action.assumptions } };
+      return { ...state, workflowRebuild: { nodes: action.nodes, edges: action.edges, assumptions: action.assumptions }, workflowReplyId: action.replyId ?? null };
     case "workflow_rebuild_handled":
       return { ...state, workflowRebuild: null };
     case "workflow_ai_undo_request":
-      return { ...state, workflowAiUndoRequested: true };
+      return { ...state, workflowAiUndoRequested: true, workflowReplyId: action.replyId ?? null };
     case "workflow_ai_undo_handled":
       return { ...state, workflowAiUndoRequested: false };
     case "workflow_ai_undo_availability":
