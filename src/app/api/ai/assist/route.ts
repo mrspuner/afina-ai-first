@@ -16,6 +16,7 @@ import {
   providerKeyPresent,
   resolveModel,
 } from "@/lib/ai/provider";
+import { unstringifyJsonArgs } from "@/lib/ai/repair-tool-call";
 import {
   buildSystemPrompt,
   buildMessages,
@@ -217,6 +218,12 @@ export async function POST(request: Request) {
       messages: buildMessages(history, text),
       tools,
       toolChoice: "required",
+      // DeepSeek иногда присылает вложенные tool-аргументы JSON-строкой —
+      // чиним до валидации (no-op для провайдеров, шлющих объекты, напр. Gemini).
+      experimental_repairToolCall: async ({ toolCall }) => {
+        const repaired = unstringifyJsonArgs(toolCall.input);
+        return repaired ? { ...toolCall, input: repaired } : null;
+      },
     });
     // Текст запроса и ответ модели не логируем — privacy-граница
     if (results.length === 0) results.push({ kind: "none" });

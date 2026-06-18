@@ -40,13 +40,24 @@ describe("providerKeyPresent", () => {
 describe("defaultModelId", () => {
   it("дефолт по провайдеру", () => {
     delete process.env.AFINA_AI_MODEL;
+    delete process.env.DEEPSEEK_MODEL;
+    delete process.env.GOOGLE_MODEL;
     expect(defaultModelId("deepseek")).toBe("deepseek-chat");
     expect(defaultModelId("google")).toBe("gemini-2.5-flash");
   });
 
-  it("AFINA_AI_MODEL переопределяет", () => {
-    process.env.AFINA_AI_MODEL = "deepseek-reasoner";
-    expect(defaultModelId("deepseek")).toBe("deepseek-reasoner");
-    expect(defaultModelId("google")).toBe("deepseek-reasoner");
+  it("per-provider override независим", () => {
+    process.env.DEEPSEEK_MODEL = "deepseek-v4-flash";
+    process.env.GOOGLE_MODEL = "gemini-2.5-pro";
+    expect(defaultModelId("deepseek")).toBe("deepseek-v4-flash");
+    expect(defaultModelId("google")).toBe("gemini-2.5-pro");
+  });
+
+  it("чужой AFINA_AI_MODEL (legacy, gemini) НЕ протекает в deepseek", () => {
+    delete process.env.DEEPSEEK_MODEL;
+    delete process.env.GOOGLE_MODEL;
+    process.env.AFINA_AI_MODEL = "gemini-2.5-flash-lite";
+    expect(defaultModelId("deepseek")).toBe("deepseek-chat");
+    expect(defaultModelId("google")).toBe("gemini-2.5-flash-lite");
   });
 });

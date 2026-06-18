@@ -22,10 +22,17 @@ export function providerKeyPresent(id: AiProviderId): boolean {
     : Boolean(process.env.DEEPSEEK_API_KEY);
 }
 
-/** id модели: явный AFINA_AI_MODEL имеет приоритет, иначе дефолт провайдера. */
+/**
+ * id модели — per-provider override, чтобы переключение провайдера не ломалось
+ * о чужой override (напр. AFINA_AI_MODEL=gemini-* при активном deepseek).
+ *  - deepseek: DEEPSEEK_MODEL ?? "deepseek-chat"
+ *  - google:   GOOGLE_MODEL ?? AFINA_AI_MODEL (legacy) ?? "gemini-2.5-flash"
+ */
 export function defaultModelId(id: AiProviderId): string {
-  if (process.env.AFINA_AI_MODEL) return process.env.AFINA_AI_MODEL;
-  return id === "google" ? "gemini-2.5-flash" : "deepseek-chat";
+  if (id === "google") {
+    return process.env.GOOGLE_MODEL ?? process.env.AFINA_AI_MODEL ?? "gemini-2.5-flash";
+  }
+  return process.env.DEEPSEEK_MODEL ?? "deepseek-chat";
 }
 
 /** Сконструировать языковую модель активного провайдера для generateText. */
