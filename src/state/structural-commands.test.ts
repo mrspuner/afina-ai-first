@@ -450,3 +450,26 @@ describe("diffChangedNodeIds", () => {
     expect(diff.size).toBe(0);
   });
 });
+
+describe("applyOps — резолв ноды по id (AI-путь)", () => {
+  it("remove по id ноды", () => {
+    const r = applyOps(makeGraph(), [{ kind: "remove", ref: "sms1" }]);
+    expect(r.applied).toHaveLength(1);
+    expect(r.graph.nodes.find((n) => n.id === "sms1")).toBeUndefined();
+  });
+
+  it("add after по id опорной ноды", () => {
+    const r = applyOps(makeGraph(), [
+      { kind: "add", nodeType: "email", placement: { mode: "after", ref: "signal" } },
+    ]);
+    expect(r.applied).toHaveLength(1);
+    const email = r.graph.nodes.find((n) => n.data.nodeType === "email")!;
+    expect(r.graph.edges.find((e) => e.source === "signal" && e.target === email.id)).toBeDefined();
+  });
+
+  it("несуществующий id → операция пропущена", () => {
+    const r = applyOps(makeGraph(), [{ kind: "remove", ref: "n_does_not_exist" }]);
+    expect(r.applied).toHaveLength(0);
+    expect(r.skipped).toHaveLength(1);
+  });
+});

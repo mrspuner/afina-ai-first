@@ -17,7 +17,7 @@ export const wireOpSchema = z.object({
     .string()
     .optional()
     .describe(
-      "Для remove/replace: label существующей ноды; для add с placement after/before: опорная нода"
+      "Для remove/replace: id существующей ноды (значение в [скобках] из контекста графа); для add с placement after/before: id опорной ноды"
     ),
   placementMode: z
     .enum(["after", "before", "between", "auto"])
@@ -26,11 +26,11 @@ export const wireOpSchema = z.object({
   refA: z
     .string()
     .optional()
-    .describe("Для placement between: первая опорная нода"),
+    .describe("Для placement between: id первой опорной ноды"),
   refB: z
     .string()
     .optional()
-    .describe("Для placement between: вторая опорная нода"),
+    .describe("Для placement between: id второй опорной ноды"),
   inlineParams: z
     .string()
     .optional()

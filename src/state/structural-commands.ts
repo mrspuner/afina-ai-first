@@ -277,11 +277,24 @@ const TYPE_LABEL: Record<WorkflowNodeType, string> = {
   new: "Новая",
 };
 
-function findNodeByLabel(
+/**
+ * Резолв ссылки на ноду. Приоритет — точный id: ИИ адресует ноды по id из
+ * контекста графа (`[id]`), сам сопоставляя формулировку пользователя (склонения,
+ * синонимы, описание) с нужной нодой — без серверного словаря синонимов.
+ * Фоллбек по нормализованной подписи оставлен для офлайн-regex-парсера команд
+ * и на случай, если модель пришлёт label вместо id.
+ */
+function findNodeByRef(
   nodes: WorkflowNode[],
   ref: string
 ): WorkflowNode | null {
-  const target = normalizeNodeRef(ref);
+  const raw = ref.trim();
+  if (!raw) return null;
+  // 1) точный id
+  const byId = nodes.find((n) => n.id === raw);
+  if (byId) return byId;
+  // 2) фоллбек: нормализованная подпись
+  const target = normalizeNodeRef(raw);
   if (!target) return null;
   return (
     nodes.find(
@@ -405,16 +418,16 @@ function applyAdd(
   let srcId: string | null = null;
   let tgtId: string | null = null;
   if (op.placement.mode === "after") {
-    const src = findNodeByLabel(graph.nodes, op.placement.ref);
+    const src = findNodeByRef(graph.nodes, op.placement.ref);
     if (!src) return { error: `«${op.placement.ref}» — нет такой ноды` };
     srcId = src.id;
   } else if (op.placement.mode === "before") {
-    const tgt = findNodeByLabel(graph.nodes, op.placement.ref);
+    const tgt = findNodeByRef(graph.nodes, op.placement.ref);
     if (!tgt) return { error: `«${op.placement.ref}» — нет такой ноды` };
     tgtId = tgt.id;
   } else if (op.placement.mode === "between") {
-    const a = findNodeByLabel(graph.nodes, op.placement.refA);
-    const b = findNodeByLabel(graph.nodes, op.placement.refB);
+    const a = findNodeByRef(graph.nodes, op.placement.refA);
+    const b = findNodeByRef(graph.nodes, op.placement.refB);
     if (!a || !b) {
       return {
         error: `Не нашёл одну из нод: «${op.placement.refA}» / «${op.placement.refB}»`,
@@ -564,7 +577,7 @@ function applyRemove(
   graph: GraphState,
   op: Extract<StructuralOp, { kind: "remove" }>
 ): { graph: GraphState; description: string } | { error: string } {
-  const node = findNodeByLabel(graph.nodes, op.ref);
+  const node = findNodeByRef(graph.nodes, op.ref);
   if (!node) return { error: `«${op.ref}» — нет такой ноды` };
   const nodeType = (node.data as { nodeType: WorkflowNodeType }).nodeType;
   if (nodeType === "signal") {
@@ -630,7 +643,7 @@ function applyReplace(
   graph: GraphState,
   op: Extract<StructuralOp, { kind: "replace" }>
 ): { graph: GraphState; description: string } | { error: string } {
-  const node = findNodeByLabel(graph.nodes, op.ref);
+  const node = findNodeByRef(graph.nodes, op.ref);
   if (!node) return { error: `«${op.ref}» — нет такой ноды` };
   const oldKind = (node.data as { nodeType: WorkflowNodeType }).nodeType;
   if (oldKind === "signal") return { error: `Сигнал заменить нельзя` };
