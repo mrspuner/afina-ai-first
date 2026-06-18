@@ -5,13 +5,17 @@
  * Privacy: текст, история (≤8), сводка моковых данных. Не логировать тексты.
  */
 
-import { google } from "@ai-sdk/google";
 import { generateText, tool } from "ai";
 import { z } from "zod";
 import {
   assistRequestSchema,
   type AssistResult,
 } from "@/lib/ai/assist-contract";
+import {
+  activeProviderId,
+  providerKeyPresent,
+  resolveModel,
+} from "@/lib/ai/provider";
 import {
   buildSystemPrompt,
   buildMessages,
@@ -23,13 +27,14 @@ import { wireNavigateSchema, toNavigateTarget } from "@/lib/ai/navigate-schema";
 
 export function GET() {
   return Response.json({
-    available: Boolean(process.env.GOOGLE_GENERATIVE_AI_API_KEY),
+    available: providerKeyPresent(activeProviderId()),
   });
 }
 
 export async function POST(request: Request) {
-  // Проверяем наличие ключа до разбора тела — быстрый путь к fallback
-  if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
+  // Проверяем наличие ключа активного провайдера до разбора тела — быстрый
+  // путь к fallback.
+  if (!providerKeyPresent(activeProviderId())) {
     return Response.json({ error: "no-key" }, { status: 503 });
   }
 
@@ -203,13 +208,11 @@ export async function POST(request: Request) {
       : {}),
   };
 
-  // "gemini-2.5-flash" — id актуальной Flash-модели на момент написания (2026-06-11)
-  // Сверено с @ai-sdk/google@3.0.80
-  const modelId = process.env.AFINA_AI_MODEL ?? "gemini-2.5-flash";
-
+  // Модель активного провайдера (deepseek по умолчанию, google по env).
+  // Дефолты id и выбор — в @/lib/ai/provider.
   try {
     await generateText({
-      model: google(modelId),
+      model: resolveModel(),
       system: buildSystemPrompt(context),
       messages: buildMessages(history, text),
       tools,
