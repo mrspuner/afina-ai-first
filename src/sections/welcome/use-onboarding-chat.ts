@@ -5,7 +5,6 @@ import { useAppDispatch, useAppState } from "@/state/app-state-context";
 import { isCampaignDone, isOnWelcome } from "@/state/app-state";
 import { useChat } from "@/state/chat-context";
 import {
-  FREEFORM_REPLY,
   POST_CAMPAIGN_REPLY,
   POST_ONBOARDING_CHIPS,
   WAVE_0_CHIPS,
@@ -17,7 +16,6 @@ export type OnboardingChatState = {
   /** Чипы текущей волны онбординга (для SuggestionBar через welcome-wave scope). */
   chips: Chip[];
   submitChip: (chip: Chip) => void;
-  submitFreeText: (text: string) => void;
 };
 
 // Пауза между сообщением пользователя и появлением «думающего» пузыря бота.
@@ -130,16 +128,5 @@ export function useOnboardingChat(): OnboardingChatState {
     [chat, dispatch, done, queueBotReply]
   );
 
-  const submitFreeText = useCallback(
-    (text: string) => {
-      const trimmed = text.trim();
-      if (!trimmed) return;
-      chat.openSidebar();
-      chat.append({ role: "user", text: trimmed });
-      queueBotReply(FREEFORM_REPLY, done ? POST_ONBOARDING_CHIPS : chips);
-    },
-    [chat, queueBotReply, done, chips]
-  );
-
-  return { chips, submitChip, submitFreeText };
+  return { chips, submitChip };
 }

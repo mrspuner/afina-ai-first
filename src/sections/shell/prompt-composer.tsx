@@ -214,9 +214,11 @@ export const PromptComposer = forwardRef<PromptComposerHandle, PromptComposerPro
         return;
       }
 
-      // 2. Welcome — free text feeds the onboarding chat.
+      // 2. Welcome — свободный текст идёт в ИИ-оркестратор (как и на других
+      // экранах). Сценарные чипы онбординга обрабатываются отдельно (submitChip).
       if (isOnWelcome(state)) {
-        welcomeChat?.submitFreeText(rawText);
+        if (rawText.trim()) chatSubmit({ text: rawText, segments });
+        resetEditor();
         return;
       }
 

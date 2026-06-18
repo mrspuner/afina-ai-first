@@ -5,13 +5,11 @@ import { useChat } from "@/state/chat-context";
 import { useTriggerEdit } from "@/state/trigger-edit-context";
 import { useAppState, useAppDispatch } from "@/state/app-state-context";
 import { isOnStatisticsSection } from "@/state/app-state";
-import { mockReplyFor } from "@/lib/mock-ai-reply";
 import { applyEmailEdit, generateEmailDraft } from "@/state/email-directory";
 import {
   lookupInformationalReply,
   warmFallbackReply,
 } from "@/lib/informational-replies";
-import { parseTriggerCommand } from "@/lib/trigger-edit-parser";
 import { pluralRu } from "@/lib/plural-ru";
 import {
   COMPLEX_THINKING_FINAL_REPLY_SIGNAL,
@@ -341,30 +339,15 @@ export function useChatSubmit(): { submit: (payload: ChatSubmitPayload) => void 
       return;
     }
 
+    // Сегмент активного триггера: его id уйдёт в контекст оркестратора, и
+    // правки доменов сделает инструмент edit_triggers (regex-парсер убран).
     const triggerSegment = segments.find((s) => s.chip.kind === "trigger");
-    if (triggerSegment && text.length > 0) {
-      const parsed = parseTriggerCommand(triggerSegment.text);
-      if (parsed.kind !== "fallback") {
-        const triggerId = triggerSegment.chip.payload as string;
-        chat.append({
-          role: "user",
-          text: triggerSegment.text,
-          triggerLabel: triggerSegment.chip.label,
-        });
-        const id = chat.append({ role: "assistant", text: "", pending: true });
-        triggerEdit.highlightTrigger(triggerId);
-        schedule(() => {
-          triggerEdit.applyToTrigger(triggerId, parsed);
-          chat.updatePending(id, mockReplyFor(parsed));
-        }, 350);
-        return;
-      }
-    }
 
     // Финальный путь: ИИ-оркестратор (если доступен) или офлайн-фоллбек.
     // Реплику пользователя и pending-пузырь создаём СРАЗУ — крутилка видна до
     // завершения await (фикс «нет обратной связи»). Доступность ждём через
     // кэшированный промис (фикс гонки первого сабмита после загрузки).
+    chat.openSidebar();
     chat.append({ role: "user", text });
     const pendingId = chat.append({ role: "assistant", text: "", pending: true });
 
